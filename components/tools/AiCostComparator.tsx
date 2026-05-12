@@ -6,6 +6,7 @@ import { ArrowUpRight, Info } from "lucide-react"
 
 import { cn, formatPrice, formatNumber } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { track } from "@/lib/analytics/events"
 
 /* ----------------------------------------------------------------------------
    AiCostComparator — TZ § 11.2
@@ -129,6 +130,22 @@ export function AiCostComparator({
   const [useCaseId, setUseCaseId] = React.useState<UseCaseId>(DEFAULTS.useCase)
   const [volume,    setVolume]    = React.useState(DEFAULTS.volume)
   const [quality,   setQuality]   = React.useState<QualityId>(DEFAULTS.quality)
+
+  // Block C — fire `tool_started` on the first non-default input. The
+  // comparator has no terminal "save / generate" action, so we don't pair
+  // this with a `tool_completed` event; engagement IS the started event.
+  const startedRef = React.useRef(false)
+  React.useEffect(() => {
+    if (startedRef.current) return
+    const dirty =
+      useCaseId !== DEFAULTS.useCase ||
+      volume    !== DEFAULTS.volume  ||
+      quality   !== DEFAULTS.quality
+    if (dirty) {
+      startedRef.current = true
+      track("tool_started", { tool_slug: "ai-cost-comparator", locale })
+    }
+  }, [useCaseId, volume, quality, locale])
 
   const useCase = USE_CASES.find((u) => u.id === useCaseId)!
 

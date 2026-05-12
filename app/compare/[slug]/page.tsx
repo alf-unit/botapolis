@@ -5,6 +5,7 @@ import type { Metadata } from "next"
 
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
+import { PageViewEvent } from "@/components/analytics/PageViewEvent"
 import { ToolLogo } from "@/components/tools/ToolLogo"
 import {
   ComparisonTable,
@@ -593,6 +594,19 @@ export default async function ComparisonPage({ params }: PageProps) {
           newsletter: dict.newsletter,
         }}
         localePrefix={localePrefix}
+      />
+
+      {/* Block C — fires once on mount with the comparison metadata,
+          giving PostHog a flat row per page view that joins cleanly with
+          subsequent affiliate_clicked events (same `tool_a` / `tool_b`). */}
+      <PageViewEvent
+        event="comparison_viewed"
+        properties={{
+          slug,
+          tool_a: toolA.slug,
+          tool_b: toolB.slug,
+          locale,
+        }}
       />
 
       {/* JSON-LD */}

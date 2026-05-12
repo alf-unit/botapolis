@@ -9,6 +9,7 @@ import { ArrowRight, Loader2, Mail } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { buttonVariants } from "@/components/ui/button"
+import { track } from "@/lib/analytics/events"
 
 /* ----------------------------------------------------------------------------
    LoginForm — TZ § 10 (sprint 5)
@@ -59,6 +60,11 @@ export function LoginForm({ strings, privacyHref, termsHref }: LoginFormProps) {
   const [googleLoading, setGoogleLoading] = React.useState(false)
   const [sent, setSent] = React.useState(false)
 
+  // Block C — derive locale from one of the href props the parent already
+  // localized. Either privacyHref or termsHref carries the /ru prefix when
+  // the page is rendered in Russian; checking either is enough.
+  const locale: "en" | "ru" = privacyHref.startsWith("/ru") ? "ru" : "en"
+
   // Where to land after a successful auth round-trip. The proxy gate sets
   // this when bouncing anon users off /dashboard or /saved.
   const next = searchParams.get("next") || "/dashboard"
@@ -98,6 +104,12 @@ export function LoginForm({ strings, privacyHref, termsHref }: LoginFormProps) {
         description: strings.magicLinkSentSubtitle,
         duration: 8_000,
       })
+      // Block C — fire on the only client-side touchpoint we have for the
+      // magic-link flow. The actual session lands when the user clicks the
+      // link in their inbox (server route /auth/callback redirects to
+      // /dashboard). We can't post events from a server route, so this is
+      // our best window into "auth attempted" funnels.
+      track("sign_in_completed", { method: "magic_link", locale })
     } finally {
       setSending(false)
     }
@@ -107,6 +119,11 @@ export function LoginForm({ strings, privacyHref, termsHref }: LoginFormProps) {
   async function signInWithGoogle() {
     if (sending || googleLoading) return
     setGoogleLoading(true)
+    // Fire BEFORE the OAuth redirect — once Supabase navigates the browser
+    // away, no further client code in this component runs. PostHog uses
+    // `sendBeacon` under the hood for capture, so the event still ships
+    // even though the page is about to unload.
+    track("sign_in_completed", { method: "google", locale })
     try {
       const supabase = createClient()
       const { error } = await supabase.auth.signInWithOAuth({

@@ -9,6 +9,7 @@ import { ArticleHero } from "@/components/content/ArticleHero"
 import { TableOfContents } from "@/components/content/TableOfContents"
 import { ProsConsList } from "@/components/content/ProsConsList"
 import { AffiliateButton } from "@/components/content/AffiliateButton"
+import { ScrollMilestone } from "@/components/analytics/ScrollMilestone"
 import { ToolLogo } from "@/components/tools/ToolLogo"
 import { buttonVariants } from "@/components/ui/button"
 import { buildMetadata } from "@/lib/seo/metadata"
@@ -256,6 +257,16 @@ export default async function ReviewPage({ params }: PageProps) {
               )}
 
               {content}
+
+              {/* Block C — fires `review_scrolled_50` once when the
+                  sentinel below the article body enters the viewport.
+                  Captured before the verdict so we measure "did the reader
+                  reach the meat of the review", not "did they bounce to
+                  the verdict via the TOC". */}
+              <ScrollMilestone
+                event="review_scrolled_50"
+                properties={{ slug, locale }}
+              />
 
               {frontmatter.verdict && (
                 <div

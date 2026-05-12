@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Check, Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { track } from "@/lib/analytics/events"
 
 /* ----------------------------------------------------------------------------
    NewsletterForm — TZ § 12 (May 2026 audit replacement)
@@ -112,6 +113,11 @@ export function NewsletterForm({
       })
       setEmail("")
       setStatus("success")
+      // Block C — single conversion event downstream funnels key off. The
+      // server-side `subscribers` row in Supabase carries the same `source`
+      // value, so PostHog and the SQL view stay attributable to the same
+      // surface.
+      track("newsletter_subscribed", { source, locale: language })
     } catch {
       // Network error / offline / aborted by a unload event.
       toast.error(strings.errorTitle)

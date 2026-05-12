@@ -6,6 +6,7 @@ import { ArrowUpRight, Check, Copy, Info, Loader2, RefreshCcw, Sparkles } from "
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { track } from "@/lib/analytics/events"
 
 /* ----------------------------------------------------------------------------
    ProductDescriptionGenerator — TZ § 11.3
@@ -95,12 +96,28 @@ export function ProductDescriptionGenerator({
   strings,
   localePrefix = "",
 }: ProductDescriptionGeneratorProps) {
+  // Block C — derive locale from the prefix the parent already passes
+  // instead of adding a new prop. Keeps the prop interface stable while
+  // unlocking analytics dimensions.
+  const locale: "en" | "ru" = localePrefix === "/ru" ? "ru" : "en"
+
   // ----- Form state ------------------------------------------------------
   const [product,   setProduct]   = React.useState("")
   const [features,  setFeatures]  = React.useState("")
   const [audience,  setAudience]  = React.useState<AudienceId>("ecom_general")
   const [tone,      setTone]      = React.useState<ToneId>("professional")
   const [maxLength, setMaxLength] = React.useState(160)
+
+  // Block C — first non-empty product/features value = the user started
+  // engaging with the tool.
+  const startedRef = React.useRef(false)
+  React.useEffect(() => {
+    if (startedRef.current) return
+    if (product.length > 0 || features.length > 0) {
+      startedRef.current = true
+      track("tool_started", { tool_slug: "product-description", locale })
+    }
+  }, [product, features, locale])
 
   // ----- Async state -----------------------------------------------------
   type Status = "idle" | "loading" | "success" | "rate_limited" | "error"
@@ -164,6 +181,18 @@ export function ProductDescriptionGenerator({
       }
       setVariations(data.variations.slice(0, 3))
       setStatus("success")
+      // Block C — successful generation is the meaningful completion event
+      // for this tool (live numbers don't apply; the result is the API call).
+      track("tool_completed", {
+        tool_slug: "product-description",
+        locale,
+        payload: {
+          variations: data.variations.length,
+          audience,
+          tone,
+          max_length: maxLength,
+        },
+      })
     } catch (err) {
       if ((err as Error)?.name === "AbortError") return
       setErrorMsg(strings.errors.generic)

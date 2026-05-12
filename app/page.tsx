@@ -8,6 +8,10 @@ import { Footer } from "@/components/nav/Footer"
 import { NewsletterForm } from "@/components/marketing/NewsletterForm"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
+import {
+  generateOrganizationSchema,
+  generateWebSiteSchema,
+} from "@/lib/seo/schema"
 
 export default async function HomePage() {
   const locale = await getLocale()
@@ -268,6 +272,24 @@ export default async function HomePage() {
           newsletter: dict.newsletter,
         }}
         localePrefix={localePrefix as "" | "/ru"}
+      />
+
+      {/* Block C — Organization + WebSite JSON-LD. Emit on both EN and RU
+          homepages (RU re-exports this same module). The WebSite node ships
+          a SearchAction so Google's sitelinks search box can surface our
+          search modal once block D wires Pagefind. Until then the URL
+          template still resolves — Google just won't render the box. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(generateOrganizationSchema()),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(generateWebSiteSchema()),
+        }}
       />
     </>
   )

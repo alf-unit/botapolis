@@ -1,7 +1,7 @@
-import Link from "next/link"
 import { ArrowUpRight } from "lucide-react"
 
 import { ToolLogo } from "@/components/tools/ToolLogo"
+import { TrackedAffiliateLink } from "@/components/content/TrackedAffiliateLink"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createServiceClient } from "@/lib/supabase/service"
@@ -90,13 +90,21 @@ export async function AffiliateButton({
     campaign ? `?utm_campaign=${encodeURIComponent(campaign)}` : ""
   }`
 
+  // Block C — analytics dimensions. Source defaults to the campaign slug
+  // when provided; that's the tightest funnel-attribution we have today
+  // (`review-klaviyo-review-2026`, `compare-klaviyo-vs-mailchimp`, etc.).
+  const eventLocale: "en" | "ru" = localePrefix === "/ru" ? "ru" : "en"
+  const eventSource = campaign ?? `affiliate-button-${slug}`
+
   // ----- "link" variant — plain text, for inline mid-paragraph anchors -----
   if (variant === "link") {
     return (
-      <Link
+      <TrackedAffiliateLink
         href={goHref}
-        rel="sponsored nofollow noopener"
-        target="_blank"
+        toolSlug={slug}
+        source={eventSource}
+        campaign={campaign}
+        locale={eventLocale}
         className={cn(
           "inline-flex items-center gap-1",
           "text-[var(--brand)] underline underline-offset-[3px] decoration-[1.5px] decoration-[var(--accent-300)]",
@@ -106,7 +114,7 @@ export async function AffiliateButton({
       >
         {label}
         <ArrowUpRight className="size-[14px]" aria-hidden="true" />
-      </Link>
+      </TrackedAffiliateLink>
     )
   }
 
@@ -141,10 +149,12 @@ export async function AffiliateButton({
           </p>
         )}
       </div>
-      <Link
+      <TrackedAffiliateLink
         href={goHref}
-        rel="sponsored nofollow noopener"
-        target="_blank"
+        toolSlug={slug}
+        source={eventSource}
+        campaign={campaign}
+        locale={eventLocale}
         className={cn(
           buttonVariants({ size: "lg" }),
           "h-11 shrink-0 px-4 text-[14px] text-white",
@@ -155,7 +165,7 @@ export async function AffiliateButton({
       >
         <span>{label}</span>
         <ArrowUpRight className="size-4" aria-hidden="true" />
-      </Link>
+      </TrackedAffiliateLink>
     </div>
   )
 }

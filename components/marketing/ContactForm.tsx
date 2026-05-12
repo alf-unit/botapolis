@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { track } from "@/lib/analytics/events"
 
 /* ----------------------------------------------------------------------------
    <ContactForm>
@@ -82,6 +83,14 @@ export function ContactForm({
         setStatus("success")
         setConsecutiveFailures(0)
         toast.success(strings.successTitle, { description: strings.successBody })
+        // Block C — conversion. Properties stay coarse (no PII): we capture
+        // whether a subject was provided + message length so funnel cohorts
+        // can distinguish a one-line ping from a detailed inquiry.
+        track("contact_submitted", {
+          locale: language,
+          has_subject:   Boolean(payload.subject),
+          message_chars: payload.message?.length ?? 0,
+        })
         ;(e.target as HTMLFormElement).reset()
         return
       }

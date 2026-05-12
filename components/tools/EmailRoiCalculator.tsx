@@ -8,6 +8,7 @@ import { ArrowUpRight, BookmarkPlus, Info, Loader2, Sparkles } from "lucide-reac
 
 import { cn, formatPrice, formatNumber } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { track } from "@/lib/analytics/events"
 
 /* ----------------------------------------------------------------------------
    EmailRoiCalculator — TZ § 11.1
@@ -173,6 +174,25 @@ export function EmailRoiCalculator({
   const [platform,     setPlatform]     = React.useState<PlatformId>(DEFAULTS.platform)
   const [saving,       setSaving]       = React.useState(false)
 
+  // Block C — fire `tool_started` once on the user's first input change.
+  // Watching state in useEffect (rather than wrapping every setter) keeps
+  // the instrumentation in one block; the dependency array intentionally
+  // covers all five inputs.
+  const startedRef = React.useRef(false)
+  React.useEffect(() => {
+    if (startedRef.current) return
+    const dirty =
+      subscribers !== DEFAULTS.subscribers   ||
+      openRate    !== DEFAULTS.openRatePct   ||
+      clickRate   !== DEFAULTS.clickRatePct  ||
+      aov         !== DEFAULTS.aov           ||
+      platform    !== DEFAULTS.platform
+    if (dirty) {
+      startedRef.current = true
+      track("tool_started", { tool_slug: "email-roi-calculator", locale })
+    }
+  }, [subscribers, openRate, clickRate, aov, platform, locale])
+
   // ----- Derived numbers (pure functions of inputs) ------------------------
   const result = React.useMemo(() => {
     const emailsPerMonth = subscribers * DEFAULTS.campaignsPerMonth
@@ -240,6 +260,21 @@ export function EmailRoiCalculator({
         return
       }
       toast.success(strings.save.saved)
+      // Block C — "tool_completed" for this calculator = the user committed
+      // to the result enough to save it. Live numbers update on every
+      // keystroke, so we deliberately tie completion to an intentional
+      // action rather than the mere existence of a computed value.
+      track("tool_completed", {
+        tool_slug: "email-roi-calculator",
+        locale,
+        payload: {
+          subscribers,
+          platform,
+          // Round revenue so PostHog's distribution charts bucket cleanly
+          // and tiny rounding diffs don't fragment the histogram.
+          monthly_revenue_usd: Math.round(result.monthlyRevenue),
+        },
+      })
     } catch {
       toast.error(strings.save.failed)
     } finally {

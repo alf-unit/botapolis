@@ -287,12 +287,33 @@ async function translateFile(type: "reviews" | "guides", slug: string) {
   const enPath = path.join(CONTENT_DIR, type, "en", `${slug}.mdx`)
   const ruPath = path.join(CONTENT_DIR, type, "ru", `${slug}.mdx`)
 
+  // ---- Existing-RU handling ------------------------------------------------
+  // Two independent flags govern overwrite:
+  //   1. --force (CLI arg) — caller-side override, used by the pre-commit
+  //      hook so EN changes always re-translate.
+  //   2. `manuallyTranslated: true` in RU frontmatter — opt-out the editor
+  //      can set on any RU file to lock in hand-edits against future auto
+  //      re-translation. The flag survives because gray-matter round-trips
+  //      unknown frontmatter keys cleanly.
+  // Precedence: manuallyTranslated wins. If you really want to wipe an
+  // opted-out RU file, flip the frontmatter flag first and re-run.
+  // --------------------------------------------------------------------------
   if (!args.force) {
     try {
       await fs.access(ruPath)
       console.log(`  [skip] ${type}/${slug} — RU file exists (pass --force to overwrite)`)
       return
     } catch { /* doesn't exist → proceed */ }
+  } else {
+    // --force is set: still respect the per-file opt-out.
+    try {
+      const existing = await fs.readFile(ruPath, "utf-8")
+      const { data } = matter(existing)
+      if (data && (data as Record<string, unknown>).manuallyTranslated === true) {
+        console.log(`  [locked] ${type}/${slug} — RU has manuallyTranslated:true, skipping`)
+        return
+      }
+    } catch { /* RU doesn't exist yet, fine */ }
   }
 
   console.log(`  [translate] ${type}/${slug} …`)

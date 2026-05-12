@@ -12,7 +12,8 @@
     "translate:missing": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/translate-content.ts --missing",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -57,6 +58,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "happy-dom": "^20.9.0",
+    "husky": "^9.1.7",
     "pagefind": "^1.5.2",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",

@@ -1,0 +1,71 @@
+#!/usr/bin/env sh
+# ============================================================================
+# Botapolis · pre-commit hook
+# ----------------------------------------------------------------------------
+# Auto-translates EN MDX articles to RU on every commit. Triggered by any
+# staged file under content/{reviews,guides}/en/*.mdx. Result: every push
+# carries both locales — visitors never see EN-fallback notices on /ru
+# even on freshly-shipped content.
+#
+# Design choices the user signed off on:
+#   - Auto-overwrite by default. Editing the EN article later wipes any
+#     manual RU edits made between then and now. That's the trade-off for
+#     zero-friction ship.
+#   - Opt-out per file: add `manuallyTranslated: true` to RU frontmatter
+#     and the translator skips it even with --force. Use when you've
+#     hand-edited an RU file and don't want auto to clobber it.
+#   - Hook exits 0 (not a hard fail) on missing OPENROUTER_API_KEY or
+#     translator errors. Better to ship the EN commit + flag the gap
+#     than block a commit on a flaky API.
+# ============================================================================
+set -e
+
+# 1. Find staged EN MDX files. --diff-filter=ACMR catches add/copy/modify/rename.
+staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^content/(reviews|guides)/en/.*\.mdx$' || true)
+
+if [ -z "$staged" ]; then
+  # Nothing relevant staged — exit fast so unrelated commits aren't slowed
+  # down by the API-key check below.
+  exit 0
+fi
+
+echo ""
+echo "[pre-commit] EN MDX files staged — running auto-translate:"
+echo "$staged" | sed 's/^/  /'
+
+# 2. Verify we can actually call the translator. Either an exported
+#    OPENROUTER_API_KEY env var OR a .env.local file works (the translator
+#    npm script passes --env-file=.env.local).
+if [ -z "${OPENROUTER_API_KEY:-}" ] && [ ! -f .env.local ]; then
+  echo ""
+  echo "[pre-commit] WARNING: OPENROUTER_API_KEY missing and .env.local not found."
+  echo "  Skipping auto-translation. Run 'npx vercel env pull' or export"
+  echo "  OPENROUTER_API_KEY in your shell to enable. Commit proceeds without"
+  echo "  RU dubs — they can be generated later via 'npm run translate:missing'."
+  exit 0
+fi
+
+# 3. Run the translator per file, then stage the resulting RU twins. --force
+#    so EN changes re-translate the RU twin; the manuallyTranslated:true
+#    opt-out is enforced inside the translator and not here.
+echo "$staged" | while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  type=$(echo "$f" | sed -E 's|^content/(reviews\|guides)/en/.*|\1|')
+  slug=$(echo "$f" | sed -E 's|^content/(reviews\|guides)/en/(.*)\.mdx$|\2|')
+
+  if ! npm run --silent translate -- --type "$type" --slug "$slug" --force; then
+    echo "  [pre-commit] translation failed for $type/$slug — continuing"
+    continue
+  fi
+
+  ru_path="content/$type/ru/$slug.mdx"
+  if [ -f "$ru_path" ]; then
+    git add "$ru_path"
+    echo "  [pre-commit] staged $ru_path"
+  fi
+done
+
+echo "[pre-commit] auto-translate complete"
+echo ""
+
+exit 0

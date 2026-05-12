@@ -52,3 +52,4 @@ next-env.d.ts
 # Rust-compiled WASM + JSON. The build script scripts/build-search-index.ts
 # rebuilds this at deploy time; commit it and we'd merge-conflict on every PR.
 /public/pagefind/
+.env*.local

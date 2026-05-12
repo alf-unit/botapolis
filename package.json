@@ -7,7 +7,9 @@
     "build": "next build && npm run search:index",
     "start": "next start",
     "lint": "eslint",
-    "search:index": "node --experimental-strip-types --no-warnings scripts/build-search-index.ts"
+    "search:index": "node --experimental-strip-types --no-warnings scripts/build-search-index.ts",
+    "translate": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/translate-content.ts",
+    "translate:missing": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/translate-content.ts --missing"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

@@ -265,31 +265,27 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
         {/* Bottom legal strip */}
         <div className="mt-10 pt-6 border-t border-[var(--border-base)] flex flex-col-reverse md:flex-row md:items-center md:justify-between gap-4 text-[12px] text-[var(--text-tertiary)]">
           <span>{strings.copyright}</span>
-          <div className="flex items-center gap-1">
-            {[
-              // BUG-FIX (May 2026 audit): dropped the RSS icon — /rss.xml
-              // 404s and shipping a dead link in the footer of every page is
-              // worse than not advertising RSS at all. Wire the icon back in
-              // the day we actually ship app/rss.xml/route.ts.
-              // The remaining three socials still point at placeholder
-              // URLs (x.com / linkedin.com / github.com root pages); swap
-              // them for real brand profiles before the next press push.
-              { Icon: TwitterMark,  href: "https://x.com",        label: "X / Twitter" },
-              { Icon: LinkedinMark, href: "https://linkedin.com", label: "LinkedIn"    },
-              { Icon: GithubMark,   href: "https://github.com",   label: "GitHub"      },
-            ].map(({ Icon, href, label }) => (
-              <a
-                key={label}
-                href={href}
-                aria-label={label}
-                rel="noopener noreferrer"
-                target="_blank"
-                className="h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)] transition-colors"
-              >
-                <Icon className="size-[18px]" />
-              </a>
-            ))}
-          </div>
+
+          {/*
+            Block F (May 2026): the previous footer shipped three social
+            icons pointing at the literal homepages of X / LinkedIn /
+            GitHub. We removed them rather than keeping placeholder URLs
+            in the footer of every page — a generic "/x.com/" link reads
+            as broken trust, especially next to the brand wordmark.
+
+            Re-wire the socials the day there are real Botapolis brand
+            accounts. The two helpers below (TwitterMark / LinkedinMark
+            / GithubMark) are exported above and stay imported because:
+              (a) they're tiny inline SVGs, no bundle cost
+              (b) we want them ready when the URLs land — don't churn the
+                  import graph around the day socials return
+            Wiring template for when real URLs exist:
+              <SocialRow socials={[
+                { Icon: TwitterMark,  href: process.env.NEXT_PUBLIC_SOCIAL_X       ?? "", label: "X / Twitter" },
+                { Icon: LinkedinMark, href: process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN ?? "", label: "LinkedIn"    },
+                { Icon: GithubMark,   href: process.env.NEXT_PUBLIC_SOCIAL_GITHUB   ?? "", label: "GitHub"      },
+              ].filter(s => s.href)} />
+          */}
         </div>
       </div>
     </footer>

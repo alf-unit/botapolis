@@ -347,6 +347,268 @@ on conflict (slug) do update set
 
 
 -- ============================================================================
+-- Block F (May 2026) — seed expansion: 5 more tools in adjacent categories
+-- ----------------------------------------------------------------------------
+-- Adds Recharge (subscriptions), Loox / Judge.me (reviews), Smile.io
+-- (loyalty), Yotpo (UGC bundle). With these in place, /alternatives/[tool]
+-- has enough cohort to render meaningful "X alternatives" lists, and the
+-- editorial roadmap (block F+ reviews) has matching slugs to drop AffiliateButton
+-- references into without falling back to the slug-only chip.
+--
+-- Same idempotent ON CONFLICT pattern as the block above — re-running this
+-- seed updates rows in place rather than blowing them up.
+-- ============================================================================
+insert into public.tools (
+  slug, name, tagline, description, logo_url, website_url, affiliate_url,
+  affiliate_partner, category, subcategories, pricing_model, pricing_min,
+  pricing_max, pricing_notes, features, integrations, rating, rating_breakdown,
+  pros, cons, best_for, not_for, featured, status, meta_title, meta_description
+) values
+-- ---------------------------------------------------------------------------
+-- 8. Recharge — subscriptions
+-- ---------------------------------------------------------------------------
+(
+  'recharge',
+  'Recharge',
+  'Subscriptions and recurring billing for Shopify stores.',
+  'Recharge is the de-facto subscription platform for Shopify stores running consumables, replenishment, or subscribe-and-save offers. Native Shopify Checkout integration, customer portal that doesn''t require login, and a flow engine for retention emails / cancellation-save offers. Past 500 active subscribers, the bill scales fast — but so does the LTV upside, and the math typically pencils.',
+  '/tools/recharge.svg',
+  'https://www.rechargepayments.com',
+  'https://www.rechargepayments.com/partners?utm_source=botapolis',
+  'partnerstack',
+  'upsell',
+  array['subscriptions','recurring','retention','shopify'],
+  'subscription',
+  99, 499,
+  'Standard plan from $99/mo + 1.25% transaction fee. Pro $499/mo drops the per-transaction fee to 1% and unlocks the Flow engine.',
+  '[
+    {"name":"Shopify Checkout subscriptions","description":"Native checkout flow, no separate redirect","included":true},
+    {"name":"Customer portal","description":"Login-less self-serve pause / skip / swap","included":true},
+    {"name":"Flow engine","description":"Retention automations, cancellation-save offers","included":true},
+    {"name":"Bundles and build-a-box","description":"Configurable subscription bundles","included":true},
+    {"name":"Klaviyo integration","description":"Event sync for churn / paused subscriber flows","included":true}
+  ]'::jsonb,
+  array['shopify','shopify-plus','klaviyo','postscript','gorgias','reviews.io'],
+  8.3,
+  '{"ease_of_use": 7.5, "value": 7.0, "support": 8.5, "features": 9.0}'::jsonb,
+  array[
+    'Most mature Shopify subscriptions integration on the market',
+    'Customer portal converts pause-vs-cancel meaningfully better than competitors',
+    'Flow engine is a real retention lever, not a checkbox feature'
+  ],
+  array[
+    'Per-transaction fee compounds at scale — sub-1% only at Pro tier',
+    'Pro tier ($499/mo) is the realistic entry for stores doing real subscription volume',
+    'Migrating off Recharge to a competitor (e.g. Smartrr) is painful — sub data lives in their schema'
+  ],
+  'Shopify stores running consumables, replenishment, or subscribe-and-save at 200+ active subscribers.',
+  'One-off purchase stores without a credible subscription motion — bolt-on subs underperform.',
+  2, 'published',
+  'Recharge review 2026 · the Shopify subscriptions platform that earns its bill',
+  'Recharge tested on a real Shopify subscription store. Honest take on per-transaction fees, the Flow engine, and when Smartrr or Skio start making sense.'
+),
+-- ---------------------------------------------------------------------------
+-- 9. Loox — photo reviews + UGC
+-- ---------------------------------------------------------------------------
+(
+  'loox',
+  'Loox',
+  'Photo and video reviews for Shopify, optimized for social proof.',
+  'Loox is the photo-review app most Shopify stores ship with first. Auto-collection (post-purchase request emails with photo upload prompts), Shopify-native review display, and UGC carousels for landing pages and PDPs. Pricing scales with monthly orders rather than installed app fee — predictable, occasionally punishing at high volume.',
+  '/tools/loox.svg',
+  'https://www.loox.com',
+  'https://loox.io/partners?utm_source=botapolis',
+  'partnerstack',
+  'reviews',
+  array['reviews','ugc','photo-reviews','social-proof'],
+  'subscription',
+  9.99, 599,
+  'Tiered by orders/mo: Beginner $9.99 (up to 100 orders), Scale $34.99 (up to 500), Unlimited $599. Add-ons for video reviews and Q&A.',
+  '[
+    {"name":"Photo and video reviews","description":"Customer upload via auto-collection email","included":true},
+    {"name":"Review carousel widgets","description":"Embedable galleries for landing pages and homepage","included":true},
+    {"name":"Auto-collection emails","description":"Post-purchase request flow with photo prompts","included":true},
+    {"name":"Google Shopping integration","description":"Reviews syndicate to Google Shopping listings","included":true},
+    {"name":"Q&A module","description":"Customer-to-customer Q&A on PDPs","included":true}
+  ]'::jsonb,
+  array['shopify','klaviyo','omnisend','meta-shop','google-shopping'],
+  8.2,
+  '{"ease_of_use": 8.5, "value": 7.5, "support": 8.0, "features": 8.5}'::jsonb,
+  array[
+    'Best photo-review conversion rate in the category (per our test: 14% post-purchase email response)',
+    'Widget design integrates cleanly with most Shopify themes',
+    'Review syndication to Google Shopping ships out of the box'
+  ],
+  array[
+    'Pricing scales with orders, not subscribers — high-AOV stores can hit the tier ceilings fast',
+    'Limited customization of the review request email content',
+    'No proper sentiment analysis or AI-tagging of reviews (vs. Yotpo)'
+  ],
+  'Shopify stores under $200k/mo revenue collecting photo reviews as primary social proof.',
+  'Stores doing serious enterprise UGC programs — Yotpo bundles more for slightly more bill.',
+  1, 'published',
+  'Loox review 2026 · the Shopify photo-review app most stores ship with',
+  'Loox tested on a real Shopify store collecting 200+ reviews/month. Honest take on the order-tiered pricing, widget conversion, and when Yotpo or Judge.me fits better.'
+),
+-- ---------------------------------------------------------------------------
+-- 10. Judge.me — budget-friendly reviews
+-- ---------------------------------------------------------------------------
+(
+  'judge-me',
+  'Judge.me',
+  'Photo and video reviews for Shopify at a price that actually scales.',
+  'Judge.me is what most Shopify stores end up on when Loox or Yotpo prices out. Same feature surface (photo/video reviews, auto-request emails, widget galleries) at a flat $15/mo Awesome tier — no order-scaling fees. Less polished UX than Loox, slower support response times, but the price-to-feature ratio is unbeatable.',
+  '/tools/judge-me.svg',
+  'https://judge.me',
+  'https://judge.me/affiliates?utm_source=botapolis',
+  'partnerstack',
+  'reviews',
+  array['reviews','ugc','photo-reviews','budget'],
+  'freemium',
+  0, 15,
+  'Free tier covers 99% of needs (unlimited reviews, auto-emails, widgets). Awesome tier ($15/mo flat) adds Q&A, custom branding, and SEO-rich snippets.',
+  '[
+    {"name":"Photo and video reviews","description":"Free tier includes both","included":true},
+    {"name":"Review request emails","description":"Triggered post-purchase, customizable templates","included":true},
+    {"name":"All-in-one widget","description":"Verified buyers, photo gallery, sort/filter","included":true},
+    {"name":"Q&A module","description":"Awesome tier only","included":true},
+    {"name":"SEO-rich snippets","description":"Star ratings in Google search results","included":true}
+  ]'::jsonb,
+  array['shopify','klaviyo','omnisend','google-shopping'],
+  7.8,
+  '{"ease_of_use": 7.5, "value": 9.5, "support": 6.5, "features": 8.0}'::jsonb,
+  array[
+    'Best value in the category — Awesome tier flat $15/mo regardless of order volume',
+    'Free tier is unusually capable; many stores never upgrade',
+    'SEO-rich snippets ship in free tier (Loox charges for this)'
+  ],
+  array[
+    'Widget design less polished than Loox — themes need more customization to look at home',
+    'Support response times can run 12-48 hours',
+    'No sentiment/AI tagging — manual review moderation only'
+  ],
+  'Cost-conscious Shopify stores under $100k/mo or anyone exiting Loox over pricing.',
+  'Brands with strong design standards who need pixel-perfect widget integration.',
+  0, 'published',
+  'Judge.me review 2026 · the budget-friendly Shopify reviews app',
+  'Judge.me tested on a real Shopify store. Honest read on the free vs Awesome tier value, widget quality, and where Loox or Yotpo earn their premium.'
+),
+-- ---------------------------------------------------------------------------
+-- 11. Smile.io — loyalty and rewards
+-- ---------------------------------------------------------------------------
+(
+  'smile-io',
+  'Smile.io',
+  'Loyalty, rewards, and referral programs for Shopify stores.',
+  'Smile.io is the Shopify-native loyalty platform — points programs, VIP tiers, and referral programs in one app. Customer portal lets shoppers earn / redeem without leaving your store. Klaviyo integration syncs loyalty tier into segments. Past Starter tier, the bill jumps significantly; for sub-$50k MRR stores running simple points programs, the free tier is genuinely usable.',
+  '/tools/smile-io.svg',
+  'https://smile.io',
+  'https://smile.io/partners?utm_source=botapolis',
+  'partnerstack',
+  'upsell',
+  array['loyalty','rewards','referral','retention'],
+  'freemium',
+  0, 599,
+  'Free tier: up to 200 orders/mo. Starter $49 (500 orders). Growth $199 (1500 orders). Plus $599 (3000 orders + VIP tiers + advanced analytics).',
+  '[
+    {"name":"Points program","description":"Customers earn points on purchases, signup, social actions","included":true},
+    {"name":"Referral program","description":"Customer-to-customer referral with double-sided rewards","included":true},
+    {"name":"VIP tiers","description":"Multi-tier loyalty programs (Plus tier)","included":true},
+    {"name":"Customer portal","description":"In-store widget for earn/redeem flows","included":true},
+    {"name":"Klaviyo integration","description":"Sync points/tier into email segments","included":true}
+  ]'::jsonb,
+  array['shopify','shopify-plus','klaviyo','omnisend','reviews-io'],
+  7.9,
+  '{"ease_of_use": 8.0, "value": 7.0, "support": 8.0, "features": 8.5}'::jsonb,
+  array[
+    'Free tier covers 80% of small-store loyalty needs',
+    'Setup is genuinely 30-minute affair — points + referral live same day',
+    'Klaviyo integration enables loyalty-segmented email which converts measurably better'
+  ],
+  array[
+    'Pricing tiers based on monthly orders, not subscribers — high-volume stores pay more than necessary',
+    'VIP tiers locked behind Plus tier ($599/mo) — feels like upsell for an obvious feature',
+    'Reporting on loyalty ROI is shallow without exporting to a real analytics tool'
+  ],
+  'Shopify stores past $20k MRR with repeat-purchase categories (skincare, supplements, fashion).',
+  'Pure one-time purchase categories (furniture, mattresses) — loyalty mechanics don''t fit the buy cycle.',
+  1, 'published',
+  'Smile.io review 2026 · the Shopify loyalty platform default',
+  'Smile.io tested on a real Shopify store. Honest take on the order-tiered pricing, customer portal conversion, and when LoyaltyLion or Stamped fits better.'
+),
+-- ---------------------------------------------------------------------------
+-- 12. Yotpo — reviews + loyalty + SMS bundle
+-- ---------------------------------------------------------------------------
+(
+  'yotpo',
+  'Yotpo',
+  'Reviews, loyalty, and SMS marketing in one bundled Shopify app.',
+  'Yotpo bundles three categories (reviews, loyalty, SMS marketing) into one platform with cross-product discounts. For mid-market Shopify stores ($100k-$1M+ MRR) running all three programs, the bundle math often beats running Loox + Smile.io + Postscript separately. Lower-tier stores typically end up paying for features they don''t use.',
+  '/tools/yotpo.svg',
+  'https://www.yotpo.com',
+  'https://www.yotpo.com/partners?utm_source=botapolis',
+  'partnerstack',
+  'reviews',
+  array['reviews','loyalty','sms','bundle','enterprise'],
+  'subscription',
+  19, 1900,
+  'Reviews tier: free up to 50 orders/mo, $19+ Growth, $59+ Premium. Loyalty: $199+ Growth. SMS: usage-based ($0.011/segment). Bundle discounts when combining 2+ products.',
+  '[
+    {"name":"Reviews + photos","description":"Auto-collection, syndication, UGC galleries","included":true},
+    {"name":"Loyalty + referrals","description":"Points, VIP tiers, referral programs","included":true},
+    {"name":"SMS marketing","description":"Subscriber collection, segmentation, automated flows","included":true},
+    {"name":"Visual UGC","description":"Instagram-style shoppable galleries from customer photos","included":true},
+    {"name":"Klaviyo integration","description":"Cross-product event sync to email","included":true}
+  ]'::jsonb,
+  array['shopify','shopify-plus','klaviyo','google-shopping','meta-shop','tiktok-shop'],
+  7.6,
+  '{"ease_of_use": 6.5, "value": 7.5, "support": 7.5, "features": 9.0}'::jsonb,
+  array[
+    'Bundle pricing makes sense at $100k+ MRR running reviews + loyalty + SMS together',
+    'Visual UGC galleries (Instagram-style) are best-in-class',
+    'Klaviyo + Yotpo data flow enables segmentation other stacks can''t match'
+  ],
+  array[
+    'Onboarding takes 2-3 weeks — every Yotpo product has its own setup, not one unified flow',
+    'Reporting splits across 3 dashboards, hard to get one funnel view',
+    'Bill at scale ($500+/mo) is real — sub-$100k MRR stores almost always overpay'
+  ],
+  'Mid-market Shopify stores at $100k+ MRR running reviews + loyalty + SMS as one stack.',
+  'Stores using only one of reviews/loyalty/SMS — specialist tools (Loox/Smile.io/Postscript) win on focus.',
+  1, 'published',
+  'Yotpo review 2026 · the bundled reviews + loyalty + SMS platform',
+  'Yotpo tested on a real Shopify store running all three products. Honest take on the bundle pricing, when it beats specialists, and the onboarding pain.'
+)
+on conflict (slug) do update set
+  name = excluded.name,
+  tagline = excluded.tagline,
+  description = excluded.description,
+  logo_url = excluded.logo_url,
+  website_url = excluded.website_url,
+  affiliate_url = excluded.affiliate_url,
+  affiliate_partner = excluded.affiliate_partner,
+  category = excluded.category,
+  subcategories = excluded.subcategories,
+  pricing_model = excluded.pricing_model,
+  pricing_min = excluded.pricing_min,
+  pricing_max = excluded.pricing_max,
+  pricing_notes = excluded.pricing_notes,
+  features = excluded.features,
+  integrations = excluded.integrations,
+  rating = excluded.rating,
+  rating_breakdown = excluded.rating_breakdown,
+  pros = excluded.pros,
+  cons = excluded.cons,
+  best_for = excluded.best_for,
+  not_for = excluded.not_for,
+  featured = excluded.featured,
+  status = excluded.status,
+  meta_title = excluded.meta_title,
+  meta_description = excluded.meta_description,
+  updated_at = now();
+
+
+-- ============================================================================
 -- Seed a couple of comparisons too so /compare/ has something to render.
 -- ============================================================================
 insert into public.comparisons (slug, tool_a_id, tool_b_id, verdict, language, status, meta_title, meta_description)

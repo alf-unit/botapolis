@@ -108,6 +108,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority:        0.7,
       alternates:      alternates(path),
     })
+
+    // Block F (May 2026): /alternatives/[slug] pSEO sibling. Same lastmod
+    // as the tool row — the alternatives grid is computed from the same
+    // data, so whenever the tool record updates the listicle re-ranks.
+    const altPath = `/alternatives/${t.slug}`
+    routes.push({
+      url:             absoluteUrl(altPath),
+      lastModified:    new Date(t.updated_at),
+      changeFrequency: "weekly",
+      priority:        0.65,
+      alternates:      alternates(altPath),
+    })
   }
 
   // ----- Comparisons (pSEO X-vs-Y) ------------------------------------------

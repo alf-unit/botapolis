@@ -10,8 +10,26 @@
  * unknown index signature — `type` aliases do. If we slip back to interfaces
  * here, every typed `.select()` collapses to `never`.
  *
- * When the supabase CLI is wired up later, replace this file with the output
- * of `supabase gen types typescript --local`. Call-sites don't change.
+ * When you want to regenerate from the live schema (block F decision: we
+ * keep handwritten today because the schema is stable + only two
+ * migrations have shipped — auto-gen would be heavier than the diff cost).
+ * The manual command is:
+ *
+ *   # 1. Link the CLI to the Supabase project (one-time, stores .env-style
+ *   #    creds in supabase/.temp/). Get the project ref from the URL of
+ *   #    your dashboard: https://supabase.com/dashboard/project/<REF>/
+ *   npx supabase link --project-ref <REF>
+ *
+ *   # 2. Pull types — output replaces this file:
+ *   npx supabase gen types typescript --linked > lib/supabase/types.ts
+ *
+ *   # 3. Run `tsc --noEmit` immediately — the generated file uses Database
+ *   #    interfaces with PostgREST GenericTable constraints, and a hand
+ *   #    pass is needed to add back the typed enums (ToolStatus,
+ *   #    ToolPricingModel, etc.) we use in our domain layer above.
+ *
+ * Call-sites in app/ don't change either way — the Row / Insert / Update
+ * type names are stable.
  */
 
 // ----------------------------------------------------------------------------

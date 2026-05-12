@@ -46,8 +46,17 @@ export const env = createEnv({
     BEEHIIV_API_KEY:        optionalString(),
     BEEHIIV_PUBLICATION_ID: optionalString(),
 
-    // ----- Transactional email --------------------------------------------
-    RESEND_API_KEY: optionalString(),
+    // ----- Transactional email (block F) ---------------------------------
+    // RESEND_API_KEY drives /api/newsletter welcome + /api/contact inbox
+    // notification. Optional — every helper in lib/email/resend.ts no-ops
+    // when this is unset, so deployments without it still work.
+    RESEND_API_KEY:       optionalString(),
+    // Override the FROM address if your verified Resend sender differs from
+    // editorial@botapolis.com. Optional; defaults baked into the helper.
+    RESEND_FROM_ADDRESS:  optionalString(),
+    // Override where /api/contact submissions land. Defaults to
+    // editorial@botapolis.com — set when you spin up a separate triage box.
+    RESEND_ADMIN_INBOX:   optionalString(),
 
     // ----- Bot protection -------------------------------------------------
     TURNSTILE_SECRET_KEY: optionalString(),
@@ -87,6 +96,8 @@ export const env = createEnv({
     BEEHIIV_API_KEY:                 process.env.BEEHIIV_API_KEY,
     BEEHIIV_PUBLICATION_ID:          process.env.BEEHIIV_PUBLICATION_ID,
     RESEND_API_KEY:                  process.env.RESEND_API_KEY,
+    RESEND_FROM_ADDRESS:             process.env.RESEND_FROM_ADDRESS,
+    RESEND_ADMIN_INBOX:              process.env.RESEND_ADMIN_INBOX,
     TURNSTILE_SECRET_KEY:            process.env.TURNSTILE_SECRET_KEY,
     REVALIDATE_SECRET:               process.env.REVALIDATE_SECRET,
 

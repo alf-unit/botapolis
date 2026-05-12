@@ -14,6 +14,7 @@ import { z } from "zod"
 import { createServiceClient } from "@/lib/supabase/service"
 import { newsletterLimit } from "@/lib/ratelimit"
 import { getClientIp, hashIp } from "@/lib/utils"
+import { sendNewsletterWelcome } from "@/lib/email/resend"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -177,6 +178,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "subscribe_failed" }, { status: 500 })
     }
   }
+
+  // 6. Block F — Resend welcome email. Fire-and-forget so a slow Resend
+  // never delays the success response to the user. Helper no-ops cleanly
+  // when RESEND_API_KEY is unset (today's prod state until the env lands),
+  // and logs at the helper level on failure — nothing to handle here.
+  // Note: Beehiiv ALSO sends its own welcome email when
+  // `send_welcome_email: true` is set on the subscription request, so
+  // disable one or the other before turning Resend on to avoid double-send.
+  void sendNewsletterWelcome(body.email.toLowerCase(), body.language)
 
   return NextResponse.json({ success: true })
 }

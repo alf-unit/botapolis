@@ -27,6 +27,7 @@ import { z } from "zod"
 import { createServiceClient } from "@/lib/supabase/service"
 import { contactLimit } from "@/lib/ratelimit"
 import { getClientIp, hashIp } from "@/lib/utils"
+import { sendContactAutoReply, sendContactInboxNotification } from "@/lib/email/resend"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -165,6 +166,23 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     )
   }
+
+  // 5. Block F — Resend notifications. Fire-and-forget so a slow Resend
+  // doesn't delay the success response. Helpers no-op cleanly when
+  // RESEND_API_KEY is unset (current state); logs at the helper level
+  // surface failures in Vercel without needing handler-side branching.
+  // Determine language from Accept-Language header (we don't ask the
+  // client to send it explicitly — keeps the form payload narrow).
+  const acceptLang = req.headers.get("accept-language")?.toLowerCase() ?? ""
+  const language: "en" | "ru" = acceptLang.includes("ru") ? "ru" : "en"
+  void sendContactInboxNotification({
+    name:    body.name ?? null,
+    email:   body.email,
+    subject: body.subject ?? null,
+    message: body.message,
+    source:  body.source,
+  })
+  void sendContactAutoReply(body.email, language)
 
   return NextResponse.json({ success: true })
 }

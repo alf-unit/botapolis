@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { track } from "@/lib/analytics/events"
+import { TurnstileGate, type TurnstileGateHandle } from "@/components/shared/TurnstileGate"
 
 /* ----------------------------------------------------------------------------
    <ContactForm>
@@ -57,10 +58,26 @@ export function ContactForm({
 }: ContactFormProps) {
   const [status, setStatus] = React.useState<FormStatus>("idle")
   const [consecutiveFailures, setConsecutiveFailures] = React.useState(0)
+  // Block D — Turnstile token (same pattern as NewsletterForm). State lives
+  // in the form because the widget hands it over asynchronously.
+  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null)
+  const turnstileRef = React.useRef<TurnstileGateHandle | null>(null)
+  const turnstileConfigured = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (status === "submitting") return
+
+    if (turnstileConfigured && !turnstileToken) {
+      toast.error(strings.errorTitle, {
+        description:
+          language === "ru"
+            ? "Подожди — мы проверяем что ты не бот."
+            : "Hang on — we're verifying you're human.",
+      })
+      return
+    }
+
     setStatus("submitting")
 
     const fd = new FormData(e.currentTarget)
@@ -70,6 +87,7 @@ export function ContactForm({
       subject: (fd.get("subject") as string)?.trim() || undefined,
       message: (fd.get("message") as string)?.trim(),
       source:  "contact_page",
+      turnstileToken: turnstileToken ?? undefined,
     }
 
     try {
@@ -92,6 +110,8 @@ export function ContactForm({
           message_chars: payload.message?.length ?? 0,
         })
         ;(e.target as HTMLFormElement).reset()
+        setTurnstileToken(null)
+        turnstileRef.current?.reset()
         return
       }
 
@@ -104,11 +124,15 @@ export function ContactForm({
       toast.error(strings.errorTitle, { description: errMsg })
       setStatus("idle")
       setConsecutiveFailures((c) => c + 1)
+      setTurnstileToken(null)
+      turnstileRef.current?.reset()
     } catch {
       // Network blip / firewall. Same UX as a structured error from the API.
       toast.error(strings.errorTitle, { description: strings.errorGeneric })
       setStatus("idle")
       setConsecutiveFailures((c) => c + 1)
+      setTurnstileToken(null)
+      turnstileRef.current?.reset()
     }
   }
 
@@ -168,6 +192,17 @@ export function ContactForm({
             placeholder=""
           />
         </Field>
+
+        {/* Block D — Turnstile sits between the message field and the
+            submit button. Most visitors never see anything (managed
+            challenge + interaction-only). When the widget is disabled
+            (no NEXT_PUBLIC_TURNSTILE_SITE_KEY), it renders null. */}
+        <TurnstileGate
+          ref={turnstileRef}
+          onToken={setTurnstileToken}
+          onError={() => setTurnstileToken(null)}
+          className="my-1"
+        />
 
         <Button
           type="submit"

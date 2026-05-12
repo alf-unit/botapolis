@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Menu, Search } from "lucide-react"
+import { Menu } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -19,6 +19,8 @@ import { Logo } from "./Logo"
 import { ThemeToggle } from "./ThemeToggle"
 import { LanguageSwitcher } from "./LanguageSwitcher"
 import { UserMenu } from "@/components/shared/UserMenu"
+import { SearchTrigger } from "@/components/shared/SearchTrigger"
+import type { SearchModalStrings } from "@/components/shared/SearchModal"
 
 /* ----------------------------------------------------------------------------
    Navbar
@@ -80,8 +82,34 @@ function userMenuStrings(localePrefix: "" | "/ru") {
   }
 }
 
+/**
+ * Locale-resolved SearchModal copy. Kept inline here (rather than threaded
+ * through dict.nav.search.*) because the strings are component-specific
+ * and live alongside the only consumer.
+ */
+function searchModalStrings(locale: "en" | "ru", trigger: string, placeholder: string): SearchModalStrings {
+  return {
+    triggerLabel:    trigger,
+    placeholder,
+    closeLabel:      locale === "ru" ? "Закрыть"          : "Close",
+    emptyTitle:      locale === "ru" ? "Что ищем?"        : "What are you looking for?",
+    emptyBody:       locale === "ru"
+      ? "Инструменты, обзоры, гайды, сравнения — всё в одном поле."
+      : "Tools, reviews, guides, comparisons — all in one box.",
+    loadingError:    locale === "ru"
+      ? "Не удалось загрузить поисковый индекс. Попробуй обновить страницу."
+      : "Couldn't load the search index. Try refreshing the page.",
+    noResultsTitle:  locale === "ru" ? "Ничего не нашли"  : "No results",
+    noResultsBody:   locale === "ru"
+      ? "Перефразируй запрос или загляни в каталог инструментов."
+      : "Try a different query, or browse the tools catalog.",
+    resultsLabel:    locale === "ru" ? "Pagefind"         : "Pagefind",
+  }
+}
+
 export function Navbar({ strings, localePrefix = "", user = null, className }: NavbarProps) {
   const [scrolled, setScrolled] = React.useState(false)
+  const locale: "en" | "ru" = localePrefix === "/ru" ? "ru" : "en"
 
   // rAF-throttled scroll listener — keeps per-frame work under the 16ms budget.
   React.useEffect(() => {
@@ -153,19 +181,18 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
 
         {/* Right cluster */}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Search trigger — desktop only (real modal lands in a later sprint) */}
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={strings.search}
-            className="hidden md:inline-flex text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
-            <Search className="size-4" data-icon="inline-start" />
-            <span className="hidden lg:inline">{strings.search}</span>
-            <kbd className="hidden lg:inline-flex h-5 items-center rounded border border-[var(--border-base)] bg-[var(--bg-muted)] px-1.5 font-mono text-[10px] text-[var(--text-tertiary)] ml-1">
-              ⌘K
-            </kbd>
-          </Button>
+          {/* Search trigger — Pagefind-backed modal (block D). Owns its own
+              ⌘K / Ctrl+K listener at the document level so the shortcut
+              fires from anywhere on the page, not just when the trigger
+              has focus. The static index is built post-deploy by
+              scripts/build-search-index.ts. Mounted ONCE so we don't end
+              up with two modals / two listeners — the trigger renders
+              itself responsively (icon-only on phones, full chip with ⌘K
+              hint on desktop). */}
+          <SearchTrigger
+            strings={searchModalStrings(locale, strings.search, strings.searchPlaceholder)}
+            locale={locale}
+          />
 
           <ThemeToggle label={strings.toggleTheme} />
 

@@ -6,6 +6,7 @@ import { Check, Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { track } from "@/lib/analytics/events"
+import { TurnstileGate, type TurnstileGateHandle } from "@/components/shared/TurnstileGate"
 
 /* ----------------------------------------------------------------------------
    NewsletterForm — TZ § 12 (May 2026 audit replacement)
@@ -66,6 +67,14 @@ export function NewsletterForm({
   const [email, setEmail] = React.useState("")
   const [status, setStatus] =
     React.useState<"idle" | "loading" | "success">("idle")
+  // Block D — Turnstile token. Stays in state because the widget hands it
+  // over asynchronously, and the form needs it at submit time.
+  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null)
+  const turnstileRef = React.useRef<TurnstileGateHandle | null>(null)
+  // When the site key is unset (dev / preview), TurnstileGate renders null
+  // and we never receive a token — the server-side check is also gated on
+  // the secret being present, so the submission still succeeds.
+  const turnstileConfigured = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -74,6 +83,19 @@ export function NewsletterForm({
     const cleaned = email.trim().toLowerCase()
     if (!EMAIL_PATTERN.test(cleaned)) {
       toast.error(strings.errorInvalid)
+      return
+    }
+
+    // If the widget is configured but the user submitted before it issued
+    // a token, fail fast with a clear toast — better than firing the
+    // request and getting a server-side captcha_required 400.
+    if (turnstileConfigured && !turnstileToken) {
+      toast.error(strings.errorTitle, {
+        description:
+          language === "ru"
+            ? "Подожди секунду — мы проверяем что ты не бот."
+            : "Hang on — we're verifying you're human.",
+      })
       return
     }
 
@@ -91,6 +113,7 @@ export function NewsletterForm({
           // already a client island, no SSR mismatch concern.
           source_path:
             typeof window !== "undefined" ? window.location.pathname : undefined,
+          turnstileToken: turnstileToken ?? undefined,
         }),
       })
 
@@ -118,10 +141,16 @@ export function NewsletterForm({
       // value, so PostHog and the SQL view stay attributable to the same
       // surface.
       track("newsletter_subscribed", { source, locale: language })
+      // One-use Turnstile tokens — reset the widget for the next session.
+      setTurnstileToken(null)
+      turnstileRef.current?.reset()
     } catch {
       // Network error / offline / aborted by a unload event.
       toast.error(strings.errorTitle)
       setStatus("idle")
+      // Bad attempt → fresh token before the user retries.
+      setTurnstileToken(null)
+      turnstileRef.current?.reset()
     }
   }
 
@@ -132,9 +161,13 @@ export function NewsletterForm({
     <form
       onSubmit={handleSubmit}
       aria-label="Subscribe to the operator's brief"
-      className={cn("flex flex-col gap-2 sm:flex-row", className)}
+      className={cn("flex flex-col gap-2", className)}
       noValidate
     >
+    {/* Inner row holds email+button so the Turnstile widget stacks below
+        them naturally even when the parent container is row-flex. The
+        widget itself is `interaction-only`, so most visitors never see it. */}
+    <div className="flex flex-col gap-2 sm:flex-row">
       <input
         type="email"
         name="email"
@@ -182,6 +215,12 @@ export function NewsletterForm({
           strings.cta
         )}
       </button>
+    </div>
+    <TurnstileGate
+      ref={turnstileRef}
+      onToken={setTurnstileToken}
+      onError={() => setTurnstileToken(null)}
+    />
     </form>
   )
 }

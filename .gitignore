@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Block D — .env.example IS checked in as the onboarding template. Without
+# this negation .env* above would exclude it too.
+!.env.example
 
 # vercel
 .vercel
@@ -44,3 +47,8 @@ next-env.d.ts
 
 # Local Claude Code harness state — never commit
 .claude/
+
+# Pagefind static search index — regenerated on every build, ~700KB of
+# Rust-compiled WASM + JSON. The build script scripts/build-search-index.ts
+# rebuilds this at deploy time; commit it and we'd merge-conflict on every PR.
+/public/pagefind/

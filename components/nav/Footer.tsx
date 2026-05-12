@@ -3,6 +3,10 @@ import { Rss } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Logo } from "./Logo"
+import {
+  NewsletterForm,
+  type NewsletterFormStrings,
+} from "@/components/marketing/NewsletterForm"
 
 /* Inline brand glyphs — lucide-react 1.x removed third-party brand marks,
    and using their official trademarks here keeps things faithful. */
@@ -60,38 +64,48 @@ function GithubMark({ className }: { className?: string }) {
 export interface FooterStrings {
   tagline: string
   copyright: string
+  // Column titles. Sprint 2 (May 2026) re-introduced a "Library" column for
+  // the editorial routes (/reviews, /guides) now that the MDX pipeline ships.
+  // The earlier audit had dropped them because the pages didn't exist; that
+  // constraint no longer applies.
   columns: {
     tools: string
     compare: string
-    guides: string
+    library: string
+    site: string
     legal: string
   }
+  // Link labels. Every key here MUST map to a route that returns 200; the
+  // shape mirrors what the dead-link audit (May 2026) + Sprint 2 verified
+  // is live.
   links: {
-    emailRoi: string
-    adSpend: string
-    ltvCac: string
-    allTools: string
-    klaviyoMailchimp: string
-    gorgiasZendesk: string
-    omnisendKlaviyo: string
-    looxJudgeme: string
-    allGuides: string
-    directory: string
-    methodology: string
-    about: string
-    privacy: string
-    terms: string
+    emailRoi:            string
+    aiCostComparator:    string
+    productDescription:  string
+    allTools:            string
+    klaviyoMailchimp:    string
+    omnisendKlaviyo:     string
+    gorgiasTidio:        string
+    allComparisons:      string
+    klaviyoReview:       string
+    productDescGuide:    string
+    allReviews:          string
+    allGuides:           string
+    about:               string
+    catalog:             string
+    privacy:             string
+    terms:               string
     affiliateDisclosure: string
-    cookiePolicy: string
   }
+  // `eyebrow / title / subtitle / footnote` live in the footer chrome; the
+  // remaining slots are forwarded straight to <NewsletterForm>, so we pin
+  // them to its actual prop type to keep the two in sync.
   newsletter: {
-    eyebrow: string
-    title: string
+    eyebrow:  string
+    title:    string
     subtitle: string
-    placeholder: string
-    cta: string
     footnote: string
-  }
+  } & NewsletterFormStrings
 }
 
 interface FooterProps {
@@ -103,32 +117,48 @@ interface FooterProps {
 export function Footer({ strings, localePrefix = "", className }: FooterProps) {
   const { columns, links } = strings
 
+  // Footer column definitions — every href below was verified to render a
+  // 200 against the deployed `next build` route table on 2026-05-12. If a
+  // new page lands later (e.g. /methodology, /guides), add the link here
+  // AND in the locale dictionary AND in app/sitemap.ts together.
   const columnDefs = [
     {
       title: columns.tools,
       items: [
-        { label: links.emailRoi,  href: `${localePrefix}/tools/email-roi-calculator` },
-        { label: links.adSpend,   href: `${localePrefix}/tools/ad-spend-breakeven` },
-        { label: links.ltvCac,    href: `${localePrefix}/tools/ltv-cac` },
-        { label: links.allTools,  href: `${localePrefix}/tools` },
+        { label: links.emailRoi,            href: `${localePrefix}/tools/email-roi-calculator` },
+        { label: links.aiCostComparator,    href: `${localePrefix}/tools/ai-cost-comparator` },
+        { label: links.productDescription,  href: `${localePrefix}/tools/product-description` },
+        { label: links.allTools,            href: `${localePrefix}/tools` },
       ],
     },
     {
       title: columns.compare,
       items: [
         { label: links.klaviyoMailchimp, href: `${localePrefix}/compare/klaviyo-vs-mailchimp` },
-        { label: links.gorgiasZendesk,   href: `${localePrefix}/compare/gorgias-vs-zendesk` },
         { label: links.omnisendKlaviyo,  href: `${localePrefix}/compare/omnisend-vs-klaviyo` },
-        { label: links.looxJudgeme,      href: `${localePrefix}/compare/loox-vs-judgeme` },
+        { label: links.gorgiasTidio,     href: `${localePrefix}/compare/gorgias-vs-tidio` },
+        { label: links.allComparisons,   href: `${localePrefix}/compare` },
       ],
     },
     {
-      title: columns.guides,
+      // Sprint 2 — reviews + guides are linked from a single "Library"
+      // column. The featured entries are hand-picked (one of each); the
+      // "all" link sends people to the indexes. We avoid auto-generating
+      // the featured rows from MDX frontmatter to keep the footer stable
+      // — link-rot here cascades into a worse perceived navigation.
+      title: columns.library,
       items: [
-        { label: links.allGuides,   href: `${localePrefix}/guides` },
-        { label: links.directory,   href: `${localePrefix}/directory` },
-        { label: links.methodology, href: `${localePrefix}/methodology` },
-        { label: links.about,       href: `${localePrefix}/about` },
+        { label: links.klaviyoReview,    href: `${localePrefix}/reviews/klaviyo-review-2026` },
+        { label: links.allReviews,       href: `${localePrefix}/reviews` },
+        { label: links.productDescGuide, href: `${localePrefix}/guides/how-to-use-ai-for-shopify-product-descriptions` },
+        { label: links.allGuides,        href: `${localePrefix}/guides` },
+      ],
+    },
+    {
+      title: columns.site,
+      items: [
+        { label: links.about,   href: `${localePrefix}/about` },
+        { label: links.catalog, href: `${localePrefix}/tools` },
       ],
     },
     {
@@ -137,7 +167,6 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
         { label: links.privacy,             href: `${localePrefix}/legal/privacy` },
         { label: links.terms,               href: `${localePrefix}/legal/terms` },
         { label: links.affiliateDisclosure, href: `${localePrefix}/legal/affiliate-disclosure` },
-        { label: links.cookiePolicy,        href: `${localePrefix}/legal/cookie-policy` },
       ],
     },
   ]
@@ -150,8 +179,10 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
       )}
     >
       <div className="container-default py-14 lg:py-16">
-        {/* Top: brand + link columns */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[1.4fr_repeat(4,1fr)] gap-10">
+        {/* Top: brand + link columns. Five link columns since Sprint 2 added
+            a Library column for /reviews + /guides — keep the brand cell
+            slightly wider so the link grid breathes on desktop. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[1.2fr_repeat(5,1fr)] gap-10">
           <div className="col-span-2 md:col-span-3 lg:col-span-1 flex flex-col gap-4">
             <Logo href={`${localePrefix}/`} idSuffix="footer" />
             <p className="text-sm leading-[1.6] text-[var(--text-secondary)] max-w-[32ch]">
@@ -206,32 +237,14 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
                   {strings.newsletter.subtitle}
                 </p>
               </div>
-              <form
-                className="flex flex-col sm:flex-row gap-2 w-full md:w-auto md:min-w-[420px]"
-                action="/api/newsletter"
-                method="post"
-              >
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  placeholder={strings.newsletter.placeholder}
-                  aria-label="Email address"
-                  className={cn(
-                    "h-11 flex-1 rounded-md border border-[var(--border-base)]",
-                    "bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)]",
-                    "placeholder:text-[var(--text-tertiary)]",
-                    "outline-none transition-shadow focus:border-[var(--brand)]",
-                    "focus:shadow-[0_0_0_3px_var(--focus-ring)]",
-                  )}
-                />
-                <button
-                  type="submit"
-                  className="h-11 px-5 rounded-md bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors"
-                >
-                  {strings.newsletter.cta}
-                </button>
-              </form>
+              <NewsletterForm
+                strings={strings.newsletter}
+                source="footer"
+                // Footer doesn't know the locale directly; we infer it
+                // from the locale prefix the page passed in.
+                language={localePrefix === "/ru" ? "ru" : "en"}
+                className="w-full md:w-auto md:min-w-[420px]"
+              />
             </div>
             <p className="relative mt-4 text-[12px] text-[var(--text-tertiary)]">
               {strings.newsletter.footnote}

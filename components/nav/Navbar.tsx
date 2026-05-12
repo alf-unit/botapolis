@@ -102,12 +102,19 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
     }
   }, [])
 
+  // Primary nav scope (Sprint 2, May 2026):
+  //   - /tools, /compare      — sprint 3-4, live since launch
+  //   - /reviews, /guides     — sprint 2 (MDX pipeline) shipped May 2026
+  //   - /directory            — still excluded (308 redirect to /tools)
+  // The order goes "do something" → "compare options" → "deep reads" so
+  // the path reflects intent rather than alphabet. Keeping it to four
+  // entries holds the desktop bar visually balanced against the right-side
+  // utility cluster.
   const links: NavLink[] = [
-    { label: strings.tools,     href: `${localePrefix}/tools` },
-    { label: strings.compare,   href: `${localePrefix}/compare` },
-    { label: strings.reviews,   href: `${localePrefix}/reviews` },
-    { label: strings.guides,    href: `${localePrefix}/guides` },
-    { label: strings.directory, href: `${localePrefix}/directory` },
+    { label: strings.tools,   href: `${localePrefix}/tools` },
+    { label: strings.compare, href: `${localePrefix}/compare` },
+    { label: strings.reviews, href: `${localePrefix}/reviews` },
+    { label: strings.guides,  href: `${localePrefix}/guides` },
   ]
 
   return (

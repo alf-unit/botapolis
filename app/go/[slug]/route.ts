@@ -26,7 +26,7 @@ interface RouteContext {
 export async function GET(req: NextRequest, ctx: RouteContext) {
   const { slug } = await ctx.params
   if (!slug || !/^[a-z0-9-]+$/i.test(slug)) {
-    return NextResponse.redirect(new URL("/directory", req.url))
+    return NextResponse.redirect(new URL("/tools", req.url))
   }
 
   const ip = getClientIp(req)
@@ -57,12 +57,12 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     .maybeSingle()
 
   if (error || !tool || tool.status !== "published") {
-    return NextResponse.redirect(new URL("/directory", req.url))
+    return NextResponse.redirect(new URL("/tools", req.url))
   }
 
   const target = tool.affiliate_url ?? tool.website_url
   if (!target) {
-    return NextResponse.redirect(new URL(`/directory/${slug}`, req.url))
+    return NextResponse.redirect(new URL(`/tools/${slug}`, req.url))
   }
 
   // ----- Build outbound URL with UTM overlay --------------------------------
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     outbound = new URL(target)
   } catch {
     // Stored URL is malformed — fall back to safe internal route.
-    return NextResponse.redirect(new URL(`/directory/${slug}`, req.url))
+    return NextResponse.redirect(new URL(`/tools/${slug}`, req.url))
   }
 
   const incoming = new URL(req.url)

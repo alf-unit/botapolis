@@ -287,6 +287,62 @@ export function generateItemListSchema(opts: {
 }
 
 // ============================================================================
+// Article — generic schema for /guides/[slug] and /reviews/[slug]
+// ----------------------------------------------------------------------------
+// For reviews we additionally emit `generateReviewSchema` (Review wraps a
+// SoftwareApplication). The Article node is the editorial frame around it —
+// Google likes seeing both nodes on the same page.
+// ============================================================================
+export function generateArticleSchema(opts: {
+  /** Article headline (frontmatter.title). */
+  headline:      string
+  description:   string
+  /** Path including locale prefix, e.g. "/reviews/klaviyo-review-2026". */
+  path:          string
+  /** ISO date of first publish. */
+  publishedAt:   string
+  /** ISO date of last edit, defaults to publishedAt. */
+  updatedAt?:    string
+  /** Hero image, falls back to the dynamic OG endpoint when omitted. */
+  image?:        string
+  /** Author display name. */
+  authorName?:   string
+  /** Editorial section ("review" | "guide" | "blog"). */
+  section?:      string
+  /** Subject tags. */
+  tags?:         string[]
+}) {
+  const url = absoluteUrl(opts.path)
+  const image = opts.image
+    ? absoluteUrl(opts.image)
+    : absoluteUrl(`${opts.path}/opengraph-image`)
+
+  return withContext({
+    "@type":         "Article",
+    "@id":           `${url}#article`,
+    headline:        opts.headline,
+    description:     opts.description,
+    image,
+    datePublished:   opts.publishedAt,
+    dateModified:    opts.updatedAt ?? opts.publishedAt,
+    author: {
+      "@type": "Organization",
+      name:    opts.authorName ?? "Botapolis editorial",
+      url:     SITE_URL,
+    },
+    publisher: {
+      "@id": `${SITE_URL}/#organization`,
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id":   url,
+    },
+    articleSection: opts.section,
+    keywords:       opts.tags?.join(", "),
+  })
+}
+
+// ============================================================================
 // HowTo — for step-by-step guides
 // ============================================================================
 export function generateHowToSchema(opts: {

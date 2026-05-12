@@ -1,7 +1,119 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from "next"
+
+/* ----------------------------------------------------------------------------
+   Security headers — TZ § 15.1 (May 2026 audit)
+   ----------------------------------------------------------------------------
+   Up until this audit `next.config.ts` was the stock boilerplate, which
+   means the deployed site shipped with zero security headers (CSP, X-Frame-
+   Options, etc.) and would score F on securityheaders.com. This config
+   brings the site to an A-grade baseline.
+
+   The CSP intentionally keeps `'unsafe-inline'` on script-src and style-src
+   for now — next-themes injects an inline pre-paint script to set the
+   theme class (avoiding FOUC), and Sonner / next/font / Next 16 hydration
+   all use inline styles. Migrating to a nonce-based CSP is a follow-up
+   (would require a request-time nonce flowing through proxy.ts).
+
+   Domains allowlisted, with justification each:
+     - plausible.io                     — TZ § 13.1, web analytics script
+     - us.i.posthog.com                 — TZ § 13.2, event-capture endpoint
+     - challenges.cloudflare.com        — TZ § 15.4, Turnstile widget+verify
+     - *.supabase.co  (https + wss)     — TZ § 4, DB/auth REST + realtime
+     - api.beehiiv.com                  — TZ § 12, newsletter API
+   No third-party image hosts are pinned — `img-src https:` is broad because
+   Supabase Storage URLs are dynamic and we'd rather serve a working logo
+   than block a tool card. Tighten later if a CSP-violation report shows abuse.
+---------------------------------------------------------------------------- */
+
+const csp = [
+  // Everything defaults to same-origin unless overridden by a more
+  // specific directive below.
+  "default-src 'self'",
+
+  // Scripts: 'unsafe-inline' covers next-themes' pre-paint script + Next's
+  // hydration payload. Plausible / PostHog / Turnstile are explicit allow.
+  "script-src 'self' 'unsafe-inline' https://plausible.io https://us.i.posthog.com https://challenges.cloudflare.com",
+
+  // Styles: Sonner + next/font + Tailwind inline-critical all need 'unsafe-inline'.
+  "style-src 'self' 'unsafe-inline'",
+
+  // Images: any HTTPS host (tool logos can live on Supabase Storage or
+  // partner CDNs). `data:` for inline SVG fallbacks (ToolLogo initial-letter
+  // chip), `blob:` for any client-side generated previews.
+  "img-src 'self' data: blob: https:",
+
+  // Fonts: next/font self-hosts Geist under `_next/static`; data: for any
+  // base64-embedded font in CSS.
+  "font-src 'self' data:",
+
+  // Connect (fetch/XHR/WebSocket): API endpoints we POST to + Supabase realtime.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://plausible.io https://us.i.posthog.com https://api.beehiiv.com https://api.anthropic.com",
+
+  // Frames: only Turnstile renders a child frame today.
+  "frame-src https://challenges.cloudflare.com",
+
+  // Frame-ancestors: replaces X-Frame-Options DENY semantics. Botapolis is
+  // never meant to be iframed; embeds happen the other way around (we ship
+  // tool snippets people embed in their blogs, not vice versa).
+  "frame-ancestors 'none'",
+
+  // Forms can only submit to same-origin endpoints. Even if a misconfigured
+  // <form action="https://evil.com"> sneaks into the markup, the browser
+  // blocks it.
+  "form-action 'self'",
+
+  // <base> tag hijack guard.
+  "base-uri 'self'",
+
+  // No <object> / <embed> / <applet> — no legitimate use, large XSS surface.
+  "object-src 'none'",
+
+  // Auto-promote any leftover http:// links to https:// at fetch time.
+  "upgrade-insecure-requests",
+].join("; ")
+
+const securityHeaders = [
+  { key: "Content-Security-Policy",   value: csp },
+  // Belt-and-suspenders alongside the CSP frame-ancestors directive — old
+  // browsers respect X-Frame-Options when they don't speak CSP frame-ancestors.
+  { key: "X-Frame-Options",           value: "DENY" },
+  // Stops content-type sniffing that can turn a .txt into JavaScript.
+  { key: "X-Content-Type-Options",    value: "nosniff" },
+  // Send origin only on cross-site navigations; full URL on same-origin.
+  { key: "Referrer-Policy",           value: "strict-origin-when-cross-origin" },
+  // Disable platform sensors we never use; ` ` keeps the directive empty
+  // ("()") which is the spec's way of saying "no origin allowed".
+  { key: "Permissions-Policy",        value: "camera=(), microphone=(), geolocation=(), interest-cohort=()" },
+  // 2-year HSTS with subdomain + preload eligibility. Vercel also sets this
+  // automatically; pinning it here makes the policy explicit and survives
+  // a hosting migration.
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+]
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  async headers() {
+    return [
+      {
+        // Apply to every route. Specific overrides (e.g. weaker CSP for an
+        // /embed/* iframe path) can be added with more specific `source`
+        // entries above this catch-all if we ever ship them.
+        source: "/(.*)",
+        headers: securityHeaders,
+      },
+    ]
+  },
+  // Sprint 2: the MDX loader reads `content/{type}/{lang}/{slug}.mdx` from
+  // disk at request time. Without an explicit trace include, Turbopack's
+  // NFT can't tell which files the dynamic path.join needs and either
+  // (a) traces the whole repo (bloats the function bundle) or (b) ships
+  // without the content directory entirely (404s on every review/guide
+  // route). Pinning the trace to `content/**` is the documented fix:
+  // https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats
+  outputFileTracingIncludes: {
+    "/reviews/**":  ["./content/reviews/**"],
+    "/guides/**":   ["./content/guides/**"],
+    "/sitemap.xml": ["./content/**"],
+  },
+}
 
-export default nextConfig;
+export default nextConfig

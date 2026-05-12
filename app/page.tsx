@@ -1,10 +1,11 @@
 import Link from "next/link"
-import { ArrowRight, BarChart3, LineChart, Mail } from "lucide-react"
+import { ArrowRight, BarChart3, Mail, Sparkles } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
+import { NewsletterForm } from "@/components/marketing/NewsletterForm"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 
@@ -13,10 +14,13 @@ export default async function HomePage() {
   const dict = await getDictionary(locale)
   const localePrefix = locale === "ru" ? "/ru" : ""
 
+  // Featured-tool icon map. Keys MUST mirror `dict.tools.items` and the
+  // slug map below — three calculators we actually ship today (Email ROI,
+  // AI Cost Comparator, AI Product Description Generator).
   const toolIcons = {
-    emailRoi:    Mail,
-    adBreakeven: LineChart,
-    ltvCac:      BarChart3,
+    emailRoi:           Mail,
+    aiCostComparator:   BarChart3,
+    productDescription: Sparkles,
   } as const
 
   return (
@@ -84,7 +88,10 @@ export default async function HomePage() {
                     <ArrowRight className="size-4" data-icon="inline-end" />
                   </Link>
                   <Link
-                    href={`${localePrefix}/reviews`}
+                    // Was /reviews until the May 2026 audit — that route
+                    // doesn't exist yet (sprint 2 / MDX pipeline pending).
+                    // /compare is the closest editorial surface we ship.
+                    href={`${localePrefix}/compare`}
                     className={cn(
                       buttonVariants({ variant: "outline", size: "lg" }),
                       "h-12 px-5 text-base border-[var(--border-base)]",
@@ -144,15 +151,17 @@ export default async function HomePage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-              {(["emailRoi", "adBreakeven", "ltvCac"] as const).map((key) => {
+              {(["emailRoi", "aiCostComparator", "productDescription"] as const).map((key) => {
                 const item = dict.tools.items[key]
                 const Icon = toolIcons[key]
+                // Each featured-tool key maps to its actual /tools/{slug}
+                // route. Audit (May 2026) confirmed all three resolve to 200.
                 const slug =
                   key === "emailRoi"
                     ? "email-roi-calculator"
-                    : key === "adBreakeven"
-                    ? "ad-spend-breakeven"
-                    : "ltv-cac"
+                    : key === "aiCostComparator"
+                    ? "ai-cost-comparator"
+                    : "product-description"
                 return (
                   <Link
                     key={key}
@@ -235,32 +244,12 @@ export default async function HomePage() {
                 <p className="mt-3 text-[15px] text-[var(--text-secondary)] max-w-md mx-auto">
                   {dict.newsletter.subtitle}
                 </p>
-                <form
-                  className="mt-6 flex flex-col sm:flex-row gap-2 max-w-md mx-auto"
-                  action="/api/newsletter"
-                  method="post"
-                >
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    placeholder={dict.newsletter.placeholder}
-                    aria-label="Email address"
-                    className={cn(
-                      "h-11 flex-1 rounded-md border border-[var(--border-base)]",
-                      "bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)]",
-                      "placeholder:text-[var(--text-tertiary)]",
-                      "outline-none transition-shadow focus:border-[var(--brand)]",
-                      "focus:shadow-[0_0_0_3px_var(--focus-ring)]",
-                    )}
-                  />
-                  <button
-                    type="submit"
-                    className="h-11 px-5 rounded-md bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors"
-                  >
-                    {dict.newsletter.cta}
-                  </button>
-                </form>
+                <NewsletterForm
+                  strings={dict.newsletter}
+                  source="homepage_hero"
+                  language={locale}
+                  className="mt-6 max-w-md mx-auto"
+                />
                 <p className="mt-3 text-[12px] text-[var(--text-tertiary)]">
                   {dict.newsletter.footnote}
                 </p>

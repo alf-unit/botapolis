@@ -18,7 +18,7 @@
     "headline": "The AI playbook for serious Shopify operators.",
     "lede": "Calculators that show real ROI. Reviews tested on real stores. Comparisons that pick a winner — not a draw.",
     "ctaPrimary": "Try the tools",
-    "ctaSecondary": "See reviews",
+    "ctaSecondary": "See comparisons",
     "social": "1,247 operators subscribed",
     "rating": "84 reviews tested",
     "widget": {
@@ -44,19 +44,19 @@
         "value": "$18,420 /mo",
         "category": "Email"
       },
-      "adBreakeven": {
-        "title": "Ad spend break-even",
-        "desc": "When do paid ads start to lose money? Set CPA, AOV, margin — get the line.",
-        "metric": "Break-even ROAS",
-        "value": "2.4×",
-        "category": "Ads"
+      "aiCostComparator": {
+        "title": "AI Cost Comparator",
+        "desc": "Compare Claude, GPT-4o, Gemini pricing for descriptions, support, ad copy, SEO.",
+        "metric": "Cheapest model",
+        "value": "$28 /mo",
+        "category": "AI"
       },
-      "ltvCac": {
-        "title": "LTV vs CAC ratio",
-        "desc": "Live cohort math without a spreadsheet — find your sustainable acquisition window.",
-        "metric": "Healthy ratio",
-        "value": "3.2 : 1",
-        "category": "Analytics"
+      "productDescription": {
+        "title": "AI Product Description",
+        "desc": "Three on-brand product description variations in five seconds. Tone- and audience-aware.",
+        "metric": "Variations",
+        "value": "3 / run",
+        "category": "AI"
       }
     }
   },
@@ -66,33 +66,42 @@
     "subtitle": "One email a week. Calculator updates, new reviews, the trade-offs we caught.",
     "placeholder": "you@store.com",
     "cta": "Subscribe",
-    "footnote": "Join 1,247 Shopify operators · Unsubscribe anytime"
+    "ctaLoading": "Subscribing…",
+    "ctaSubscribed": "Subscribed",
+    "footnote": "Join 1,247 Shopify operators · Unsubscribe anytime",
+    "successTitle": "You're in.",
+    "successDescription": "Check your inbox for a welcome note.",
+    "errorTitle": "Couldn't subscribe",
+    "errorInvalid": "That email looks off — double-check it.",
+    "errorRateLimited": "Too many attempts. Try again in a few minutes."
   },
   "footer": {
     "tagline": "The operator's manual for AI tools that move Shopify stores forward.",
     "columns": {
       "tools": "Tools",
       "compare": "Compare",
-      "guides": "Guides",
+      "library": "Library",
+      "site": "Site",
       "legal": "Legal"
     },
     "links": {
       "emailRoi": "Email ROI calculator",
-      "adSpend": "Ad spend planner",
-      "ltvCac": "LTV / CAC",
+      "aiCostComparator": "AI Cost Comparator",
+      "productDescription": "Product description generator",
       "allTools": "All tools",
       "klaviyoMailchimp": "Klaviyo vs Mailchimp",
-      "gorgiasZendesk": "Gorgias vs Zendesk",
       "omnisendKlaviyo": "Omnisend vs Klaviyo",
-      "looxJudgeme": "Loox vs Judge.me",
+      "gorgiasTidio": "Gorgias vs Tidio",
+      "allComparisons": "All comparisons",
+      "klaviyoReview": "Klaviyo review 2026",
+      "productDescGuide": "AI product descriptions",
+      "allReviews": "All reviews",
       "allGuides": "All guides",
-      "directory": "Directory",
-      "methodology": "Methodology",
       "about": "About",
+      "catalog": "Tool catalog",
       "privacy": "Privacy",
       "terms": "Terms",
-      "affiliateDisclosure": "Affiliate disclosure",
-      "cookiePolicy": "Cookie policy"
+      "affiliateDisclosure": "Affiliate disclosure"
     },
     "copyright": "© 2026 Botapolis · Made for operators, not lurkers"
   },

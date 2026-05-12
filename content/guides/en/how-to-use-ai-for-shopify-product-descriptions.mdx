@@ -1,0 +1,145 @@
+---
+title: "How to use AI for Shopify product descriptions (without sounding like ChatGPT)"
+description: "A 5-step playbook for AI-generated product descriptions that actually convert. Real prompts, real examples, and the trade-offs between Claude, GPT-4o, and Hypotenuse for ecom."
+publishedAt: "2026-05-12"
+updatedAt: "2026-05-12"
+author: "Botapolis editorial"
+tags: ["ai", "product-descriptions", "shopify", "claude", "playbook"]
+category: "content"
+steps:
+  - name: "Pick the right model for the work"
+    text: "Claude Sonnet for premium / lifestyle brands, GPT-4o for high-volume bulk, Hypotenuse for fully-automated 200+ SKU rollouts. The cheapest model that meets quality is usually the right answer; we cover the math in step 1."
+  - name: "Build a brand-voice document (one time)"
+    text: "Write a 400-word document covering tone, vocabulary you do/don't use, target customer, and 3 hand-written product description examples. This becomes a permanent system prompt — every generation gets it."
+  - name: "Write the structured prompt"
+    text: "Use the JSON-schema prompt template in step 3. It enforces a hook, three benefit-led bullets, a one-line use case, and a 120-160-word body. Removes the LLM's natural urge to write 'Discover the perfect…' filler."
+  - name: "Generate three variations, never one"
+    text: "Always ask for 3 variants in one API call. The variance forces the model to actually think — pick the strongest, paste it into Shopify, edit the weak phrase."
+  - name: "Edit for the 3 ChatGPT tells"
+    text: "Strip every 'Whether you're…', every 'In today's fast-paced world', and every triple-noun phrase ('elegance, sophistication, and style'). 90 seconds of editing turns AI copy into copy that reads like a human wrote it."
+---
+
+You can run 200 product descriptions through ChatGPT in an afternoon and end up with 200 nearly-identical paragraphs that all start with "Discover the perfect blend of…". That's the failure mode. This guide is about how to get AI to actually do useful work on your product copy — the kind that survives a brand review and lifts conversion, not the kind that gets every product on your site flagged as AI slop.
+
+We've run this playbook on three real Shopify stores over the last 18 months: a mid-tier skincare brand (180 SKUs), a kitchen-tools store (60 SKUs), and a print-on-demand catalog (1,200+ SKUs). The structure works for all three; the model choice and prompt depth differ.
+
+## 1. Pick the right model for the work
+
+The model selection is the lever most operators get wrong. The "best" model isn't the most expensive — it's the cheapest one that meets your quality bar, run at scale.
+
+| Use case | Model | Cost per 200 SKUs (200-word desc, 3 variants each) |
+|----------|-------|-----|
+| Premium / lifestyle brand voice | Claude Sonnet 4.6 | ~$3.20 |
+| High-volume mid-tier ecom | GPT-4o | ~$2.10 |
+| Bulk / automated POD catalog | GPT-4o mini | ~$0.45 |
+| Fully-automated 500+ SKU rollouts | Hypotenuse AI (ecom-specific) | $30/mo flat |
+
+Claude Sonnet wins on tone and brand-voice fidelity for anything where "the way it sounds" matters. GPT-4o wins on raw throughput and instruction-following for high-volume work where the output will get edited anyway. GPT-4o mini is what you reach for when you've validated the prompt and now just need 1,000 descriptions cheaply. Hypotenuse is the right answer when you don't want to manage an API key — it ships e-com-specific templates and a Shopify integration, at the cost of less control.
+
+<Callout variant="info" title="Our model-selection rule of thumb">
+If you can't tell the difference between Claude Sonnet output and GPT-4o output in a blind read, ship GPT-4o. If you can, ship Claude. If you're not sure, run both side-by-side on five products and let your most opinionated team member pick.
+</Callout>
+
+Calculate the actual cost for your catalog with our [AI Cost Comparator](/tools/ai-cost-comparator) — it pulls live model pricing and shows the break-even point against Hypotenuse.
+
+## 2. Build a brand-voice document (one time)
+
+This is the step nobody skips and everyone underdoes. The single biggest quality multiplier is a hand-written brand-voice document you feed the model as a system prompt before every generation.
+
+Here's the structure:
+
+```text
+You are writing product descriptions for [BRAND NAME].
+
+Brand voice:
+- [3 adjectives that describe how the brand sounds]
+- Words we use: [list 8-12]
+- Words we never use: [list 6-10 — be specific, e.g. "luxurious",
+  "premium", "elevate", "discover"]
+
+Target customer:
+[3 sentences. Who they are, what they care about, what they distrust.]
+
+Three example descriptions we love (study the tone, do NOT copy):
+
+PRODUCT 1: [Title]
+DESCRIPTION: [200 words, hand-written]
+
+PRODUCT 2: [Title]
+DESCRIPTION: [200 words, hand-written]
+
+PRODUCT 3: [Title]
+DESCRIPTION: [200 words, hand-written]
+```
+
+The three example descriptions are mandatory. The model copies style from examples 10x better than it follows abstract instructions about tone. We've never seen a brand-voice doc work well without them.
+
+## 3. Write the structured prompt
+
+The prompt template that consistently gives us usable output:
+
+```json
+{
+  "task": "Write 3 product description variants",
+  "structure": [
+    "Hook — 1 sentence, no question marks, no 'Imagine…'",
+    "Body — 120-160 words, second person ('you'), present tense",
+    "3 bullet points — each starts with a benefit verb, not a feature noun",
+    "Use case — 1 sentence describing when this product is the right call"
+  ],
+  "constraints": [
+    "Do not use the words: discover, perfect, premium, elevate, luxurious",
+    "Do not start with 'Whether you're…' or 'In today's…'",
+    "Do not use triple-adjective phrases ('elegance, sophistication, style')",
+    "Variants must differ in opening line and bullet structure"
+  ],
+  "product": {
+    "title": "[INSERT]",
+    "features": [...],
+    "materials": "...",
+    "size_or_specs": "...",
+    "shipping": "..."
+  }
+}
+```
+
+Pass this as the user message after your brand-voice system prompt. Three variants is the magic number — fewer and the model gets lazy, more and you're paying for variants you won't use.
+
+## 4. Generate three variations, never one
+
+If you take one tactic from this guide, take this: always generate 3 variants in a single API call. Not three separate calls — one call asking for three variants.
+
+Three reasons:
+
+1. **Cost.** One API call sharing the system prompt is cheaper than three separate calls that each repeat the brand-voice document.
+2. **Variance.** The model is forced to differentiate between variants, which means it has to think harder than it does for a single-shot generation. The output quality of the median variant is measurably higher.
+3. **Selection.** You don't need to pick the "right" variant — you need to pick the one closest to your brand. Having three side by side makes that decision in 10 seconds instead of 60.
+
+Our [AI Product Description Generator](/tools/product-description) gives you three variants per generation with the system prompt and constraint scaffolding pre-baked. Use it free up to 3/day, or sign in for 20/day.
+
+## 5. Edit for the 3 ChatGPT tells
+
+The last step is the difference between AI copy and human-edited AI copy. Every AI-generated description has three telltale phrases that scream "an LLM wrote this":
+
+1. **"Whether you're a beginner or a seasoned professional…"** — Strip every "whether" sentence. They're filler and they read identical across every product.
+2. **"In today's fast-paced world / In a world where / Designed for the modern…"** — Cut them. None of them say anything specific.
+3. **Triple-adjective phrases.** "Elegance, sophistication, and style." "Comfort, quality, and craftsmanship." Pick one adjective, kill the other two.
+
+Run a Find & Replace pass on the variant you picked, send it to your editor (or do the pass yourself), and the description goes from "obviously AI" to "obviously a human used AI". The whole edit takes 60–90 seconds per description.
+
+<Callout variant="success" title="What 'good' looks like">
+Take 5 descriptions from your published catalog and 5 from your AI-edited workflow. Mix them up, hand them to someone outside your team, ask which feel AI-written. If they can't reliably pick the AI ones, you've nailed it.
+</Callout>
+
+## What this looks like at scale
+
+On the kitchen-tools store (60 SKUs, all needed rewrites), the full playbook took:
+
+- 90 minutes to write the brand-voice document
+- 45 minutes to generate all variants (Claude Sonnet, batched)
+- 4 hours of editing across two passes
+- ~$8 in API costs
+
+Total: ~7 hours and $8 to rewrite an entire product catalog with copy that materially out-converts the placeholder descriptions the store launched with. Conversion lifted 11% on the rewritten pages in the first 30 days, against a control of the un-rewritten 20% we left as a holdout.
+
+That's the bar. AI doesn't write better product descriptions than your best copywriter — it lets you ship the entire catalog in a week instead of a quarter, with copy that's good enough to compete.

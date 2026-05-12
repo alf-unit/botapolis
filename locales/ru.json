@@ -18,7 +18,7 @@
     "headline": "AI-плейбук для серьёзных Shopify-операторов.",
     "lede": "Калькуляторы, которые показывают реальный ROI. Обзоры на настоящих магазинах. Сравнения с конкретным победителем — без ничьих.",
     "ctaPrimary": "Открыть инструменты",
-    "ctaSecondary": "Смотреть обзоры",
+    "ctaSecondary": "Смотреть сравнения",
     "social": "1247 операторов подписаны",
     "rating": "84 обзора протестировано",
     "widget": {
@@ -44,19 +44,19 @@
         "value": "$18,420 /мес",
         "category": "Email"
       },
-      "adBreakeven": {
-        "title": "Точка окупаемости рекламы",
-        "desc": "Когда платный трафик перестаёт окупаться? Задайте CPA, AOV, маржу — получите линию.",
-        "metric": "Break-even ROAS",
-        "value": "2.4×",
-        "category": "Реклама"
+      "aiCostComparator": {
+        "title": "AI Cost Comparator",
+        "desc": "Сравните цены Claude, GPT-4o, Gemini для описаний, поддержки, рекламы и SEO.",
+        "metric": "Дешевле всех",
+        "value": "$28 /мес",
+        "category": "AI"
       },
-      "ltvCac": {
-        "title": "Отношение LTV к CAC",
-        "desc": "Живая когортная математика без таблиц — найдите устойчивое окно привлечения.",
-        "metric": "Здоровое значение",
-        "value": "3.2 : 1",
-        "category": "Аналитика"
+      "productDescription": {
+        "title": "AI-генератор описаний",
+        "desc": "Три варианта описания товара под тон и аудиторию за 5 секунд.",
+        "metric": "Вариантов",
+        "value": "3 / запрос",
+        "category": "AI"
       }
     }
   },
@@ -66,33 +66,42 @@
     "subtitle": "Одно письмо в неделю. Обновления калькуляторов, новые обзоры, найденные нами компромиссы.",
     "placeholder": "you@store.com",
     "cta": "Подписаться",
-    "footnote": "Уже 1247 Shopify-операторов · Отписаться можно в любой момент"
+    "ctaLoading": "Подписываем…",
+    "ctaSubscribed": "Подписаны",
+    "footnote": "Уже 1247 Shopify-операторов · Отписаться можно в любой момент",
+    "successTitle": "Готово.",
+    "successDescription": "Проверьте почту — там welcome-письмо.",
+    "errorTitle": "Не удалось подписаться",
+    "errorInvalid": "В email похоже опечатка — проверь.",
+    "errorRateLimited": "Слишком много попыток. Попробуй через пару минут."
   },
   "footer": {
     "tagline": "Operator's manual по AI-инструментам, которые двигают Shopify-магазины вперёд.",
     "columns": {
       "tools": "Инструменты",
       "compare": "Сравнения",
-      "guides": "Гайды",
+      "library": "Библиотека",
+      "site": "Сайт",
       "legal": "Правовое"
     },
     "links": {
       "emailRoi": "Калькулятор Email ROI",
-      "adSpend": "Планировщик рекламы",
-      "ltvCac": "LTV / CAC",
+      "aiCostComparator": "AI Cost Comparator",
+      "productDescription": "AI-генератор описаний",
       "allTools": "Все инструменты",
       "klaviyoMailchimp": "Klaviyo vs Mailchimp",
-      "gorgiasZendesk": "Gorgias vs Zendesk",
       "omnisendKlaviyo": "Omnisend vs Klaviyo",
-      "looxJudgeme": "Loox vs Judge.me",
+      "gorgiasTidio": "Gorgias vs Tidio",
+      "allComparisons": "Все сравнения",
+      "klaviyoReview": "Обзор Klaviyo 2026",
+      "productDescGuide": "AI-описания товаров",
+      "allReviews": "Все обзоры",
       "allGuides": "Все гайды",
-      "directory": "Каталог",
-      "methodology": "Методология",
       "about": "О проекте",
+      "catalog": "Каталог инструментов",
       "privacy": "Конфиденциальность",
       "terms": "Условия",
-      "affiliateDisclosure": "Партнёрский disclosure",
-      "cookiePolicy": "Cookie-политика"
+      "affiliateDisclosure": "Партнёрский disclosure"
     },
     "copyright": "© 2026 Botapolis · Сделано для операторов, не для зевак"
   },

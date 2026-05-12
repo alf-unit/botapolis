@@ -41,7 +41,11 @@ function derivePathsFromSupabaseWebhook(payload: SupabaseWebhookPayload): string
   if (!slug) return []
   switch (payload.table) {
     case "tools":
-      return [`/tools/${slug}`, `/directory/${slug}`, "/tools", "/directory", "/"]
+      // /directory is a permanent redirect to /tools and has no [slug]
+      // route; the tool detail page is /tools/{slug}. Listing the old
+      // /directory paths was a no-op (revalidatePath silently ignores
+      // unknown paths) but cluttered logs — dropped in the May 2026 audit.
+      return [`/tools/${slug}`, "/tools", "/"]
     case "comparisons":
       return [`/compare/${slug}`, "/compare", "/"]
     default:

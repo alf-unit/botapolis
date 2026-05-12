@@ -1,24 +1,32 @@
 /**
  * POST /api/tools/description — TZ § 11.3
  * ----------------------------------------------------------------------------
- * Generates three product-description variations through Claude Haiku 4.5
- * (the dirt-cheap model in the family — TZ specifies it explicitly).
+ * Generates three product-description variations through OpenRouter's
+ * unified gateway. We default to anthropic/claude-haiku-4.5 (cheap, fast,
+ * the same family TZ originally specified) but the model is now an env
+ * flag — switching to openai/gpt-4o-mini or any other supported route is a
+ * one-line env change with no code redeploy.
  *
  * Pipeline:
  *   1. Zod-validate the body.
  *   2. Rate-limit by hashed client IP (aiToolGuestLimit = 3 / 24 h, TZ § 11).
  *   3. Build a structured prompt + system instruction so the model returns
  *      exactly 3 variations separated by a `---` delimiter we can split on.
- *   4. POST to api.anthropic.com directly via fetch — no SDK dependency,
- *      no extra cold-start weight, same fetch idiom we use elsewhere.
+ *   4. POST to openrouter.ai via fetch — no SDK dependency. OpenRouter is
+ *      OpenAI-compatible, so we use the /chat/completions shape.
  *   5. Parse the text block, split into variations, return JSON.
  *
  * Failure modes mapped to clear status codes:
  *   400 invalid_input           — zod validation
  *   429 rate_limited            — too many attempts on this IP today
- *   503 ai_not_configured       — ANTHROPIC_API_KEY missing in this env
- *   502 upstream_error          — Anthropic non-200 / bad shape
+ *   503 ai_not_configured       — OPENROUTER_API_KEY missing in this env
+ *   502 upstream_error          — OpenRouter non-200 / bad shape
  *   500 internal                — anything else
+ *
+ * Migration note (May 2026): switched from Anthropic direct API to
+ * OpenRouter to consolidate vendor billing + unlock model-shopping. The
+ * default model anthropic/claude-haiku-4.5 routes through the same
+ * underlying Anthropic infrastructure, so output quality is unchanged.
  */
 import { NextResponse, type NextRequest } from "next/server"
 import { z } from "zod"
@@ -27,7 +35,7 @@ import { aiToolGuestLimit } from "@/lib/ratelimit"
 import { getClientIp, hashIp } from "@/lib/utils"
 
 // Force Node.js runtime — Web Crypto + 10s budget is plenty, no Edge gain
-// here because Anthropic's tail latency dominates the request.
+// here because the model latency dominates the request.
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
@@ -53,8 +61,8 @@ type ParsedBody = z.infer<typeof bodySchema>
 // --------------------------------------------------------------------------
 // Audience descriptions — fed straight into the prompt so the model has
 // a concrete persona to write towards. Localized labels live client-side;
-// these strings are deliberately English because Claude is being asked to
-// write English product copy.
+// these strings are deliberately English because the model is being asked
+// to write English product copy.
 // --------------------------------------------------------------------------
 const AUDIENCE_HINT: Record<ParsedBody["audience"], string> = {
   ecom_general: "general DTC ecommerce shoppers — pragmatic, value-conscious, comparison shopping",
@@ -65,11 +73,15 @@ const AUDIENCE_HINT: Record<ParsedBody["audience"], string> = {
 }
 
 // --------------------------------------------------------------------------
-// Anthropic API types — only the shape we read.
+// OpenRouter response types (OpenAI-compatible /chat/completions shape).
+// We only read the fields we need; the API returns much more.
 // --------------------------------------------------------------------------
-interface AnthropicMessage {
-  content?: Array<{ type: string; text?: string }>
-  error?:   { message?: string; type?: string }
+interface OpenRouterCompletion {
+  choices?: Array<{
+    message?: { role?: string; content?: string }
+    finish_reason?: string
+  }>
+  error?:   { message?: string; type?: string; code?: string }
 }
 
 // --------------------------------------------------------------------------
@@ -114,53 +126,69 @@ function splitVariations(raw: string): string[] {
 }
 
 // --------------------------------------------------------------------------
-// Anthropic call
+// OpenRouter call
 // --------------------------------------------------------------------------
-async function callAnthropic(body: ParsedBody): Promise<
+async function callOpenRouter(body: ParsedBody): Promise<
   | { ok: true; variations: string[] }
   | { ok: false; status: number; reason: string }
 > {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) {
     return { ok: false, status: 503, reason: "ai_not_configured" }
   }
+
+  // Model is configurable via env so we can A/B-test model choice without a
+  // code deploy. Default mirrors TZ's original "cheap Haiku" spec.
+  const model = process.env.OPENROUTER_MODEL ?? "anthropic/claude-haiku-4.5"
 
   try {
     // Token budget heuristic: ~1.3 tokens per word × 3 variations × maxLength
     // + a 200-token cushion for the delimiters / preamble.
     const maxTokens = Math.min(4096, Math.ceil(body.maxLength * 3 * 1.3) + 200)
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method:  "POST",
       headers: {
-        "x-api-key":         apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type":      "application/json",
+        "Authorization":  `Bearer ${apiKey}`,
+        "Content-Type":   "application/json",
+        // OpenRouter uses these for attribution + their rank-by-app dashboard.
+        // Neither is required for the request to succeed, but missing them
+        // makes our usage invisible in their app analytics.
+        "HTTP-Referer":   process.env.NEXT_PUBLIC_SITE_URL ?? "https://botapolis.com",
+        "X-Title":        "Botapolis",
       },
       body: JSON.stringify({
-        // TZ-2 § 11.3 explicitly pins the cheap Haiku 4.5 build.
-        model:      "claude-haiku-4-5-20251001",
+        model,
         max_tokens: maxTokens,
-        system:     SYSTEM_PROMPT,
         messages: [
-          { role: "user", content: buildUserPrompt(body) },
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user",   content: buildUserPrompt(body) },
         ],
+        // Mild temperature — we want 3 different variants, not 3 carbon
+        // copies. 0.7 is a sweet spot for marketing copy.
+        temperature: 0.7,
       }),
-      // Anthropic's p99 is ~10s for Haiku — cap a hair higher to surface
-      // a real "upstream slow" error before our serverless function times out.
+      // Tail latency varies by upstream model; 20s clears the p99 for the
+      // Haiku-family routes while still surfacing real "upstream slow"
+      // before our serverless function's 30s hard cap.
       signal: AbortSignal.timeout(20_000),
     })
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "")
-      console.error("[/api/tools/description] anthropic non-OK:", res.status, errText.slice(0, 400))
+      console.error("[/api/tools/description] openrouter non-OK:", res.status, errText.slice(0, 400))
       return { ok: false, status: 502, reason: "upstream_error" }
     }
 
-    const data = (await res.json()) as AnthropicMessage
-    const textBlock = data.content?.find((b) => b.type === "text")?.text
+    const data = (await res.json()) as OpenRouterCompletion
+    if (data.error) {
+      console.error("[/api/tools/description] openrouter error payload:", data.error)
+      return { ok: false, status: 502, reason: "upstream_error" }
+    }
+
+    const textBlock = data.choices?.[0]?.message?.content
     if (!textBlock) {
-      console.error("[/api/tools/description] anthropic missing text block:", JSON.stringify(data).slice(0, 400))
+      console.error("[/api/tools/description] openrouter missing content:", JSON.stringify(data).slice(0, 400))
       return { ok: false, status: 502, reason: "upstream_error" }
     }
 
@@ -217,16 +245,16 @@ export async function POST(req: NextRequest) {
         headers: {
           "X-RateLimit-Remaining": String(remaining),
           "X-RateLimit-Reset":     String(reset),
-          // Anthropic-style retry suggestion — give the client 30 min before
-          // the next attempt so we don't get hammered.
+          // Same retry suggestion we used previously — gives the client
+          // 30 min before the next attempt so we don't get hammered.
           "Retry-After":           "1800",
         },
       },
     )
   }
 
-  // 3. Anthropic
-  const result = await callAnthropic(body)
+  // 3. OpenRouter
+  const result = await callOpenRouter(body)
   if (!result.ok) {
     return NextResponse.json(
       {

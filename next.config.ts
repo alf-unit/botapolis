@@ -47,7 +47,11 @@ const csp = [
   "font-src 'self' data:",
 
   // Connect (fetch/XHR/WebSocket): API endpoints we POST to + Supabase realtime.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://plausible.io https://us.i.posthog.com https://api.beehiiv.com https://api.anthropic.com",
+  // openrouter.ai is server-to-server (the AI route fetches from our Node
+  // runtime, not the browser), so technically CSP wouldn't block it. We
+  // keep it allowlisted anyway for honesty — if we ever expose direct
+  // client calls (streaming UI?), the header is already correct.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://plausible.io https://us.i.posthog.com https://api.beehiiv.com https://openrouter.ai",
 
   // Frames: only Turnstile renders a child frame today.
   "frame-src https://challenges.cloudflare.com",

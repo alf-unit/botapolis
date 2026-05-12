@@ -25,5 +25,10 @@ export async function generateMetadata(): Promise<Metadata> {
       "Калькуляторы с реальным ROI. Обзоры на настоящих магазинах. Сравнения с конкретным победителем — без ничьих.",
     path:    "/",
     locale:  "ru",
+    // BUG-FIX (May 2026 audit): the homepage title already contains the
+    // "Botapolis — " prefix, so the root layout's `%s · Botapolis` template
+    // doubled the brand into "Botapolis — … · Botapolis". Setting
+    // absoluteTitle bypasses the template for this page only.
+    absoluteTitle: true,
   })
 }

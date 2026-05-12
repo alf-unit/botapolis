@@ -38,9 +38,23 @@ interface BuildMetadataOptions {
   noIndex?: boolean
   /** Additional keywords. */
   keywords?: string[]
+  /**
+   * Bypass the root layout's `%s · Botapolis` template. Use when the title
+   * already contains the brand (e.g. homepage hero copy). Without this
+   * flag, a title of "Botapolis — Foo" becomes "Botapolis — Foo · Botapolis"
+   * in the rendered <title>. Defaults to false.
+   */
+  absoluteTitle?: boolean
 }
 
-const DEFAULT_OG_IMAGE = "/og-default.png"
+// Fallback OG image — points at our /api/og dynamic generator instead of a
+// static PNG. Reason (May 2026 audit): the original `/og-default.png` was
+// never shipped to /public, so every page without a custom OG override was
+// emitting a `og:image` URL that 404'd. Twitter / Slack / LinkedIn rendered
+// preview cards without an image. `/api/og` returns a 1200×630 mint+violet
+// gradient with the site title — same visual family as the article OGs.
+const DEFAULT_OG_IMAGE =
+  "/api/og?title=Botapolis&description=The%20AI%20operator%27s%20manual%20for%20Shopify"
 const SITE_NAME = "Botapolis"
 
 function localePath(path: string, locale: LanguageCode): string {
@@ -61,6 +75,7 @@ export function buildMetadata({
   article,
   noIndex = false,
   keywords,
+  absoluteTitle = false,
 }: BuildMetadataOptions): Metadata {
   const enPath = localePath(path, "en")
   const ruPath = localePath(path, "ru")
@@ -74,7 +89,10 @@ export function buildMetadata({
   const shortDescription = truncate(description, 200)
 
   const metadata: Metadata = {
-    title,
+    // When absoluteTitle is true, wrap in { absolute } so Next skips the
+    // root layout's `%s · Botapolis` template — pages that already include
+    // the brand in the title text shouldn't have it appended a second time.
+    title: absoluteTitle ? { absolute: title } : title,
     description: shortDescription,
     keywords,
     alternates: {

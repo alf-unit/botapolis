@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { Rss } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Logo } from "./Logo"
@@ -257,9 +256,15 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
           <span>{strings.copyright}</span>
           <div className="flex items-center gap-1">
             {[
+              // BUG-FIX (May 2026 audit): dropped the RSS icon — /rss.xml
+              // 404s and shipping a dead link in the footer of every page is
+              // worse than not advertising RSS at all. Wire the icon back in
+              // the day we actually ship app/rss.xml/route.ts.
+              // The remaining three socials still point at placeholder
+              // URLs (x.com / linkedin.com / github.com root pages); swap
+              // them for real brand profiles before the next press push.
               { Icon: TwitterMark,  href: "https://x.com",        label: "X / Twitter" },
               { Icon: LinkedinMark, href: "https://linkedin.com", label: "LinkedIn"    },
-              { Icon: Rss,          href: "/rss.xml",             label: "RSS feed"    },
               { Icon: GithubMark,   href: "https://github.com",   label: "GitHub"      },
             ].map(({ Icon, href, label }) => (
               <a

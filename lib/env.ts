@@ -6,7 +6,7 @@
  *
  * The first time this module is imported it validates `process.env` and
  * throws a readable error if anything's missing or wrong. Optional services
- * (Beehiiv, Turnstile, PostHog, Resend, Anthropic) are intentionally lenient
+ * (Beehiiv, Turnstile, PostHog, Resend, OpenRouter) are intentionally lenient
  * — set them later without blocking dev.
  *
  * Usage:
@@ -34,8 +34,13 @@ export const env = createEnv({
     UPSTASH_REDIS_REST_URL:   optionalString(),
     UPSTASH_REDIS_REST_TOKEN: optionalString(),
 
-    // ----- AI tools (sprint 4) --------------------------------------------
-    ANTHROPIC_API_KEY: optionalString(),
+    // ----- AI tools (sprint 4, migrated May 2026 to OpenRouter) -----------
+    // OpenRouter is OpenAI-compatible and routes to many providers under
+    // one bill. The default model is set via OPENROUTER_MODEL (server-only
+    // because we don't want the chosen model in the client bundle); when
+    // unset the AI route falls back to anthropic/claude-haiku-4.5.
+    OPENROUTER_API_KEY: optionalString(),
+    OPENROUTER_MODEL:   optionalString(),
 
     // ----- Newsletter (sprint 5) ------------------------------------------
     BEEHIIV_API_KEY:        optionalString(),
@@ -77,7 +82,8 @@ export const env = createEnv({
     SUPABASE_SERVICE_ROLE_KEY:       process.env.SUPABASE_SERVICE_ROLE_KEY,
     UPSTASH_REDIS_REST_URL:          process.env.UPSTASH_REDIS_REST_URL,
     UPSTASH_REDIS_REST_TOKEN:        process.env.UPSTASH_REDIS_REST_TOKEN,
-    ANTHROPIC_API_KEY:               process.env.ANTHROPIC_API_KEY,
+    OPENROUTER_API_KEY:              process.env.OPENROUTER_API_KEY,
+    OPENROUTER_MODEL:                process.env.OPENROUTER_MODEL,
     BEEHIIV_API_KEY:                 process.env.BEEHIIV_API_KEY,
     BEEHIIV_PUBLICATION_ID:          process.env.BEEHIIV_PUBLICATION_ID,
     RESEND_API_KEY:                  process.env.RESEND_API_KEY,

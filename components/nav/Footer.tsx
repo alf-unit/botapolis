@@ -75,8 +75,8 @@ export interface FooterStrings {
     legal: string
   }
   // Link labels. Every key here MUST map to a route that returns 200; the
-  // shape mirrors what the dead-link audit (May 2026) + Sprint 2 verified
-  // is live.
+  // shape mirrors what the dead-link audit (May 2026) + Sprint 2 + Block B
+  // verified is live.
   links: {
     emailRoi:            string
     aiCostComparator:    string
@@ -92,8 +92,12 @@ export interface FooterStrings {
     allGuides:           string
     about:               string
     catalog:             string
+    methodology:         string
+    contact:             string
     privacy:             string
     terms:               string
+    cookiePolicy:        string
+    disclaimer:          string
     affiliateDisclosure: string
   }
   // `eyebrow / title / subtitle / footnote` live in the footer chrome; the
@@ -156,8 +160,13 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
     {
       title: columns.site,
       items: [
-        { label: links.about,   href: `${localePrefix}/about` },
-        { label: links.catalog, href: `${localePrefix}/tools` },
+        { label: links.about,       href: `${localePrefix}/about` },
+        { label: links.catalog,     href: `${localePrefix}/tools` },
+        // Block B (May 2026): methodology + contact land here. They're
+        // editorial chrome rather than tools/comparisons/library, so the
+        // "Site" column collects them.
+        { label: links.methodology, href: `${localePrefix}/methodology` },
+        { label: links.contact,     href: `${localePrefix}/contact` },
       ],
     },
     {
@@ -165,6 +174,8 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
       items: [
         { label: links.privacy,             href: `${localePrefix}/legal/privacy` },
         { label: links.terms,               href: `${localePrefix}/legal/terms` },
+        { label: links.cookiePolicy,        href: `${localePrefix}/legal/cookie-policy` },
+        { label: links.disclaimer,          href: `${localePrefix}/legal/disclaimer` },
         { label: links.affiliateDisclosure, href: `${localePrefix}/legal/affiliate-disclosure` },
       ],
     },

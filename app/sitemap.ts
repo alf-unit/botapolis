@@ -47,8 +47,13 @@ const STATIC_ROUTES: Array<{
   { path: "/reviews",      changeFrequency: "weekly",  priority: 0.85 },
   { path: "/guides",       changeFrequency: "weekly",  priority: 0.85 },
   { path: "/about",        changeFrequency: "monthly", priority: 0.5 },
+  // Block B (May 2026) — trust signals + contact surface.
+  { path: "/methodology",  changeFrequency: "monthly", priority: 0.6 },
+  { path: "/contact",      changeFrequency: "monthly", priority: 0.45 },
   { path: "/legal/privacy",              changeFrequency: "yearly", priority: 0.2 },
   { path: "/legal/terms",                changeFrequency: "yearly", priority: 0.2 },
+  { path: "/legal/cookie-policy",        changeFrequency: "yearly", priority: 0.2 },
+  { path: "/legal/disclaimer",           changeFrequency: "yearly", priority: 0.2 },
   { path: "/legal/affiliate-disclosure", changeFrequency: "yearly", priority: 0.3 },
 ]
 

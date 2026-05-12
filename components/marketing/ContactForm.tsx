@@ -1,0 +1,223 @@
+"use client"
+
+import * as React from "react"
+import { toast } from "sonner"
+import { ArrowUpRight, Mail } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+
+/* ----------------------------------------------------------------------------
+   <ContactForm>
+   ----------------------------------------------------------------------------
+   Client island that powers /contact and /ru/contact. POSTs to /api/contact
+   with JSON, surfaces success/error via Sonner toasts (same UX pattern as
+   NewsletterForm). Form falls back to a `mailto:` link if the network
+   submit fails twice in a row — better than letting a frustrated visitor
+   give up silently.
+
+   Locale-aware strings come down as props so this client component never
+   has to touch getDictionary (which is server-only).
+---------------------------------------------------------------------------- */
+
+export interface ContactFormStrings {
+  nameLabel:       string
+  emailLabel:      string
+  subjectLabel:    string
+  messageLabel:    string
+  submitCta:       string
+  submitLoading:   string
+  successTitle:    string
+  successBody:     string
+  errorTitle:      string
+  errorRateLimited: string
+  errorGeneric:    string
+  fallbackTitle:   string
+  fallbackBody:    string
+  fallbackCta:     string
+}
+
+interface ContactFormProps {
+  strings:      ContactFormStrings
+  contactEmail: string
+  language:     "en" | "ru"
+  className?:   string
+}
+
+type FormStatus = "idle" | "submitting" | "success"
+
+export function ContactForm({
+  strings,
+  contactEmail,
+  language,
+  className,
+}: ContactFormProps) {
+  const [status, setStatus] = React.useState<FormStatus>("idle")
+  const [consecutiveFailures, setConsecutiveFailures] = React.useState(0)
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (status === "submitting") return
+    setStatus("submitting")
+
+    const fd = new FormData(e.currentTarget)
+    const payload = {
+      name:    (fd.get("name")    as string)?.trim() || undefined,
+      email:   (fd.get("email")   as string)?.trim(),
+      subject: (fd.get("subject") as string)?.trim() || undefined,
+      message: (fd.get("message") as string)?.trim(),
+      source:  "contact_page",
+    }
+
+    try {
+      const res = await fetch("/api/contact", {
+        method:  "POST",
+        headers: { "content-type": "application/json", "accept-language": language },
+        body:    JSON.stringify(payload),
+      })
+
+      if (res.ok) {
+        setStatus("success")
+        setConsecutiveFailures(0)
+        toast.success(strings.successTitle, { description: strings.successBody })
+        ;(e.target as HTMLFormElement).reset()
+        return
+      }
+
+      // Read the structured error to surface useful copy (rate-limit vs
+      // generic). We don't dump server messages directly — they're tuned
+      // for engineering audiences, not visitors.
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      const errMsg =
+        data.error === "rate_limited" ? strings.errorRateLimited : strings.errorGeneric
+      toast.error(strings.errorTitle, { description: errMsg })
+      setStatus("idle")
+      setConsecutiveFailures((c) => c + 1)
+    } catch {
+      // Network blip / firewall. Same UX as a structured error from the API.
+      toast.error(strings.errorTitle, { description: strings.errorGeneric })
+      setStatus("idle")
+      setConsecutiveFailures((c) => c + 1)
+    }
+  }
+
+  // After two failures in a row, surface a mailto: escape hatch alongside
+  // the form so the user has a backup path.
+  const showFallback = consecutiveFailures >= 2
+
+  return (
+    <div className={cn("flex flex-col gap-6", className)}>
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        className="flex flex-col gap-4"
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label={strings.nameLabel}>
+            <Input
+              name="name"
+              type="text"
+              autoComplete="name"
+              maxLength={120}
+              placeholder=""
+              className="h-11"
+            />
+          </Field>
+          <Field label={strings.emailLabel} required>
+            <Input
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              maxLength={254}
+              placeholder="you@store.com"
+              className="h-11"
+            />
+          </Field>
+        </div>
+
+        <Field label={strings.subjectLabel}>
+          <Input
+            name="subject"
+            type="text"
+            maxLength={200}
+            placeholder=""
+            className="h-11"
+          />
+        </Field>
+
+        <Field label={strings.messageLabel} required>
+          <Textarea
+            name="message"
+            required
+            minLength={10}
+            maxLength={4000}
+            rows={6}
+            className="min-h-[160px] resize-y"
+            placeholder=""
+          />
+        </Field>
+
+        <Button
+          type="submit"
+          size="lg"
+          disabled={status === "submitting"}
+          className={cn(
+            "h-12 mt-2 text-[15px] text-white",
+            "disabled:opacity-70 disabled:cursor-not-allowed",
+          )}
+          style={{
+            background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
+          }}
+        >
+          {status === "submitting" ? strings.submitLoading : strings.submitCta}
+          {status !== "submitting" && (
+            <ArrowUpRight className="size-4" aria-hidden="true" />
+          )}
+        </Button>
+      </form>
+
+      {showFallback && (
+        <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-muted)] p-4 flex items-start gap-3">
+          <Mail className="size-4 mt-0.5 text-[var(--text-secondary)]" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+              {strings.fallbackTitle}
+            </p>
+            <p className="mt-1 text-[13px] leading-[1.5] text-[var(--text-secondary)]">
+              {strings.fallbackBody}
+            </p>
+            <a
+              href={`mailto:${contactEmail}`}
+              className="mt-2 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--brand)] hover:underline underline-offset-4"
+            >
+              {strings.fallbackCta} <ArrowUpRight className="size-3.5" aria-hidden="true" />
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string
+  required?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[12px] font-semibold uppercase tracking-[0.06em] font-mono text-[var(--text-tertiary)]">
+        {label}
+        {required && <span className="text-[var(--danger)] ml-1">*</span>}
+      </span>
+      {children}
+    </label>
+  )
+}

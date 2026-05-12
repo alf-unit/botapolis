@@ -181,6 +181,31 @@ export type ContentLikeInsert = Omit<ContentLikeRow, "id" | "created_at"> & {
   created_at?: string
 }
 
+// Contact-form inbox — see supabase/migrations/002_contact_submissions.sql
+export type ContactSubmissionStatus = "new" | "read" | "replied" | "spam" | (string & {})
+
+export type ContactSubmissionRow = {
+  id: string
+  name: string | null
+  email: string
+  subject: string | null
+  message: string
+  source: string | null
+  ip_hash: string | null
+  user_agent: string | null
+  status: ContactSubmissionStatus
+  created_at: string
+}
+// `status` and `source` carry DB defaults (`'new'` and `'contact_page'`), so
+// inserts can omit them. Keep them optional in the Insert shape so the
+// callsite doesn't have to spell out the default on every write.
+export type ContactSubmissionInsert = Omit<ContactSubmissionRow, "id" | "created_at" | "status" | "source"> & {
+  id?: string
+  created_at?: string
+  status?: ContactSubmissionStatus
+  source?: string | null
+}
+
 export type FeaturedListingRow = {
   id: string
   tool_id: string
@@ -218,6 +243,7 @@ export type Database = {
       subscribers:        { Row: SubscriberRow;       Insert: SubscriberInsert;       Update: SubscriberUpdate;                 Relationships: NoRels }
       saved_calculations: { Row: SavedCalculationRow; Insert: SavedCalculationInsert; Update: Partial<SavedCalculationInsert>;  Relationships: NoRels }
       content_likes:      { Row: ContentLikeRow;      Insert: ContentLikeInsert;      Update: Partial<ContentLikeInsert>;       Relationships: NoRels }
+      contact_submissions:{ Row: ContactSubmissionRow; Insert: ContactSubmissionInsert; Update: Partial<ContactSubmissionInsert>; Relationships: NoRels }
       featured_listings:  { Row: FeaturedListingRow;  Insert: FeaturedListingInsert;  Update: Partial<FeaturedListingInsert>;   Relationships: NoRels }
     }
     Views: {

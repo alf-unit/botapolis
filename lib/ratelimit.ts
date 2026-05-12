@@ -80,6 +80,16 @@ export const aiToolAuthLimit = makeLimiter(
 )
 
 /**
+ * `/api/contact` — 3 submissions per IP per hour. Lower than newsletter
+ * because contact-form spam is more aggressive (LLM-generated, link-heavy),
+ * and a legit user almost never submits twice in the same hour.
+ */
+export const contactLimit = makeLimiter(
+  "contact",
+  Ratelimit.slidingWindow(3, "1 h"),
+)
+
+/**
  * Generic catch-all: 60 req/min. Use sparingly; specific limiters above
  * give better signal in logs and analytics.
  */

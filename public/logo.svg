@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Botapolis · brand mark
+  ============================================================================
+  Two circular nodes joined by a horizontal bar, painted with the brand
+  mint → violet gradient. The right node is hollow (operator + AI motif).
+  Matches the visual identity exported by components/nav/Logo.tsx so the
+  /logo.svg surfaced in JSON-LD Organization.logo, Open Graph card chrome,
+  and email-footer marks all read as the same brand.
+
+  Why a fixed dark hollow:
+    The hollow inside the right node is the brand's only theme-aware bit.
+    For a standalone SVG that ships through arbitrary surfaces (Google's
+    knowledge-panel logo cache, Slack unfurls, X cards) we can't rely on
+    CSS variables — `#0A0A0B` matches our dark canvas and reads as a
+    deliberate inner dot on light surfaces too.
+
+  Geometry preserved: viewBox 0 0 64 64, all stroke widths and node radii
+  identical to the React component so the brand never looks "off" when a
+  user hops from in-product nav to a sharing surface.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Botapolis">
+  <defs>
+    <linearGradient id="bot-grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <!-- Connector bar -->
+  <rect x="14" y="29" width="36" height="6" rx="3" fill="url(#bot-grad)"/>
+  <!-- Left node — solid -->
+  <circle cx="18" cy="32" r="12" fill="url(#bot-grad)"/>
+  <!-- Right node — hollow -->
+  <circle cx="46" cy="32" r="12" fill="url(#bot-grad)"/>
+  <circle cx="46" cy="32" r="5" fill="#0A0A0B"/>
+</svg>

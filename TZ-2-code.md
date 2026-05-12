@@ -1,0 +1,1605 @@
+# ТЗ-2: Реализация Botapolis на Next.js 15 для Claude Code
+
+**Проект:** botapolis.com — AI operator's manual для Shopify-продавцов
+**Стек:** Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + shadcn/ui + Supabase + Vercel
+**Языки:** EN (default) + RU (`/ru/` префикс)
+**Темы:** dark + light, через `next-themes` по системной настройке
+**Цель MVP:** запуск за 4–6 недель, ~30 ключевых статей + 100–200 pSEO страниц + 3 интерактивных tools
+
+Этот документ — пошаговое ТЗ для сборки сайта. Дизайн-система берётся из `TZ-1-design.md` и Claude Design экспорта (design tokens + 25 компонентов + 6 mockups).
+
+---
+
+## 1. Структура проекта
+
+```
+botapolis/
+├── .env.local                    # секреты (не коммитим)
+├── .env.example                  # пример env-переменных
+├── package.json
+├── tsconfig.json
+├── next.config.ts
+├── tailwind.config.ts            # Tailwind v4 — конфиг минимальный, всё в globals.css через @theme
+├── postcss.config.mjs
+├── components.json               # shadcn/ui конфиг
+├── middleware.ts                 # i18n, geo, auth-проверки
+│
+├── app/
+│   ├── globals.css               # Tailwind directives + design tokens из TZ-1
+│   ├── layout.tsx                # root layout: theme, fonts, providers
+│   ├── page.tsx                  # homepage
+│   ├── not-found.tsx             # 404
+│   ├── error.tsx                 # error boundary
+│   ├── sitemap.ts                # динамический sitemap (генерится из БД)
+│   ├── robots.ts                 # robots.txt
+│   ├── opengraph-image.tsx       # дефолтный OG для homepage
+│   │
+│   ├── (marketing)/              # route group для public страниц
+│   │   ├── tools/
+│   │   │   ├── page.tsx          # /tools — список инструментов
+│   │   │   └── [slug]/
+│   │   │       ├── page.tsx      # /tools/[slug] — calculator page
+│   │   │       └── opengraph-image.tsx
+│   │   ├── compare/
+│   │   │   ├── page.tsx          # /compare — индекс
+│   │   │   └── [...slug]/        # catch-all для /compare/klaviyo-vs-mailchimp
+│   │   │       └── page.tsx
+│   │   ├── alternatives/
+│   │   │   └── [tool]/page.tsx   # /alternatives/klaviyo
+│   │   ├── reviews/
+│   │   │   ├── page.tsx
+│   │   │   └── [slug]/page.tsx
+│   │   ├── best/
+│   │   │   └── [slug]/page.tsx   # /best/ai-tools-for-shopify-2026
+│   │   ├── guides/
+│   │   │   ├── page.tsx
+│   │   │   └── [slug]/page.tsx
+│   │   ├── prompts/
+│   │   │   ├── page.tsx
+│   │   │   └── [slug]/page.tsx
+│   │   ├── directory/
+│   │   │   ├── page.tsx          # каталог (filterable grid)
+│   │   │   └── [slug]/page.tsx   # detail page для каждого tool
+│   │   ├── news/
+│   │   │   └── page.tsx
+│   │   ├── blog/
+│   │   │   ├── page.tsx
+│   │   │   └── [slug]/page.tsx
+│   │   ├── about/page.tsx
+│   │   ├── contact/page.tsx
+│   │   ├── methodology/page.tsx
+│   │   └── legal/
+│   │       ├── privacy/page.tsx
+│   │       ├── terms/page.tsx
+│   │       ├── affiliate-disclosure/page.tsx
+│   │       ├── cookie-policy/page.tsx
+│   │       └── disclaimer/page.tsx
+│   │
+│   ├── ru/                       # русская версия — копия структуры (см. секция 7 i18n)
+│   │   └── ... (идентичная структура)
+│   │
+│   ├── (auth)/                   # auth pages (опциональный логин)
+│   │   ├── login/page.tsx
+│   │   └── callback/route.ts
+│   │
+│   ├── (account)/                # личный кабинет
+│   │   ├── dashboard/page.tsx
+│   │   └── saved/page.tsx
+│   │
+│   ├── go/[slug]/route.ts        # affiliate redirector
+│   │
+│   └── api/
+│       ├── tools/
+│       │   ├── description/route.ts        # AI Product Description endpoint
+│       │   └── ai-cost-compare/route.ts
+│       ├── newsletter/route.ts             # subscribe endpoint
+│       ├── revalidate/route.ts             # ISR webhook от Supabase
+│       ├── like/route.ts                   # like/save endpoint
+│       └── feedback/route.ts
+│
+├── components/
+│   ├── ui/                       # shadcn/ui компоненты (Button, Card, Input, etc.)
+│   ├── marketing/                # composed sections (HeroSection, FeatureGrid, etc.)
+│   ├── content/                  # ArticleHero, ProsConsList, Callout, AffiliateButton
+│   ├── tools/                    # CalculatorWidget, LiveNumber, ResultCard
+│   ├── nav/                      # Navbar, Footer, Sidebar, Breadcrumbs
+│   └── shared/                   # ThemeToggle, LangSwitcher, NewsletterCTA, SearchModal
+│
+├── content/                      # MDX контент (long-form)
+│   ├── reviews/
+│   │   ├── en/
+│   │   │   ├── klaviyo-review-2026.mdx
+│   │   │   └── ...
+│   │   └── ru/
+│   │       └── ...
+│   ├── guides/
+│   │   ├── en/
+│   │   └── ru/
+│   ├── best/
+│   ├── prompts/
+│   ├── blog/
+│   └── authors/                  # JSON или MDX для author bio
+│
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts             # browser client
+│   │   ├── server.ts             # server component client
+│   │   ├── middleware.ts         # middleware client
+│   │   └── types.ts              # autogenerated DB types
+│   ├── content/
+│   │   ├── mdx.ts                # MDX loader, frontmatter parsing
+│   │   ├── reading-time.ts
+│   │   └── toc.ts                # table of contents extraction
+│   ├── seo/
+│   │   ├── metadata.ts           # generateMetadata helpers
+│   │   ├── schema.ts             # JSON-LD schema generators
+│   │   └── og-image.tsx
+│   ├── i18n/
+│   │   ├── config.ts             # locales, default, fallback
+│   │   ├── dictionaries.ts       # подгрузка JSON словарей
+│   │   └── get-locale.ts
+│   ├── analytics/
+│   │   ├── plausible.ts
+│   │   └── posthog.ts
+│   ├── affiliate/
+│   │   ├── tracker.ts            # запись клика в Supabase
+│   │   └── partners.ts           # справочник партнёров
+│   ├── email/
+│   │   └── beehiiv.ts            # subscribe API wrapper
+│   ├── ratelimit.ts              # Upstash Redis rate limiter для tools/API
+│   └── utils.ts                  # cn() и общие helpers
+│
+├── locales/
+│   ├── en.json                   # UI strings
+│   └── ru.json
+│
+├── public/
+│   ├── favicon.ico, favicon-32x32.png, apple-touch-icon.png, ...
+│   ├── og-default.png            # 1200x630 fallback OG image
+│   ├── logo.svg, logo-icon.svg, logo-wordmark.svg
+│   ├── tools/                    # логотипы партнёрских tools (Klaviyo, Gorgias, ...)
+│   └── _pagefind/                # генерится Pagefind на build (см. секция 9)
+│
+├── scripts/
+│   ├── build-search-index.ts     # запускает Pagefind после next build
+│   ├── generate-types.ts         # supabase gen types
+│   ├── seed-db.ts                # начальные tools, partners, comparisons
+│   └── content-validator.ts      # проверка MDX frontmatter перед коммитом
+│
+├── supabase/
+│   ├── config.toml
+│   ├── migrations/               # SQL миграции (см. секция 4)
+│   └── seed.sql
+│
+└── tests/
+    ├── e2e/                      # Playwright тесты ключевых flow
+    └── unit/                     # Vitest для utility функций
+```
+
+---
+
+## 2. Установка и dependencies
+
+### Базовая инициализация
+
+```bash
+npx create-next-app@latest botapolis --typescript --tailwind --app --src-dir=false --import-alias="@/*"
+cd botapolis
+
+# shadcn/ui
+npx shadcn@latest init
+npx shadcn@latest add button card input textarea select badge dialog sheet dropdown-menu tabs accordion alert separator switch slider tooltip popover skeleton sonner
+```
+
+### Production dependencies
+
+```bash
+npm install \
+  @supabase/supabase-js \
+  @supabase/ssr \
+  @upstash/ratelimit \
+  @upstash/redis \
+  next-themes \
+  framer-motion \
+  lucide-react \
+  next-mdx-remote \
+  rehype-slug \
+  rehype-autolink-headings \
+  rehype-pretty-code \
+  remark-gfm \
+  remark-smartypants \
+  gray-matter \
+  reading-time \
+  zod \
+  @t3-oss/env-nextjs \
+  posthog-js \
+  posthog-node \
+  resend \
+  date-fns \
+  clsx \
+  tailwind-merge
+```
+
+### Dev dependencies
+
+```bash
+npm install -D \
+  @types/node \
+  pagefind \
+  supabase \
+  @playwright/test \
+  vitest \
+  @testing-library/react \
+  prettier \
+  prettier-plugin-tailwindcss \
+  eslint-config-prettier
+```
+
+### Шрифты
+
+В `app/layout.tsx`:
+
+```typescript
+import { Geist, Geist_Mono } from "next/font/google"
+
+const geistSans = Geist({ subsets: ["latin", "cyrillic"], variable: "--font-sans" })
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
+```
+
+Cyrillic subset обязательно для RU.
+
+---
+
+## 3. Environment variables
+
+`.env.example` (закоммитить, реальные значения в `.env.local`):
+
+```
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Upstash (rate limiting + caching)
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+
+# Anthropic (для AI tools)
+ANTHROPIC_API_KEY=
+
+# Beehiiv newsletter
+BEEHIIV_API_KEY=
+BEEHIIV_PUBLICATION_ID=
+
+# Resend (transactional email)
+RESEND_API_KEY=
+
+# Analytics
+NEXT_PUBLIC_PLAUSIBLE_DOMAIN=botapolis.com
+NEXT_PUBLIC_POSTHOG_KEY=
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+
+# Cloudflare Turnstile (анти-бот на формах)
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+
+# Auth
+NEXT_PUBLIC_SITE_URL=https://botapolis.com
+
+# ISR revalidation
+REVALIDATE_SECRET=
+```
+
+Использовать `@t3-oss/env-nextjs` для type-safe валидации env через Zod в `lib/env.ts`.
+
+---
+
+## 4. Supabase — схема БД
+
+Таблицы Postgres. Все включают `created_at`, `updated_at` (auto-managed через triggers).
+
+### 4.1 `tools` — каталог AI-инструментов
+
+```sql
+CREATE TABLE tools (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT UNIQUE NOT NULL,                -- 'klaviyo'
+  name TEXT NOT NULL,                        -- 'Klaviyo'
+  tagline TEXT,                              -- 'Email and SMS marketing for e-commerce'
+  description TEXT,                          -- markdown, длинное описание
+  logo_url TEXT,                             -- URL в Supabase Storage или CDN
+  website_url TEXT NOT NULL,
+  affiliate_url TEXT,                        -- партнёрская ссылка (откуда берёт redirector)
+  affiliate_partner TEXT,                    -- 'impact' | 'partnerstack' | 'rewardful' | 'direct'
+  category TEXT NOT NULL,                    -- 'email' | 'ads' | 'support' | 'content' | 'analytics' | 'inventory' | 'reviews' | 'upsell'
+  subcategories TEXT[] DEFAULT '{}',
+  pricing_model TEXT,                        -- 'free' | 'freemium' | 'subscription' | 'one_time'
+  pricing_min NUMERIC,                       -- $/month нижняя граница
+  pricing_max NUMERIC,                       -- $/month верхняя
+  pricing_notes TEXT,
+  features JSONB DEFAULT '[]'::jsonb,        -- [{name, description, included: bool}]
+  integrations TEXT[] DEFAULT '{}',          -- ['shopify', 'klaviyo', 'meta-ads']
+  rating NUMERIC(3,1),                       -- наш собственный score 0-10
+  rating_breakdown JSONB,                    -- {ease_of_use, value, support, features}
+  pros TEXT[] DEFAULT '{}',
+  cons TEXT[] DEFAULT '{}',
+  best_for TEXT,                             -- 'small stores scaling to 7-figures'
+  not_for TEXT,
+  alternatives_to UUID[] DEFAULT '{}',       -- self-references для /alternatives/
+  featured INTEGER DEFAULT 0,                -- 0=нет, 1+=уровень featured (для premium listings)
+  status TEXT DEFAULT 'published',           -- 'draft' | 'published' | 'archived'
+  meta_title TEXT,
+  meta_description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_tools_category ON tools(category);
+CREATE INDEX idx_tools_status ON tools(status);
+CREATE INDEX idx_tools_featured ON tools(featured DESC);
+CREATE INDEX idx_tools_slug ON tools(slug);
+```
+
+### 4.2 `comparisons` — pSEO страницы X-vs-Y
+
+```sql
+CREATE TABLE comparisons (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT UNIQUE NOT NULL,                 -- 'klaviyo-vs-mailchimp'
+  tool_a_id UUID NOT NULL REFERENCES tools(id),
+  tool_b_id UUID NOT NULL REFERENCES tools(id),
+  verdict TEXT,                              -- markdown, итоговый вердикт
+  winner_for JSONB,                          -- [{scenario, winner_id, reason}]
+  comparison_data JSONB,                     -- структурированные данные сравнения
+  custom_intro TEXT,                         -- перeзаписывает default template intro
+  custom_methodology TEXT,
+  language TEXT DEFAULT 'en',
+  status TEXT DEFAULT 'published',
+  meta_title TEXT,
+  meta_description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_comparisons_slug ON comparisons(slug);
+CREATE INDEX idx_comparisons_tools ON comparisons(tool_a_id, tool_b_id);
+```
+
+### 4.3 `affiliate_clicks` — лог кликов
+
+```sql
+CREATE TABLE affiliate_clicks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tool_id UUID REFERENCES tools(id),
+  source_path TEXT,                          -- '/reviews/klaviyo-review'
+  source_slug TEXT,                          -- '/go/klaviyo' для grouping
+  user_id UUID REFERENCES auth.users(id),    -- если залогинен
+  ip_hash TEXT,                              -- SHA256 от IP+secret для unique counts без хранения IP
+  user_agent TEXT,
+  referer TEXT,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_clicks_tool ON affiliate_clicks(tool_id, created_at DESC);
+CREATE INDEX idx_clicks_source ON affiliate_clicks(source_slug, created_at DESC);
+```
+
+### 4.4 `subscribers` — email база (зеркало Beehiiv для аналитики)
+
+```sql
+CREATE TABLE subscribers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  source TEXT,                               -- 'footer' | 'hero' | 'tool_klaviyo_calc' | 'article'
+  source_path TEXT,
+  language TEXT DEFAULT 'en',
+  beehiiv_id TEXT,                           -- ID в Beehiiv
+  status TEXT DEFAULT 'active',              -- 'active' | 'unsubscribed' | 'bounced'
+  ip_hash TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_subscribers_email ON subscribers(email);
+```
+
+### 4.5 `saved_calculations` — сохранённые расчёты залогиненных
+
+```sql
+CREATE TABLE saved_calculations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  tool_slug TEXT NOT NULL,                   -- 'email-roi-calculator'
+  inputs JSONB NOT NULL,
+  results JSONB,
+  name TEXT,                                 -- "Q1 2026 Email Plan"
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_saved_user ON saved_calculations(user_id, created_at DESC);
+```
+
+### 4.6 `likes` — likes на статьи
+
+```sql
+CREATE TABLE likes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  ip_hash TEXT,                              -- для гостей
+  content_type TEXT NOT NULL,                -- 'review' | 'guide' | 'tool'
+  content_slug TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, content_type, content_slug),
+  UNIQUE(ip_hash, content_type, content_slug)
+);
+
+CREATE INDEX idx_likes_content ON likes(content_type, content_slug);
+```
+
+### 4.7 `featured_listings` — premium слоты в каталоге (с месяца 9+)
+
+```sql
+CREATE TABLE featured_listings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tool_id UUID NOT NULL REFERENCES tools(id),
+  tier TEXT NOT NULL,                        -- 'basic' | 'premium' | 'sponsor'
+  starts_at TIMESTAMPTZ NOT NULL,
+  ends_at TIMESTAMPTZ NOT NULL,
+  amount_paid NUMERIC,
+  contact_email TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_featured_active ON featured_listings(ends_at) WHERE ends_at > now();
+```
+
+### 4.8 RLS policies
+
+Включить Row Level Security на всех таблицах. Базовые правила:
+
+- `tools`, `comparisons` — public read для `status='published'`, write только service_role
+- `affiliate_clicks`, `subscribers` — service_role only (insert через server actions/API)
+- `saved_calculations` — user может читать/писать только свои записи (`user_id = auth.uid()`)
+- `likes` — public read counts, insert authenticated или с rate limit для гостей
+
+### 4.9 Database triggers
+
+```sql
+-- updated_at auto-update
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tools_updated_at BEFORE UPDATE ON tools
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+-- (повторить для comparisons, ...)
+```
+
+### 4.10 Webhook: tool/comparison update → revalidate
+
+В Supabase создать database webhook на `INSERT/UPDATE/DELETE` в `tools` и `comparisons` → POST на `https://botapolis.com/api/revalidate?path=/tools/[slug]&secret=...`.
+
+В коде `app/api/revalidate/route.ts`:
+
+```typescript
+import { revalidatePath } from "next/cache"
+import { NextResponse } from "next/server"
+
+export async function POST(req: Request) {
+  const { searchParams } = new URL(req.url)
+  if (searchParams.get("secret") !== process.env.REVALIDATE_SECRET) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  }
+  const path = searchParams.get("path")
+  if (path) revalidatePath(path)
+  return NextResponse.json({ revalidated: true })
+}
+```
+
+---
+
+## 5. Routing & Data flow
+
+### 5.1 Static generation strategy
+
+| Раздел | Стратегия | Обновление |
+|--------|-----------|------------|
+| `/` (homepage) | SSG + ISR (3600s revalidate) | при изменении featured tools/comparisons |
+| `/tools/[slug]` | SSG (calculator UI), client-side state | редко (новые tools) |
+| `/compare/[...slug]` | SSG + ISR (86400s) | webhook от Supabase |
+| `/alternatives/[tool]` | SSG + ISR | webhook |
+| `/reviews/[slug]` | SSG из MDX, build-time | при коммите MDX |
+| `/best/[slug]`, `/guides/[slug]`, `/blog/[slug]` | SSG из MDX | при коммите |
+| `/directory/` | SSG + ISR (3600s), client-side filtering | webhook |
+| `/directory/[slug]` | SSG + ISR (86400s) | webhook |
+| `/news/` | SSG + ISR (1800s) | при добавлении |
+| `/go/[slug]` | dynamic route (server component) — выполняет редирект | always fresh |
+
+### 5.2 generateStaticParams для pSEO страниц
+
+`app/(marketing)/compare/[...slug]/page.tsx`:
+
+```typescript
+export async function generateStaticParams() {
+  const supabase = createServerClient()
+  const { data: comparisons } = await supabase
+    .from("comparisons")
+    .select("slug")
+    .eq("status", "published")
+    .eq("language", "en")
+
+  return comparisons?.map(c => ({ slug: [c.slug] })) ?? []
+}
+```
+
+Для RU — повторить с `language='ru'` в `app/ru/compare/[...slug]/page.tsx`.
+
+### 5.3 Affiliate redirector — `/go/[slug]`
+
+`app/go/[slug]/route.ts`:
+
+```typescript
+import { NextRequest, NextResponse } from "next/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { hashIp } from "@/lib/utils"
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const supabase = createServiceClient()
+
+  // Найти tool по slug
+  const { data: tool } = await supabase
+    .from("tools")
+    .select("id, affiliate_url, website_url")
+    .eq("slug", slug)
+    .single()
+
+  if (!tool || !tool.affiliate_url) {
+    return NextResponse.redirect(new URL("/directory", req.url))
+  }
+
+  // Лог клика (асинхронно, без await чтобы не задерживать редирект)
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown"
+  const referer = req.headers.get("referer") ?? null
+  const ua = req.headers.get("user-agent") ?? null
+  const url = new URL(req.url)
+
+  void supabase.from("affiliate_clicks").insert({
+    tool_id: tool.id,
+    source_slug: slug,
+    source_path: referer ? new URL(referer).pathname : null,
+    ip_hash: await hashIp(ip),
+    user_agent: ua,
+    referer,
+    utm_source: url.searchParams.get("utm_source"),
+    utm_medium: url.searchParams.get("utm_medium"),
+    utm_campaign: url.searchParams.get("utm_campaign"),
+  })
+
+  // Добавить наши UTM к target URL
+  const target = new URL(tool.affiliate_url)
+  target.searchParams.set("utm_source", "botapolis")
+  target.searchParams.set("utm_medium", "affiliate")
+  if (url.searchParams.get("utm_campaign")) {
+    target.searchParams.set("utm_campaign", url.searchParams.get("utm_campaign")!)
+  }
+
+  return NextResponse.redirect(target.toString(), { status: 302 })
+}
+```
+
+В компоненте `<AffiliateButton>` — ссылка идёт на `/go/${slug}?utm_campaign=${page_slug}`.
+HTML атрибуты: `rel="sponsored nofollow noopener"` `target="_blank"`.
+
+---
+
+## 6. MDX pipeline — long-form контент
+
+### 6.1 Структура MDX файла
+
+`content/reviews/en/klaviyo-review-2026.mdx`:
+
+```mdx
+---
+title: "Klaviyo review 2026: still worth it for Shopify stores?"
+slug: "klaviyo-review-2026"
+description: "We tested Klaviyo for 90 days on a real Shopify store with 12k subscribers. Here's our honest verdict on pricing, deliverability, and AI features."
+publishedAt: "2026-05-15"
+updatedAt: "2026-05-15"
+author: "operator"
+category: "email-marketing"
+tags: ["klaviyo", "email", "shopify", "review"]
+toolSlug: "klaviyo"
+rating: 8.5
+ratingBreakdown:
+  easeOfUse: 8
+  value: 7
+  support: 9
+  features: 9
+pros:
+  - "Best-in-class Shopify integration"
+  - "Predictive analytics actually work"
+cons:
+  - "Pricing scales aggressively past 50k contacts"
+  - "Email builder still feels dated"
+verdict: "Worth it if you're past $50k/mo revenue. Below that, Mailchimp or Omnisend save money."
+ogImage: "/og/klaviyo-review.png"
+---
+
+import { Callout, ProsCons, AffiliateButton, ScreenshotGrid } from '@/components/content'
+
+## Lede paragraph here...
+
+<Callout variant="tip">
+This is a callout.
+</Callout>
+
+<AffiliateButton tool="klaviyo" cta="Try Klaviyo free" />
+```
+
+### 6.2 Loader — `lib/content/mdx.ts`
+
+```typescript
+import { compileMDX } from "next-mdx-remote/rsc"
+import fs from "node:fs/promises"
+import path from "node:path"
+import matter from "gray-matter"
+import readingTime from "reading-time"
+import { mdxComponents } from "@/components/content/mdx-components"
+import rehypeSlug from "rehype-slug"
+import rehypeAutolinkHeadings from "rehype-autolink-headings"
+import rehypePrettyCode from "rehype-pretty-code"
+import remarkGfm from "remark-gfm"
+import remarkSmartypants from "remark-smartypants"
+
+const CONTENT_DIR = path.join(process.cwd(), "content")
+
+export async function getMdxContent(
+  type: "reviews" | "guides" | "blog" | "best" | "prompts",
+  slug: string,
+  lang: "en" | "ru" = "en"
+) {
+  const filePath = path.join(CONTENT_DIR, type, lang, `${slug}.mdx`)
+  const source = await fs.readFile(filePath, "utf-8")
+  const { data: frontmatter, content } = matter(source)
+  const { content: mdxContent } = await compileMDX({
+    source: content,
+    components: mdxComponents,
+    options: {
+      mdxOptions: {
+        remarkPlugins: [remarkGfm, remarkSmartypants],
+        rehypePlugins: [
+          rehypeSlug,
+          [rehypeAutolinkHeadings, { behavior: "wrap" }],
+          [rehypePrettyCode, { theme: "github-dark-dimmed" }],
+        ],
+      },
+    },
+  })
+  return {
+    frontmatter,
+    content: mdxContent,
+    readingTime: readingTime(content),
+  }
+}
+
+export async function getAllMdxSlugs(type: string, lang: "en" | "ru" = "en") {
+  const dir = path.join(CONTENT_DIR, type, lang)
+  const files = await fs.readdir(dir).catch(() => [])
+  return files.filter(f => f.endsWith(".mdx")).map(f => f.replace(".mdx", ""))
+}
+```
+
+### 6.3 Frontmatter validation
+
+`scripts/content-validator.ts` запускается в pre-commit hook:
+
+```typescript
+import { z } from "zod"
+
+const reviewSchema = z.object({
+  title: z.string().min(20).max(80),
+  slug: z.string().regex(/^[a-z0-9-]+$/),
+  description: z.string().min(80).max(180),
+  publishedAt: z.string().date(),
+  rating: z.number().min(0).max(10),
+  pros: z.array(z.string()).min(2).max(8),
+  cons: z.array(z.string()).min(1).max(6),
+  toolSlug: z.string(),
+  // ...
+})
+
+// Валидируем все .mdx файлы, fail commit если что-то не ок
+```
+
+### 6.4 MDX components
+
+`components/content/mdx-components.tsx`:
+
+```typescript
+export const mdxComponents = {
+  Callout,
+  ProsCons,
+  ProsConsList,
+  AffiliateButton,
+  ScreenshotGrid,
+  CodeBlock,
+  Stat,
+  CalculatorEmbed,    // позволяет встраивать live калькуляторы прямо в гайды
+  RatingBadge,
+  ToolMention,        // <ToolMention slug="klaviyo" /> — рисует мини-карточку
+  // headings, p, ul, ol, table, blockquote — кастомизированные стили
+  h1: (props) => <h1 className="text-h1 font-semibold tracking-tight" {...props} />,
+  h2: (props) => <h2 className="text-h2 font-semibold mt-12 mb-4" {...props} />,
+  // ...
+}
+```
+
+---
+
+## 7. i18n (EN + RU)
+
+### 7.1 Стратегия
+
+- URL: `/` (EN, default), `/ru/...` (RU)
+- Middleware определяет локаль из URL и добавляет в headers
+- UI строки в `locales/en.json` и `locales/ru.json`
+- Контент (MDX, БД tools/comparisons) — отдельные записи для каждого языка
+- `hreflang` теги в каждом `<head>`: `<link rel="alternate" hreflang="en" href="..." />` и `<link rel="alternate" hreflang="ru" href="..." />` плюс `x-default`
+
+### 7.2 `lib/i18n/config.ts`
+
+```typescript
+export const i18n = {
+  defaultLocale: "en",
+  locales: ["en", "ru"],
+} as const
+
+export type Locale = (typeof i18n.locales)[number]
+```
+
+### 7.3 `middleware.ts`
+
+```typescript
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
+import { i18n } from "@/lib/i18n/config"
+
+export function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  // Skip для API, статики, _next
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/go") ||
+    pathname.includes(".")
+  ) return NextResponse.next()
+
+  // Определить локаль
+  const locale = pathname.startsWith("/ru") ? "ru" : "en"
+  const response = NextResponse.next()
+  response.headers.set("x-locale", locale)
+  return response
+}
+
+export const config = {
+  matcher: ["/((?!_next|api|go|.*\\..*).*)"],
+}
+```
+
+### 7.4 Загрузка словарей
+
+```typescript
+// lib/i18n/dictionaries.ts
+import "server-only"
+const dictionaries = {
+  en: () => import("@/locales/en.json").then(m => m.default),
+  ru: () => import("@/locales/ru.json").then(m => m.default),
+}
+export const getDictionary = (locale: "en" | "ru") => dictionaries[locale]()
+```
+
+### 7.5 LanguageSwitcher в Navbar
+
+При клике — определяет текущий путь, заменяет `/ru/...` на `/...` или наоборот, делает `router.push(newPath)`. Если эквивалентной страницы нет на втором языке — fallback на homepage этого языка.
+
+### 7.6 Стратегия выкатки RU
+
+RU добавляется поэтапно (чтобы не блокировать EN-релиз):
+
+- **MVP** (недели 1–6): EN полностью, RU только UI strings + 5 hero-страниц (homepage, /tools/, /compare/, about, methodology)
+- **Месяц 2**: переводы 10 топ guides, 10 топ reviews, 30 pSEO comparisons
+- **Месяц 4+**: догон по pSEO, news/blog публикуются параллельно
+
+В коде это работает так: если запрашивается `/ru/reviews/some-slug` и MDX не найден → показывается баннер "This article is not yet translated. Read in English →" + редирект-кнопка.
+
+---
+
+## 8. SEO & Metadata
+
+### 8.1 generateMetadata паттерн
+
+Каждая страница имеет `generateMetadata` с полным набором тегов:
+
+```typescript
+// app/(marketing)/reviews/[slug]/page.tsx
+import { Metadata } from "next"
+
+export async function generateMetadata({ params }): Promise<Metadata> {
+  const { slug } = await params
+  const { frontmatter } = await getMdxContent("reviews", slug)
+
+  return {
+    title: frontmatter.title,
+    description: frontmatter.description,
+    alternates: {
+      canonical: `https://botapolis.com/reviews/${slug}`,
+      languages: {
+        "en": `https://botapolis.com/reviews/${slug}`,
+        "ru": `https://botapolis.com/ru/reviews/${slug}`,
+        "x-default": `https://botapolis.com/reviews/${slug}`,
+      },
+    },
+    openGraph: {
+      title: frontmatter.title,
+      description: frontmatter.description,
+      type: "article",
+      publishedTime: frontmatter.publishedAt,
+      modifiedTime: frontmatter.updatedAt,
+      authors: [frontmatter.author],
+      images: [frontmatter.ogImage ?? "/og-default.png"],
+      url: `https://botapolis.com/reviews/${slug}`,
+      siteName: "Botapolis",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: frontmatter.title,
+      description: frontmatter.description,
+      images: [frontmatter.ogImage ?? "/og-default.png"],
+    },
+    other: {
+      "article:published_time": frontmatter.publishedAt,
+      "article:modified_time": frontmatter.updatedAt,
+    },
+  }
+}
+```
+
+### 8.2 JSON-LD schema
+
+`lib/seo/schema.ts` — генераторы для всех типов:
+
+- `Organization` — на главной и в footer (sameAs социалки)
+- `WebSite` + SearchAction — homepage
+- `Article` — для /blog/, /news/
+- `Review` + `Product` — для /reviews/ (с aggregateRating)
+- `FAQPage` — где есть FAQ accordion
+- `BreadcrumbList` — на каждой не-homepage странице
+- `HowTo` — для /guides/ если step-by-step
+- `ItemList` — для /best/, /directory/ списков
+- `SoftwareApplication` — для /directory/[slug] детальных страниц инструментов
+
+Внедрение через `<Script type="application/ld+json" id="...">{JSON.stringify(schema)}</Script>` в layout/page.
+
+### 8.3 Sitemap (динамический)
+
+`app/sitemap.ts`:
+
+```typescript
+import { MetadataRoute } from "next"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getAllMdxSlugs } from "@/lib/content/mdx"
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const supabase = createServiceClient()
+  const base = "https://botapolis.com"
+
+  // Tools, comparisons из БД
+  const { data: tools } = await supabase
+    .from("tools")
+    .select("slug, updated_at")
+    .eq("status", "published")
+  const { data: comparisons } = await supabase
+    .from("comparisons")
+    .select("slug, updated_at, language")
+    .eq("status", "published")
+
+  // MDX контент
+  const reviewSlugs = await getAllMdxSlugs("reviews", "en")
+  const guideSlugs = await getAllMdxSlugs("guides", "en")
+  // ... остальные
+
+  const routes: MetadataRoute.Sitemap = [
+    { url: base, lastModified: new Date(), priority: 1, changeFrequency: "daily" },
+    { url: `${base}/tools`, priority: 0.9, changeFrequency: "weekly" },
+    { url: `${base}/directory`, priority: 0.9, changeFrequency: "daily" },
+    // homepage RU
+    { url: `${base}/ru`, priority: 0.95, changeFrequency: "daily" },
+  ]
+
+  // tools detail pages
+  tools?.forEach(t => routes.push({
+    url: `${base}/directory/${t.slug}`,
+    lastModified: new Date(t.updated_at),
+    priority: 0.7,
+    changeFrequency: "weekly",
+  }))
+
+  // comparisons (split EN / RU)
+  comparisons?.forEach(c => routes.push({
+    url: c.language === "ru" ? `${base}/ru/compare/${c.slug}` : `${base}/compare/${c.slug}`,
+    lastModified: new Date(c.updated_at),
+    priority: 0.7,
+    changeFrequency: "weekly",
+  }))
+
+  // MDX content
+  reviewSlugs.forEach(slug => routes.push({
+    url: `${base}/reviews/${slug}`,
+    priority: 0.8,
+    changeFrequency: "monthly",
+  }))
+  // ... остальные
+
+  return routes
+}
+```
+
+Если URLs > 50,000 — разбить на sitemap-index с несколькими файлами (`sitemap-tools.xml`, `sitemap-comparisons.xml`, etc.).
+
+### 8.4 robots.ts
+
+```typescript
+import { MetadataRoute } from "next"
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: [
+      { userAgent: "*", allow: "/", disallow: ["/api/", "/go/", "/account/", "/login/"] },
+      // НЕ блокируем GPTBot, ClaudeBot, PerplexityBot, Google-Extended — они нужны для AI Overviews
+    ],
+    sitemap: "https://botapolis.com/sitemap.xml",
+  }
+}
+```
+
+### 8.5 OG Images (динамические)
+
+Через `next/og` генерируем OG для каждой статьи:
+
+`app/(marketing)/reviews/[slug]/opengraph-image.tsx`:
+
+```typescript
+import { ImageResponse } from "next/og"
+
+export const size = { width: 1200, height: 630 }
+export const contentType = "image/png"
+
+export default async function OGImage({ params }) {
+  const { frontmatter } = await getMdxContent("reviews", params.slug)
+  return new ImageResponse(
+    (<div style={{ /* layout: logo + title + author + rating */ }}>
+      {/* ... */}
+    </div>),
+    size
+  )
+}
+```
+
+---
+
+## 9. Search (Pagefind)
+
+Pagefind — статический индекс, генерируется после `next build`.
+
+### 9.1 Build script
+
+`package.json`:
+
+```json
+{
+  "scripts": {
+    "build": "next build && pnpm pagefind",
+    "pagefind": "pagefind --site .next/server/app --output-path public/_pagefind"
+  }
+}
+```
+
+Или кастомный скрипт `scripts/build-search-index.ts`, который читает MDX + БД и строит индекс через Pagefind Node API.
+
+### 9.2 SearchModal компонент
+
+`components/shared/SearchModal.tsx`:
+
+- Триггерится по `Cmd+K` (Mac) / `Ctrl+K` (Win), также по клику на search button в Navbar
+- Использует Pagefind UI (`@pagefind/default-ui`) или кастомный поиск через `pagefind.search()` API
+- Группирует результаты по типу (Tools / Reviews / Guides / Comparisons)
+- Stylе как в Linear/Raycast: floating overlay + glass background
+
+```typescript
+"use client"
+import { useEffect, useState } from "react"
+
+export function SearchModal() {
+  const [pagefind, setPagefind] = useState<any>(null)
+
+  useEffect(() => {
+    async function loadPagefind() {
+      // @ts-ignore
+      const pf = await import(/* webpackIgnore: true */ "/_pagefind/pagefind.js")
+      setPagefind(pf)
+    }
+    loadPagefind()
+  }, [])
+
+  // ... search input, debounced query, render results
+}
+```
+
+---
+
+## 10. Auth (Supabase Auth, opt-in)
+
+- Magic Link + Google OAuth
+- Auth НЕ обязательна для просмотра контента и большинства tools
+- Залогиненные получают: сохранение расчётов, повышенный rate limit на AI tools, history, like/save синхронизация между девайсами
+
+`app/(auth)/login/page.tsx`:
+
+```typescript
+"use client"
+import { createClient } from "@/lib/supabase/client"
+
+export default function LoginPage() {
+  async function signInWithEmail(email: string) {
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
+    // toast: "Check your inbox"
+  }
+
+  async function signInWithGoogle() {
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    })
+  }
+
+  // ... UI
+}
+```
+
+`app/(auth)/callback/route.ts` — стандартный exchange code for session.
+
+---
+
+## 11. Интерактивные tools (3 MVP калькулятора)
+
+### 11.1 Email ROI Calculator (`/tools/email-roi-calculator`)
+
+**Inputs:**
+- Stores monthly revenue ($)
+- Email subscribers count
+- Current open rate (%) и click rate (%)
+- Average order value ($)
+- Email platform (select: Klaviyo / Mailchimp / Omnisend / Other)
+
+**Logic** (на client side, мгновенный пересчёт через `useState` + `useMemo`):
+- Estimated revenue per email = (subscribers × open_rate × ctr × conversion_rate × AOV)
+- Recommended monthly send count = formula based on subscriber count
+- Comparison to "good benchmark" (industry average)
+- Cost of selected platform (lookup table из БД)
+- ROI = (estimated revenue - platform cost) / platform cost
+
+**Output:**
+- Big mono number: "$4,820/mo estimated email revenue"
+- Recommended platform с affiliate CTA
+- Methodology callout
+- "Save this calculation" (если залогинен)
+
+### 11.2 AI Cost Comparator (`/tools/ai-cost-comparator`)
+
+**Inputs:**
+- Use case (select: product descriptions / customer service / ad copy / SEO content)
+- Volume per month (descriptions, tickets, etc.)
+- Quality tier (good / great / best)
+
+**Logic:**
+- Lookup table: для каждого use case — recommended models (Claude Sonnet, GPT-4o, Gemini 1.5 Pro, Llama 3) с примерным token usage
+- Pricing API через Anthropic/OpenAI/Google price catalogs (хардкод обновляется)
+- Side-by-side cost comparison
+
+**Output:**
+- Bar chart: monthly cost by provider
+- Recommended option highlighted
+- Affiliate CTAs к Anthropic Console / OpenAI / Google Cloud (там где есть партнёрки)
+
+### 11.3 AI Product Description Generator (`/tools/product-description`)
+
+**Inputs:**
+- Product name
+- Key features (textarea)
+- Target audience (select)
+- Tone (select: professional / casual / playful / luxury)
+- Max length (slider 50–300 words)
+
+**API** (`app/api/tools/description/route.ts`):
+
+```typescript
+import { Anthropic } from "@anthropic-ai/sdk"
+import { ratelimit } from "@/lib/ratelimit"
+import { hashIp } from "@/lib/utils"
+
+export async function POST(req: Request) {
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown"
+  const ipHash = await hashIp(ip)
+
+  // Rate limit: 3 generations per IP per day для гостей, 20 для залогиненных
+  const { success } = await ratelimit.limit(ipHash)
+  if (!success) {
+    return Response.json({ error: "Daily limit reached. Sign up free for 20/day." }, { status: 429 })
+  }
+
+  const { product, features, audience, tone, maxLength } = await req.json()
+
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const message = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",  // дешёвая модель для tool
+    max_tokens: 800,
+    messages: [{
+      role: "user",
+      content: `Write a ${tone} product description for "${product}", target audience "${audience}", up to ${maxLength} words. Key features: ${features}. Output 3 variations.`,
+    }],
+  })
+
+  // Лог использования в Supabase для аналитики
+
+  return Response.json({ output: message.content[0] })
+}
+```
+
+UI: form слева, результаты справа (3 варианта), "Copy" + "Regenerate" buttons, "Try this with Hypotenuse / Jasper / Copy.ai →" affiliate CTA снизу.
+
+### 11.4 Общие правила для tools
+
+- Live numbers через `react-countup` или кастомный hook на requestAnimationFrame
+- Все inputs контролируемые, debounce на 100ms перед пересчётом
+- Sticky results на mobile (видны при scroll)
+- "Embed this calculator" snippet в footer каждого tool — скопировать iframe для блогеров (виральность + backlinks)
+- Каждое использование логируется в PostHog (event: `tool_used`, properties: tool_slug, inputs, result)
+
+---
+
+## 12. Newsletter (Beehiiv integration)
+
+### 12.1 API endpoint
+
+`app/api/newsletter/route.ts`:
+
+```typescript
+import { z } from "zod"
+import { createServiceClient } from "@/lib/supabase/server"
+import { ratelimit } from "@/lib/ratelimit"
+import { verifyTurnstile } from "@/lib/turnstile"
+
+const schema = z.object({
+  email: z.string().email(),
+  source: z.string().max(80),
+  language: z.enum(["en", "ru"]).default("en"),
+  turnstileToken: z.string(),
+})
+
+export async function POST(req: Request) {
+  const body = await req.json()
+  const parsed = schema.safeParse(body)
+  if (!parsed.success) return Response.json({ error: "invalid" }, { status: 400 })
+
+  // Bot protection
+  if (!await verifyTurnstile(parsed.data.turnstileToken)) {
+    return Response.json({ error: "bot detected" }, { status: 403 })
+  }
+
+  // Beehiiv API
+  const beehiivResp = await fetch(
+    `https://api.beehiiv.com/v2/publications/${process.env.BEEHIIV_PUBLICATION_ID}/subscriptions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.BEEHIIV_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: parsed.data.email,
+        utm_source: "botapolis",
+        utm_medium: parsed.data.source,
+        send_welcome_email: true,
+      }),
+    }
+  )
+
+  if (!beehiivResp.ok) {
+    return Response.json({ error: "subscribe failed" }, { status: 500 })
+  }
+
+  // Зеркалирование в Supabase для аналитики
+  const supabase = createServiceClient()
+  await supabase.from("subscribers").upsert({
+    email: parsed.data.email,
+    source: parsed.data.source,
+    language: parsed.data.language,
+    beehiiv_id: (await beehiivResp.json()).data?.id,
+  }, { onConflict: "email" })
+
+  return Response.json({ success: true })
+}
+```
+
+### 12.2 NewsletterCTA компонент
+
+Поддерживает форматы: `inline` (footer), `card` (homepage, end of article), `popup` (опционально, через 30 сек на странице, max 1 раз в неделю).
+
+---
+
+## 13. Analytics
+
+### 13.1 Plausible
+
+В `app/layout.tsx`:
+
+```typescript
+<Script
+  defer
+  data-domain="botapolis.com"
+  src="https://plausible.io/js/script.js"
+/>
+```
+
+### 13.2 PostHog (events)
+
+```typescript
+// lib/analytics/posthog.ts
+import posthog from "posthog-js"
+
+export function initPostHog() {
+  if (typeof window === "undefined") return
+  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    capture_pageview: true,
+    autocapture: false,  // мы трекаем events явно
+  })
+}
+
+export function track(event: string, properties?: Record<string, any>) {
+  if (typeof window !== "undefined") posthog.capture(event, properties)
+}
+```
+
+Ключевые events:
+- `tool_started`, `tool_completed`, `tool_input_changed`
+- `affiliate_link_clicked` (с tool_slug, source_path)
+- `newsletter_subscribed`
+- `search_performed`
+- `comparison_viewed`
+- `review_scrolled_50`, `review_scrolled_100`
+
+### 13.3 Vercel Analytics (Web Vitals)
+
+```typescript
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
+
+// в layout.tsx
+<Analytics />
+<SpeedInsights />
+```
+
+---
+
+## 14. Performance & Core Web Vitals
+
+### Бюджеты:
+
+- **LCP** < 2.0s (target 1.5s)
+- **INP** < 200ms (target 100ms)
+- **CLS** < 0.1
+- **Total JS** < 100KB на статических страницах (review/guide)
+- **Image weight** < 200KB на ATF (above-the-fold)
+
+### Реализация:
+
+1. **Изображения** — `next/image` везде, `priority` для hero, lazy для rest. AVIF + WebP формат, blurhash placeholder.
+2. **Шрифты** — `next/font` с `display: swap`, preload только Geist Regular + Geist Mono Medium. Остальные веса — non-blocking.
+3. **Динамические импорты** — все heavy components (calculator widgets, comments, charts) через `next/dynamic({ ssr: false, loading: () => <Skeleton /> })`.
+4. **CSS** — Tailwind v4 purge-by-default, no unused classes. Critical CSS inline через `next/font` + `@critical` директивы.
+5. **Third-party scripts** — все через `next/script` с `strategy="lazyOnload"` или `afterInteractive`.
+6. **MDX** — компилируется на build time (RSC), не в runtime.
+7. **Cache headers** — статика на год, HTML на 1 час с `stale-while-revalidate=86400`.
+
+---
+
+## 15. Безопасность
+
+### 15.1 CSP headers
+
+`next.config.ts`:
+
+```typescript
+const csp = `
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' plausible.io us.i.posthog.com challenges.cloudflare.com;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  font-src 'self' data:;
+  connect-src 'self' *.supabase.co plausible.io us.i.posthog.com api.beehiiv.com;
+  frame-src challenges.cloudflare.com;
+`.replace(/\n/g, " ").trim()
+
+const nextConfig = {
+  async headers() {
+    return [{
+      source: "/(.*)",
+      headers: [
+        { key: "Content-Security-Policy", value: csp },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+      ],
+    }]
+  },
+}
+```
+
+### 15.2 Rate limiting
+
+Через Upstash Redis (`@upstash/ratelimit`):
+
+```typescript
+// lib/ratelimit.ts
+import { Ratelimit } from "@upstash/ratelimit"
+import { Redis } from "@upstash/redis"
+
+export const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(3, "24 h"),  // 3 requests / 24h
+})
+
+export const newsletterLimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(5, "1 h"),
+})
+```
+
+### 15.3 Input sanitization
+
+Все user inputs (newsletter email, tool inputs, comments через Giscus) проходят через Zod schema.
+MDX контент trusted (наш репо), но любой user-supplied HTML — sanitize через `isomorphic-dompurify`.
+
+### 15.4 Cloudflare Turnstile
+
+На всех публичных формах (newsletter, contact, tool API endpoints).
+
+```typescript
+// lib/turnstile.ts
+export async function verifyTurnstile(token: string): Promise<boolean> {
+  const resp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `secret=${process.env.TURNSTILE_SECRET_KEY}&response=${token}`,
+  })
+  const data = await resp.json()
+  return data.success === true
+}
+```
+
+---
+
+## 16. Legal pages (содержимое)
+
+8 страниц обязательны. Шаблоны генерим через **Termly.io** (бесплатный план на старте) или **Iubenda**, кастомизируем.
+
+| Page | Path | Что важно указать |
+|------|------|-------------------|
+| Privacy Policy | `/legal/privacy` | Какие данные собираем (email, IP-hash, аналитика), как используем, third-party (Plausible, PostHog, Beehiiv, Supabase, Vercel), GDPR rights, Right to delete |
+| Terms of Service | `/legal/terms` | Использование сайта, ограничение ответственности, IP rights, account terms |
+| **Affiliate Disclosure** | `/legal/affiliate-disclosure` | **FTC-compliant**: явно говорим что зарабатываем на партнёрках, это не влияет на наши обзоры |
+| Cookie Policy | `/legal/cookie-policy` | Какие cookies (минимум — Plausible не использует cookies, Supabase auth cookies, Theme preference cookie) |
+| **Editorial Policy / Methodology** | `/methodology` | **Trust signal**: как мы тестируем tools, какие критерии оценки, как pricing отражается, как обрабатываем sponsored content |
+| About Us | `/about` | Миссия, команда (можно faceless: "team of e-com operators"), контакты |
+| Contact | `/contact` | Email, форма (с Turnstile), expected response time |
+| Disclaimer | `/legal/disclaimer` | Не финансовый/юридический совет, информация может устаревать, accuracy not guaranteed |
+
+**Affiliate Disclosure banner** в начале каждой статьи с партнёрскими ссылками:
+
+> *Botapolis is reader-supported. When you buy through links on our site, we may earn an affiliate commission at no extra cost to you. Our editorial process and methodology are independent. [Learn more →](/methodology)*
+
+---
+
+## 17. Deployment
+
+### 17.1 Vercel project
+
+1. Connect GitHub repo → import to Vercel
+2. Build command: `npm run build`
+3. Install command: `npm install`
+4. Output: `.next` (default)
+5. Node version: 20.x (default)
+6. Regions: ALL (Vercel default Edge Network)
+
+### 17.2 Environment variables
+
+Добавить все из `.env.example` в Vercel Dashboard → Settings → Environment Variables. Различать `Production`, `Preview`, `Development`.
+
+### 17.3 Domain
+
+- Подключить `botapolis.com` через Vercel domains
+- DNS: A или CNAME на Vercel (по их инструкции)
+- SSL — автоматический (Let's Encrypt через Vercel)
+- Forced HTTPS, www → apex redirect
+
+### 17.4 Preview deployments
+
+Каждый PR автоматически получает preview URL — `botapolis-git-feature-name.vercel.app`. Используем для review контента и code.
+
+### 17.5 Cron jobs (Vercel Cron)
+
+`vercel.json`:
+
+```json
+{
+  "crons": [
+    { "path": "/api/cron/refresh-search-index", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/refresh-tool-data", "schedule": "0 5 * * 1" },
+    { "path": "/api/cron/digest-affiliate-clicks", "schedule": "0 8 * * 1" }
+  ]
+}
+```
+
+---
+
+## 18. План работ — 6 спринтов по неделе
+
+### Спринт 1 — Foundation (неделя 1)
+- Init проекта, dependencies
+- Supabase setup, миграции, RLS policies
+- `app/globals.css` с design tokens из TZ-1
+- shadcn/ui + кастомизация Button, Card, Input, Badge, Dialog
+- Theme toggle (next-themes), Navbar, Footer, базовый layout
+- i18n middleware + базовые en/ru словари
+
+### Спринт 2 — Content infrastructure (неделя 2)
+- MDX pipeline (loader, components, frontmatter validation)
+- Templates для `/reviews/[slug]`, `/guides/[slug]`, `/blog/[slug]`
+- ArticleHero, TOC, Callout, ProsConsList, AffiliateButton компоненты
+- 3-5 первых review статей (real content) — ручная проверка pipeline
+
+### Спринт 3 — pSEO движок (неделя 3)
+- Seed Supabase: 30-50 tools, 30-50 comparisons
+- Templates для `/compare/[...slug]`, `/alternatives/[tool]`, `/directory/[slug]`
+- generateStaticParams + ISR + webhook от Supabase
+- Sitemap.ts, robots.ts, JSON-LD schemas
+
+### Спринт 4 — Tools & Calculators (неделя 4)
+- Email ROI Calculator (full)
+- AI Cost Comparator (full)
+- AI Product Description Generator + API + rate limiting
+- LiveNumber, CalculatorWidget, ResultCard компоненты
+- Embed snippet для tools
+
+### Спринт 5 — Conversion & SEO finishing (неделя 5)
+- Newsletter (Beehiiv API + Supabase mirror)
+- Affiliate redirector `/go/[slug]` + tracking
+- Auth (Supabase Auth, Magic Link + Google)
+- Saved calculations, account dashboard
+- Like/save на статьях
+- Pagefind search + SearchModal
+- Giscus comments на reviews/guides
+
+### Спринт 6 — Polish, legal, launch (неделя 6)
+- Все 8 legal pages с реальным content
+- Methodology page (это ВАЖНЫЙ trust signal)
+- About, Contact с Turnstile
+- OG images dynamic generation для всех типов
+- Hreflang теги, RU версия 5 hero-страниц
+- Performance audit (Lighthouse, PageSpeed Insights)
+- Accessibility audit (axe DevTools, manual keyboard nav)
+- Plausible + PostHog setup, key events
+- GSC + Bing Webmaster setup, sitemap submit
+
+---
+
+## 19. Pre-launch checklist
+
+**Performance:**
+- [ ] Lighthouse Mobile ≥ 90 на всех ключевых страницах
+- [ ] LCP < 2.0s, INP < 200ms, CLS < 0.1
+- [ ] Bundle size < 100KB на review/guide pages
+- [ ] Все images через next/image, AVIF + WebP
+
+**SEO:**
+- [ ] Title + description на каждой странице, unique
+- [ ] hreflang теги для всех страниц с RU-версией
+- [ ] Canonical URLs корректны
+- [ ] JSON-LD валидируется через [Schema.org validator](https://validator.schema.org)
+- [ ] Sitemap submitted в GSC + Bing
+- [ ] robots.txt корректен (не блокирует AI bots)
+- [ ] OG images проверены через [opengraph.xyz](https://opengraph.xyz)
+
+**Accessibility:**
+- [ ] Все интерактивные элементы достижимы клавиатурой
+- [ ] Visible focus rings на всех focusable элементах
+- [ ] Цветовой контраст ≥ 4.5:1 (axe DevTools clean)
+- [ ] Все images имеют meaningful alt
+- [ ] Heading hierarchy строго иерархична
+- [ ] prefers-reduced-motion работает
+
+**Security:**
+- [ ] CSP headers применяются (test через securityheaders.com)
+- [ ] Rate limits на всех public endpoints
+- [ ] Turnstile на всех формах
+- [ ] Supabase RLS включён везде, проверен service_role не утекает в client
+- [ ] No console.log с sensitive data в production
+
+**Legal/Compliance:**
+- [ ] Affiliate Disclosure banner на каждой статье с партнёрками
+- [ ] Privacy Policy, Terms, Cookie Policy опубликованы
+- [ ] Methodology page заполнена реальным content
+- [ ] FTC-compliant disclosures
+- [ ] GDPR-friendly (Plausible, no cookies для трекинга, opt-in для marketing)
+
+**Content:**
+- [ ] Минимум 20-30 unique деталей на каждой pSEO странице (не template-content)
+- [ ] Минимум 10 deep reviews опубликовано
+- [ ] Минимум 5 long-form guides
+- [ ] 3 калькулятора работают, embed code тестирован
+- [ ] Каталог: 50+ tools с полными карточками
+
+**Tracking:**
+- [ ] GSC verification done
+- [ ] Bing Webmaster verification done
+- [ ] Plausible подтверждает события
+- [ ] PostHog ловит ключевые events (tool_used, affiliate_clicked, newsletter_subscribed)
+- [ ] Affiliate redirector логирует в Supabase
+
+**Affiliate readiness:**
+- [ ] Shopify Partner approved + 20% recurring активен
+- [ ] 10-15 SaaS партнёрок approved (Klaviyo, Gorgias, Tidio, Postscript, Recharge, ManyChat, etc.)
+- [ ] Все ссылки идут через `/go/[slug]`, UTM-метки корректны
+- [ ] `rel="sponsored nofollow"` на всех affiliate ссылках
+
+---
+
+## 20. Post-launch (первые 90 дней)
+
+**Неделя 1-2:**
+- Submit sitemap в GSC, Bing
+- Anonymously использовать сайт от лица merchant — найти UX-баги
+- Запустить первый калькулятор на Reddit r/shopify, IndieHackers, Product Hunt
+- Первая отправка newsletter (Welcome + best of the month)
+
+**Месяц 1:**
+- Ежедневный output: 1-2 in-depth статьи, 5-10 pSEO страниц
+- Отслеживать в GSC: impressions, average position, CTR
+- A/B тестировать homepage hero (две версии)
+- Начать outreach к Shopify-влияющим в Twitter/LinkedIn
+
+**Месяц 2-3:**
+- Когда первые 1000 sessions/неделю — подключать Ezoic
+- Когда 50+ статей — semantic search через pgvector embeddings (upgrade)
+- Первые попытки sponsored review (только после 5+ honest reviews опубликовано)
+- Расширение RU контента (топ 30 страниц)
+
+---
+
+**Конец ТЗ-2.**
+
+Дизайн берётся из TZ-1-design.md и Claude Design экспорта. Все architectural решения зафиксированы и протестированы на масштабируемость до 5,000+ страниц и 100k sessions/мес без проблем на Vercel Hobby (с переходом на Pro $20/мес ожидаемо к месяцу 6-9).

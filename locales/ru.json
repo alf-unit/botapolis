@@ -1,0 +1,120 @@
+{
+  "nav": {
+    "tools": "Инструменты",
+    "compare": "Сравнения",
+    "reviews": "Обзоры",
+    "guides": "Гайды",
+    "directory": "Каталог",
+    "search": "Поиск",
+    "searchPlaceholder": "Поиск инструментов, обзоров…",
+    "subscribe": "Подписаться",
+    "openMenu": "Открыть меню",
+    "closeMenu": "Закрыть меню",
+    "toggleTheme": "Сменить тему",
+    "switchLanguage": "Сменить язык"
+  },
+  "hero": {
+    "eyebrow": "Operator's manual · v.026",
+    "headline": "AI-плейбук для серьёзных Shopify-операторов.",
+    "lede": "Калькуляторы, которые показывают реальный ROI. Обзоры на настоящих магазинах. Сравнения с конкретным победителем — без ничьих.",
+    "ctaPrimary": "Открыть инструменты",
+    "ctaSecondary": "Смотреть обзоры",
+    "social": "1247 операторов подписаны",
+    "rating": "84 обзора протестировано",
+    "widget": {
+      "badge": "AI · live",
+      "title": "Калькулятор Email ROI",
+      "try": "попробовать →",
+      "subscribers": "Подписчики",
+      "openRate": "Open rate",
+      "aov": "Средний чек",
+      "resultLabel": "Прогноз выручки в месяц",
+      "resultMeta": "При 4 рассылках/мес · 2.1% клика · 1.8% конверсии"
+    }
+  },
+  "tools": {
+    "title": "Главные инструменты",
+    "subtitle": "Живые калькуляторы для реальных Shopify-решений.",
+    "viewAll": "Все инструменты →",
+    "items": {
+      "emailRoi": {
+        "title": "Калькулятор Email ROI",
+        "desc": "Оцените выручку с рассылки по числу подписчиков, open rate и AOV.",
+        "metric": "Live-результат",
+        "value": "$18,420 /мес",
+        "category": "Email"
+      },
+      "adBreakeven": {
+        "title": "Точка окупаемости рекламы",
+        "desc": "Когда платный трафик перестаёт окупаться? Задайте CPA, AOV, маржу — получите линию.",
+        "metric": "Break-even ROAS",
+        "value": "2.4×",
+        "category": "Реклама"
+      },
+      "ltvCac": {
+        "title": "Отношение LTV к CAC",
+        "desc": "Живая когортная математика без таблиц — найдите устойчивое окно привлечения.",
+        "metric": "Здоровое значение",
+        "value": "3.2 : 1",
+        "category": "Аналитика"
+      }
+    }
+  },
+  "newsletter": {
+    "eyebrow": "Только для операторов",
+    "title": "Получайте operator's brief.",
+    "subtitle": "Одно письмо в неделю. Обновления калькуляторов, новые обзоры, найденные нами компромиссы.",
+    "placeholder": "you@store.com",
+    "cta": "Подписаться",
+    "footnote": "Уже 1247 Shopify-операторов · Отписаться можно в любой момент"
+  },
+  "footer": {
+    "tagline": "Operator's manual по AI-инструментам, которые двигают Shopify-магазины вперёд.",
+    "columns": {
+      "tools": "Инструменты",
+      "compare": "Сравнения",
+      "guides": "Гайды",
+      "legal": "Правовое"
+    },
+    "links": {
+      "emailRoi": "Калькулятор Email ROI",
+      "adSpend": "Планировщик рекламы",
+      "ltvCac": "LTV / CAC",
+      "allTools": "Все инструменты",
+      "klaviyoMailchimp": "Klaviyo vs Mailchimp",
+      "gorgiasZendesk": "Gorgias vs Zendesk",
+      "omnisendKlaviyo": "Omnisend vs Klaviyo",
+      "looxJudgeme": "Loox vs Judge.me",
+      "allGuides": "Все гайды",
+      "directory": "Каталог",
+      "methodology": "Методология",
+      "about": "О проекте",
+      "privacy": "Конфиденциальность",
+      "terms": "Условия",
+      "affiliateDisclosure": "Партнёрский disclosure",
+      "cookiePolicy": "Cookie-политика"
+    },
+    "copyright": "© 2026 Botapolis · Сделано для операторов, не для зевак"
+  },
+  "common": {
+    "tryIt": "Попробовать",
+    "learnMore": "Подробнее",
+    "loading": "Загрузка…"
+  },
+  "auth": {
+    "signIn": "Войти",
+    "signOut": "Выйти",
+    "signedOut": "Вы вышли из аккаунта",
+    "signOutFailed": "Не удалось выйти",
+    "dashboard": "Личный кабинет",
+    "saved": "Сохранённые",
+    "openMenu": "Открыть меню пользователя",
+    "signInHeadline": "Войти в Botapolis",
+    "signInLede": "Сохраняй расчёты, отслеживай активность, получай повышенные лимиты на AI-инструменты.",
+    "magicLinkCta": "Прислать magic link",
+    "magicLinkSent": "Проверьте почту",
+    "googleCta": "Войти через Google",
+    "emailLabel": "Email",
+    "checkInbox": "Открой письмо и нажми на ссылку — мы залогиним тебя автоматически."
+  }
+}

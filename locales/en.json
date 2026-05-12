@@ -1,0 +1,120 @@
+{
+  "nav": {
+    "tools": "Tools",
+    "compare": "Compare",
+    "reviews": "Reviews",
+    "guides": "Guides",
+    "directory": "Directory",
+    "search": "Search",
+    "searchPlaceholder": "Search tools, reviews…",
+    "subscribe": "Subscribe",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "toggleTheme": "Toggle theme",
+    "switchLanguage": "Switch language"
+  },
+  "hero": {
+    "eyebrow": "Operator's manual · v.026",
+    "headline": "The AI playbook for serious Shopify operators.",
+    "lede": "Calculators that show real ROI. Reviews tested on real stores. Comparisons that pick a winner — not a draw.",
+    "ctaPrimary": "Try the tools",
+    "ctaSecondary": "See reviews",
+    "social": "1,247 operators subscribed",
+    "rating": "84 reviews tested",
+    "widget": {
+      "badge": "AI · live",
+      "title": "Email ROI Calculator",
+      "try": "try it →",
+      "subscribers": "Subscribers",
+      "openRate": "Open rate",
+      "aov": "Average order value",
+      "resultLabel": "Estimated monthly revenue",
+      "resultMeta": "Based on 4 sends/mo · 2.1% click · 1.8% conversion"
+    }
+  },
+  "tools": {
+    "title": "Featured tools",
+    "subtitle": "Live calculators built for real Shopify decisions.",
+    "viewAll": "All tools →",
+    "items": {
+      "emailRoi": {
+        "title": "Email ROI Calculator",
+        "desc": "Estimate revenue per send across subscribers, open rate, and AOV.",
+        "metric": "Live result",
+        "value": "$18,420 /mo",
+        "category": "Email"
+      },
+      "adBreakeven": {
+        "title": "Ad spend break-even",
+        "desc": "When do paid ads start to lose money? Set CPA, AOV, margin — get the line.",
+        "metric": "Break-even ROAS",
+        "value": "2.4×",
+        "category": "Ads"
+      },
+      "ltvCac": {
+        "title": "LTV vs CAC ratio",
+        "desc": "Live cohort math without a spreadsheet — find your sustainable acquisition window.",
+        "metric": "Healthy ratio",
+        "value": "3.2 : 1",
+        "category": "Analytics"
+      }
+    }
+  },
+  "newsletter": {
+    "eyebrow": "Operators only",
+    "title": "Get the operator's brief.",
+    "subtitle": "One email a week. Calculator updates, new reviews, the trade-offs we caught.",
+    "placeholder": "you@store.com",
+    "cta": "Subscribe",
+    "footnote": "Join 1,247 Shopify operators · Unsubscribe anytime"
+  },
+  "footer": {
+    "tagline": "The operator's manual for AI tools that move Shopify stores forward.",
+    "columns": {
+      "tools": "Tools",
+      "compare": "Compare",
+      "guides": "Guides",
+      "legal": "Legal"
+    },
+    "links": {
+      "emailRoi": "Email ROI calculator",
+      "adSpend": "Ad spend planner",
+      "ltvCac": "LTV / CAC",
+      "allTools": "All tools",
+      "klaviyoMailchimp": "Klaviyo vs Mailchimp",
+      "gorgiasZendesk": "Gorgias vs Zendesk",
+      "omnisendKlaviyo": "Omnisend vs Klaviyo",
+      "looxJudgeme": "Loox vs Judge.me",
+      "allGuides": "All guides",
+      "directory": "Directory",
+      "methodology": "Methodology",
+      "about": "About",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "affiliateDisclosure": "Affiliate disclosure",
+      "cookiePolicy": "Cookie policy"
+    },
+    "copyright": "© 2026 Botapolis · Made for operators, not lurkers"
+  },
+  "common": {
+    "tryIt": "Try it",
+    "learnMore": "Learn more",
+    "loading": "Loading…"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signedOut": "Signed out",
+    "signOutFailed": "Couldn't sign out",
+    "dashboard": "Dashboard",
+    "saved": "Saved",
+    "openMenu": "Open user menu",
+    "signInHeadline": "Sign in to Botapolis",
+    "signInLede": "Save your calculations, track activity, get higher rate-limits on the AI tools.",
+    "magicLinkCta": "Send magic link",
+    "magicLinkSent": "Check your inbox",
+    "googleCta": "Continue with Google",
+    "emailLabel": "Email",
+    "checkInbox": "Open the email and click the link — we'll log you in automatically."
+  }
+}

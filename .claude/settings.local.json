@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"D:\\\\CLAUDE\\\\PROJECTS\\\\02_botapolis\\\\botapolis-handoff-All_Site_files\\\\botapolis\\\\\")",
+      "Read(//d/CLAUDE/PROJECTS/02_botapolis/botapolis-handoff-All_Site_files/**)",
+      "Bash(ls 'D:/CLAUDE/PROJECTS/02_botapolis/')",
+      "Read(//d/CLAUDE/PROJECTS/02_botapolis/**)",
+      "Bash(npm run *)",
+      "Bash(echo \"started pid=$!\")",
+      "Bash(curl -s -o /tmp/page.html -w \"HTTP=%{http_code} size=%{size_download}\\\\n\" http://localhost:3000/)",
+      "Bash(grep -iE '\\(github|twitter|linkedin|rss|x\\)\\\\.mjs$')",
+      "Bash(> 'D:/Projects/botapolis/dev.log')",
+      "Bash(curl -s -o /tmp/page-ru.html -w \"HTTP=%{http_code} size=%{size_download}\\\\n\" http://localhost:3000/ru)",
+      "Bash(grep -oE '\\(botapolis|Email ROI|Subscribe|operator\\)' /tmp/page.html | sort -u | head -20)",
+      "Read(//tmp/**)",
+      "Bash(npx tsc *)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(node -e \"console.log\\(require\\('@t3-oss/env-nextjs/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\(require\\('zod/package.json'\\).version\\)\")"
+    ]
+  }
+}

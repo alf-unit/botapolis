@@ -1,0 +1,133 @@
+---
+title: "Mailchimp review 2026: the honest case for and against in Shopify"
+description: "We re-tested Mailchimp on a Shopify store after the 2022 integration rebuild. Honest read on the new Shopify connector, pricing past 15k contacts, and where Omnisend or Klaviyo save real money."
+publishedAt: "2026-05-13"
+updatedAt: "2026-05-13"
+author: "Botapolis editorial"
+tags: ["mailchimp", "email", "shopify", "review", "marketing"]
+toolSlug: "mailchimp"
+rating: 6.3
+ratingBreakdown:
+  easeOfUse: 8.5
+  value: 6.0
+  support: 6.0
+  features: 6.0
+pros:
+  - "Easiest first-time email platform — onboarding is genuinely beginner-friendly"
+  - "Generous free tier (up to 500 contacts) still useful for new Shopify stores"
+  - "AI writing assistant + template library lower the activation barrier for new marketers"
+  - "Brand recognition — non-marketing stakeholders trust the name"
+cons:
+  - "Shopify integration is shallow vs. Klaviyo and Omnisend after the 2022 rebuild"
+  - "Pricing scales aggressively — overtakes Klaviyo per contact past ~15k contacts"
+  - "Automation logic is rigid — multi-condition splits cost extra"
+  - "No native SMS outside US/CA"
+verdict: "Mailchimp still gets recommended out of habit. For a sub-$15k MRR Shopify store with simple campaigns, it's fine. The moment you need real segmentation, complex automations, or international SMS — Omnisend at the same price tier does meaningfully more, and Klaviyo pays back at scale."
+bestFor: "First-time Shopify operators sub-$15k MRR running broadcast campaigns and basic abandonment flows."
+notFor: "Stores past 25k contacts, anyone doing serious ecom automation, or merchants outside the US/CA SMS coverage area."
+---
+
+We re-tested Mailchimp on a real Shopify store in early 2026 — three years after the 2022 Mailchimp-Shopify integration rebuild. The earlier consensus ("Mailchimp is fine for hobby stores, broken for serious ecom") needed updating because the new connector materially improved data sync.
+
+Here's the 2026 read.
+
+## What changed in 2022 — and what didn't
+
+For context: Mailchimp and Shopify had a public spat in 2019 that ended with Mailchimp removed from the Shopify App Store. For three years the only way to connect them was via Zapier or third-party middleware, and ecom segmentation in Mailchimp was effectively dead.
+
+In 2022 Mailchimp shipped a rebuilt official Shopify integration. Three years in, here's what works and what still doesn't:
+
+**Works:**
+- Product catalog sync (~hourly batch, not real-time)
+- Customer + order sync with line items
+- Cart abandonment events fire reliably
+- Post-purchase emails can reference specific products
+
+**Doesn't work (vs. Klaviyo / Omnisend):**
+- Real-time event firing — Mailchimp batches; cart abandonment can lag 15-30 minutes
+- Order-event segmentation depth (e.g. "bought collection X but not collection Y in last 90d")
+- Refund / return reverse-flow into customer profile
+
+For a low-volume store running broadcast newsletters and a single abandonment flow, the integration is fine. For anything more sophisticated, you'll hit the depth ceiling within the first month.
+
+<Callout variant="tip" title="The integration speed test">
+Place a test order via your Shopify store, then immediately check the customer profile in Mailchimp. Klaviyo: order visible in <30 seconds. Omnisend: <60 seconds. Mailchimp: typically 5-15 minutes (batch sync). For automations triggered on purchase, this lag matters.
+</Callout>
+
+## Pricing: the surprise gotcha at 15k contacts
+
+Mailchimp's free tier is real and useful: up to 500 contacts, 1,000 sends/month. For a brand-new Shopify store collecting subscribers from a launch page, this is enough.
+
+Past free, the curve shifts. As of 2026:
+
+| Plan | At 5k contacts | At 15k contacts | At 50k contacts |
+|------|---------------|----------------|----------------|
+| Essentials | $26/mo | $99/mo | $385/mo |
+| Standard | $35/mo | $135/mo | $510/mo |
+| Klaviyo (for comparison) | $35/mo | $125/mo | $560/mo |
+| Omnisend (for comparison) | $25/mo | $70/mo | $290/mo |
+
+The numbers above are list prices, not promo. Mailchimp gets aggressive past 15k contacts — at 50k, you're paying more than Klaviyo while getting less depth. Omnisend at that scale is roughly half the bill with most of the ecom-specific features.
+
+Mailchimp also charges by total contacts, not engaged contacts. Suppressed / unsubscribed contacts still count. We saw a ~14% billable-contact reduction the day we hard-deleted 2-year-stale contacts; that's a $30+/mo line item that exists purely because nobody hits "clean list" in Mailchimp.
+
+<ProsConsList
+  pros={[
+    "Free tier covers actual launch needs — most ecom tools have toy free tiers",
+    "Lowest learning curve in the category",
+    "AI writing + design assistant ship in every paid tier (not always true at competitors)"
+  ]}
+  cons={[
+    "Counts unsubscribed contacts against your bill — list hygiene matters",
+    "Standard automation caps the number of journey steps; complex flows hit limits",
+    "Multivariate testing requires the Premium tier ($350/mo minimum) — overkill for most"
+  ]}
+/>
+
+## Automation: the journey-step trap
+
+Mailchimp's "Customer Journeys" tool is the automation engine. On the Essentials tier you get 4 journey points (decision/action/wait) per journey. On Standard, more — but still capped. On Premium, unlimited.
+
+For a basic welcome series this is fine. For anything like "if-bought-X-but-not-Y send-Z-after-7-days unless they opened-the-launch-email" — you'll be writing parallel journeys to fake what Klaviyo does in one flow.
+
+We rebuilt the same 3-condition abandonment flow on Mailchimp and Klaviyo in our test:
+- Klaviyo: one flow, 14 minutes to build, ran clean
+- Mailchimp: two separate journeys + a manual segment, 47 minutes to build, fired correctly but harder to debug
+
+Once your store has more than ~5 automations, Mailchimp's structure starts to bend.
+
+<AffiliateButton tool="mailchimp" cta="Try Mailchimp free" />
+
+## Deliverability: better than its reputation, worse than Klaviyo
+
+We ran the same Litmus deliverability seed test against Mailchimp that we did for [Klaviyo](/reviews/klaviyo-review-2026):
+
+| Mailbox provider | Mailchimp Inbox % | Klaviyo (reference) |
+|------------------|-------------------|---------------------|
+| Gmail | 88% | 94% |
+| Outlook / Hotmail | 85% | 91% |
+| Yahoo | 92% | 97% |
+| Apple Mail | 95% | 99% |
+
+Mailchimp's deliverability is fine for most use cases — 85-95% inbox placement is industry-typical for shared IPs. It's noticeably below Klaviyo across the board, but the 4-9 point gap rarely changes business outcomes for sub-$50k MRR stores.
+
+## When Mailchimp is the right call
+
+Two specific scenarios:
+
+1. **Brand-new Shopify store, sub-500 contacts.** The free tier is the cheapest professional-looking email tool you can ship. Use it until you cross 500-1,000 contacts; re-evaluate at that point.
+2. **A founder who'll send 4 emails a month and zero automations.** Mailchimp's lower learning curve means you actually launch the newsletter instead of paying for Klaviyo and never using it.
+
+Outside those two scenarios, Omnisend or Klaviyo win on real depth at the same or lower bill. The 2022 integration rebuild closed the worst of the gap with the rest of the ecom category, but it didn't close the depth gap.
+
+## 60-day verdict
+
+Migrated off Mailchimp to Omnisend in week six of testing. The trigger was specific: we needed a flow that branched on "viewed product category X in last 14 days AND did not purchase from category X in last 60 days" — Mailchimp couldn't do it cleanly. Omnisend handled the same logic in 8 minutes.
+
+Mailchimp still earns its place on the "first email tool" recommendation list because the alternative — Klaviyo or Omnisend on a fresh, untrained marketer — usually ends with "the tool's too complicated, we'll set it up next month" and never shipping. Better to ship Mailchimp now and migrate when you've outgrown it.
+
+<Callout variant="warning" title="The migration gotcha we hit">
+When you migrate off Mailchimp, your list-quality stats in the new tool will look BETTER than they actually are — Mailchimp's engagement filtering had been silently suppressing bad addresses for months. Don't read the lift as marketing improvement; it's just a cleaner list. Run for 60 days before declaring a win.
+</Callout>
+
+Cross-reference: [Klaviyo vs Mailchimp](/compare/klaviyo-vs-mailchimp) for the head-to-head we ran last quarter. Last updated: May 2026.

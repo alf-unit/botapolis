@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
-import { NewsletterForm } from "@/components/marketing/NewsletterForm"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import {
@@ -220,47 +219,16 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* =========================================================
-            NEWSLETTER CTA (homepage feature card — full version
-            lives in the Footer)
-           ========================================================= */}
-        <section className="pb-20">
-          <div className="container-default">
-            <div
-              id="newsletter-hero"
-              className="relative overflow-hidden mx-auto max-w-2xl rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)] px-6 py-12 md:px-10 md:py-14 text-center shadow-[var(--shadow-md)]"
-            >
-              <div
-                aria-hidden="true"
-                className="absolute inset-x-1/4 -top-1/2 h-[200%] pointer-events-none opacity-70"
-                style={{
-                  background:
-                    "radial-gradient(ellipse, rgba(16,185,129,0.10), transparent 60%)",
-                }}
-              />
-              <div className="relative">
-                <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--brand)]">
-                  {dict.newsletter.eyebrow}
-                </span>
-                <h2 className="mt-3 text-h2 font-semibold tracking-[-0.02em]">
-                  {dict.newsletter.title}
-                </h2>
-                <p className="mt-3 text-[15px] text-[var(--text-secondary)] max-w-md mx-auto">
-                  {dict.newsletter.subtitle}
-                </p>
-                <NewsletterForm
-                  strings={dict.newsletter}
-                  source="homepage_hero"
-                  language={locale}
-                  className="mt-6 max-w-md mx-auto"
-                />
-                <p className="mt-3 text-[12px] text-[var(--text-tertiary)]">
-                  {dict.newsletter.footnote}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* BUG-FIX (May 2026 polish): removed the standalone homepage
+            newsletter feature card. The Footer (rendered immediately
+            below) already ships an identical card with the SAME eyebrow,
+            title, subtitle, form, and footnote — on desktop the two were
+            visually separated, on mobile they stacked back-to-back and
+            read as a duplicate "Get the operator's brief" block. Source
+            attribution stays clean: the Footer's form posts with
+            `source: "footer"`, so analytics still distinguish subscribers
+            who came from page-level CTAs (in-article cards, hero buttons)
+            from the always-present footer strip. */}
       </main>
 
       <Footer

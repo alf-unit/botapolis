@@ -21,20 +21,15 @@ export default function AppleIcon() {
           display:        "flex",
           alignItems:     "center",
           justifyContent: "center",
-          background:     "#0A0A0B",
+          // BUG-FIX (May 2026 polish): same swap as app/icon.tsx — was a
+          // solid dark canvas which iOS masked into a black square in
+          // the home-screen grid. iOS still applies a rounded-corner mask
+          // automatically to whatever pixels we ship, and a transparent
+          // background lets the OS surface (dark / light mode wallpaper,
+          // app folder fill) show through instead of fighting it.
+          background:     "transparent",
         }}
       >
-        {/* Subtle atmospheric glow — gives the icon depth on the iOS home
-            screen without making it look busy at the spotlight-grid size. */}
-        <div
-          style={{
-            position: "absolute",
-            inset:    0,
-            background:
-              "radial-gradient(circle at 30% 30%, rgba(16,185,129,0.25), transparent 60%)," +
-              "radial-gradient(circle at 70% 70%, rgba(139,92,246,0.22), transparent 60%)",
-          }}
-        />
         <svg width="120" height="120" viewBox="0 0 64 64" fill="none" style={{ position: "relative" }}>
           <defs>
             <linearGradient id="ai-g" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
@@ -45,6 +40,8 @@ export default function AppleIcon() {
           <rect x="14" y="29" width="36" height="6" rx="3" fill="url(#ai-g)" />
           <circle cx="18" cy="32" r="12" fill="url(#ai-g)" />
           <circle cx="46" cy="32" r="12" fill="url(#ai-g)" />
+          {/* Inner hollow tinted slate so on dark wallpapers it reads as
+              a hollow and on light wallpapers as a deliberate dot. */}
           <circle cx="46" cy="32" r="5"  fill="#0A0A0B" />
         </svg>
       </div>

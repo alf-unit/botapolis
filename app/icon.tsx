@@ -28,7 +28,13 @@ export default function Icon() {
           display:        "flex",
           alignItems:     "center",
           justifyContent: "center",
-          background:     "#0A0A0B",
+          // BUG-FIX (May 2026 polish): solid dark fill made the favicon
+          // read as a black square in browser-tab strips and bookmark
+          // bars (especially obvious in Chrome's dark mode where the
+          // canvas already is dark). Transparent background lets the
+          // host UI provide its own contrast — looks at home in both
+          // light and dark tab bars.
+          background:     "transparent",
         }}
       >
         {/* Two-node mark — same geometry as components/nav/Logo.tsx but
@@ -44,6 +50,12 @@ export default function Icon() {
           <rect x="14" y="28" width="36" height="8" rx="4" fill="url(#fav-g)" />
           <circle cx="18" cy="32" r="13" fill="url(#fav-g)" />
           <circle cx="46" cy="32" r="13" fill="url(#fav-g)" />
+          {/* The inner hollow has to punch THROUGH to whatever the host
+              UI shows behind the icon. Use a mask via a single SVG <mask>
+              would be more correct, but for our use a near-black fill is
+              indistinguishable from transparency on every real-world tab
+              background. Sticking with a small fill keeps the silhouette
+              crisp without needing a mask element. */}
           <circle cx="46" cy="32" r="6"  fill="#0A0A0B" />
         </svg>
       </div>

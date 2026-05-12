@@ -88,7 +88,18 @@ export default async function LoginPage({ searchParams }: PageProps) {
   }
 
   return (
-    <main className="relative min-h-svh flex flex-col">
+    <main className="relative min-h-svh flex flex-col overflow-hidden">
+      {/* BUG-FIX (May 2026 polish): added `overflow-hidden` here.
+          The decorative glow <div>s below are absolutely positioned with
+          `-left-40` / `-right-40` offsets and a 640px size, so their
+          bounding boxes extend ~600px beyond the right edge of a 375px
+          mobile viewport. Without overflow-hidden on the parent, that
+          excess geometry made the body horizontally scrollable — visiting
+          /login on mobile felt "draggable" and pinch-zoomable because the
+          page wider than the screen invited the browser's pan gesture.
+          Clipping the glows fixes it without touching the meta viewport
+          (we never want to disable user-scalable for a11y). */}
+
       {/* Background glow — pulls the brand mint→violet duality onto the page */}
       <div
         aria-hidden="true"

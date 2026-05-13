@@ -147,6 +147,38 @@ const nextConfig: NextConfig = {
         source: "/:locale(ru)?/tools/email-roi-calculator",
         headers: embedHeaders,
       },
+      {
+        // Pagefind: the search index is rebuilt every deploy and the
+        // entry.json file points at content-addressed shard files
+        // (pagefind.en_<hash>.pf_meta). When Vercel's edge cache holds
+        // a stale entry.json from the previous build, it references
+        // shard hashes that no longer exist → every search returns
+        // "Couldn't load the search index".
+        //
+        // Fix: explicitly forbid CDN caching of the entry file (and the
+        // loader JS) so each request hits the deployment that owns the
+        // current shard set. The shards themselves carry a hash in
+        // their filename and are safe to cache long-term (Vercel does
+        // by default; nothing more to do here).
+        source: "/pagefind/pagefind-entry.json",
+        headers: [
+          { key: "Cache-Control", value: "no-store, must-revalidate" },
+        ],
+      },
+      {
+        source: "/pagefind/pagefind.js",
+        headers: [
+          { key: "Cache-Control", value: "no-store, must-revalidate" },
+        ],
+      },
+      {
+        // Same for the worker bundle — it's small and gets rebuilt
+        // alongside the index.
+        source: "/pagefind/pagefind-worker.js",
+        headers: [
+          { key: "Cache-Control", value: "no-store, must-revalidate" },
+        ],
+      },
     ]
   },
   // Sprint 2: the MDX loader reads `content/{type}/{lang}/{slug}.mdx` from

@@ -322,9 +322,15 @@ export function SearchPageClient({ strings, locale }: SearchPageClientProps) {
           autoComplete="off"
           spellCheck={false}
           enterKeyHint="search"
+          // BUG-FIX (May 2026 audit): iOS Safari auto-zooms any input
+          // whose computed font-size is below 16px the instant it gets
+          // focus — and that zoom-in is what made /search feel
+          // "draggable" on mobile. Hardcoded 16px on the input so the
+          // viewport stays put. Per-breakpoint scaling kept for label /
+          // placeholder readability, but never below the zoom threshold.
           className={cn(
             "flex-1 min-w-0 bg-transparent outline-none border-none",
-            "pl-4 lg:pl-5 pr-3 text-[15px] lg:text-[16px]",
+            "pl-4 lg:pl-5 pr-3 text-[16px] lg:text-[17px]",
             "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
           )}
         />

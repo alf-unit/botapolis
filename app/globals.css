@@ -428,12 +428,23 @@
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "ss01", "cv11";
     color-scheme: light dark;
+    /* Belt-and-suspenders against accidental horizontal pan on mobile.
+       `overflow-x: clip` is the modern, layout-friendly variant that
+       (unlike `hidden`) does NOT establish a scroll container, so
+       `position: sticky` / `position: fixed` keep working as expected
+       on the Navbar and any other fixed UI. Picked up after the May
+       2026 audit when the /search page felt draggable left-right on
+       iOS — the proper fix is to identify the overflowing element
+       and contain it, but this is a robust safety net. */
+    overflow-x: clip;
   }
 
   body {
     @apply bg-background text-foreground font-sans;
     font-size: 1rem;
     line-height: 1.7;
+    /* Match `html` so the swipe-pan is killed at both levels. */
+    overflow-x: clip;
     transition:
       background-color var(--duration-base) var(--ease-out-expo),
       color            var(--duration-base) var(--ease-out-expo);

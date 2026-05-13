@@ -217,8 +217,10 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
           <Link
             href={`${localePrefix}/#newsletter`}
             className={cn(
-              buttonVariants({ size: "sm" }),
-              "hidden md:inline-flex bg-[var(--brand)] text-[var(--brand-fg)] hover:bg-[var(--brand-hover)]",
+              // CTA variant adds mint gradient + shimmer + lift; no need
+              // for the old bg-/text-/hover- triplet (variant supplies them).
+              buttonVariants({ variant: "cta", size: "sm" }),
+              "hidden md:inline-flex",
             )}
           >
             {strings.subscribe}
@@ -300,8 +302,8 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
                     <Link
                       href={`${localePrefix}/#newsletter`}
                       className={cn(
-                        buttonVariants({ size: "default" }),
-                        "mt-3 w-full bg-[var(--brand)] text-[var(--brand-fg)] hover:bg-[var(--brand-hover)]",
+                        buttonVariants({ variant: "cta", size: "default" }),
+                        "mt-3 w-full",
                       )}
                     >
                       {strings.subscribe}

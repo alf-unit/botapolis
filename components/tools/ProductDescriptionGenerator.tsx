@@ -308,12 +308,9 @@ export function ProductDescriptionGenerator({
           disabled={!canSubmit || status === "loading"}
           aria-busy={status === "loading" || undefined}
           className={cn(
-            buttonVariants({ size: "lg" }),
-            "mt-2 h-12 px-5 text-base text-white justify-center disabled:cursor-not-allowed disabled:opacity-60",
+            buttonVariants({ variant: "cta", size: "lg" }),
+            "mt-2 h-12 px-5 text-base justify-center disabled:cursor-not-allowed disabled:opacity-60",
           )}
-          style={{
-            background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-          }}
         >
           {status === "loading" ? (
             <>
@@ -433,12 +430,9 @@ export function ProductDescriptionGenerator({
               rel="sponsored nofollow noopener"
               target="_blank"
               className={cn(
-                buttonVariants({ size: "sm" }),
-                "h-10 text-[13px] text-white",
+                buttonVariants({ variant: "cta", size: "sm" }),
+                "h-10 text-[13px]",
               )}
-              style={{
-                background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-              }}
             >
               {strings.affiliate.primary}
               <ArrowUpRight className="size-3.5" />

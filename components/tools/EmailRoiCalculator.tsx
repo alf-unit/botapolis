@@ -521,12 +521,9 @@ export function EmailRoiCalculator({
                 rel="sponsored nofollow noopener"
                 target="_blank"
                 className={cn(
-                  buttonVariants({ size: "sm" }),
-                  "mt-3 w-full h-10 text-[13px] text-white justify-between",
+                  buttonVariants({ variant: "cta", size: "sm" }),
+                  "mt-3 w-full h-10 text-[13px] justify-between",
                 )}
-                style={{
-                  background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-                }}
               >
                 <span>{strings.recommendation.cta.replace("{name}", recommended.name)}</span>
                 <ArrowUpRight className="size-3.5" />

@@ -194,9 +194,11 @@ export function NewsletterForm({
         disabled={loading || subscribed}
         aria-busy={loading || undefined}
         className={cn(
-          "h-11 px-5 rounded-md inline-flex items-center justify-center gap-2",
-          "bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-medium",
-          "hover:bg-[var(--brand-hover)] transition-colors",
+          // .btn-cta supplies mint gradient + shimmer + hover-lift;
+          // we keep the local layout (h/px/rounded/flex) and disabled
+          // styling since this is a raw <button>, not a Button variant.
+          "btn-cta h-11 px-5 rounded-md inline-flex items-center justify-center gap-2",
+          "text-white text-sm font-semibold",
           "disabled:opacity-70 disabled:cursor-not-allowed",
           buttonClassName,
         )}

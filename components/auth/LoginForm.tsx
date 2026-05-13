@@ -229,13 +229,10 @@ export function LoginForm({ strings, privacyHref, termsHref }: LoginFormProps) {
           disabled={sending || googleLoading || sent}
           aria-busy={sending || undefined}
           className={cn(
-            buttonVariants({ size: "lg" }),
-            "h-12 px-5 text-[14px] text-white justify-center gap-2",
+            buttonVariants({ variant: "cta", size: "lg" }),
+            "h-12 px-5 text-[14px] justify-center gap-2",
             "disabled:cursor-not-allowed disabled:opacity-60",
           )}
-          style={{
-            background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-          }}
         >
           {sending ? (
             <Loader2 className="size-4 animate-spin" />

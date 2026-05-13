@@ -449,12 +449,9 @@ function ToolStickyCard({
           rel="sponsored nofollow noopener"
           target="_blank"
           className={cn(
-            buttonVariants({ size: "default" }),
-            "mt-4 w-full justify-between text-white",
+            buttonVariants({ variant: "cta", size: "default" }),
+            "mt-4 w-full justify-between",
           )}
-          style={{
-            background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-          }}
         >
           <span>{tryLabel}</span>
           <ArrowUpRight className="size-4" aria-hidden="true" />

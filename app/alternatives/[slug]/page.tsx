@@ -293,10 +293,9 @@ export default async function AlternativesPage({ params }: PageProps) {
               <Link
                 href={`${localePrefix}/tools/${source.slug}`}
                 className={cn(
-                  buttonVariants({ size: "lg" }),
-                  "h-11 px-4 text-[14px] text-white",
+                  buttonVariants({ variant: "cta", size: "lg" }),
+                  "h-11 px-4 text-[14px]",
                 )}
-                style={{ background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)" }}
               >
                 {t.ctaSeeReview}
                 <ArrowUpRight className="size-4" aria-hidden="true" />

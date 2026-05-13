@@ -118,13 +118,9 @@ export default async function AboutPage() {
               <Link
                 href={`${localePrefix}/tools`}
                 className={cn(
-                  buttonVariants({ size: "lg" }),
-                  "h-12 px-5 text-base text-white",
+                  buttonVariants({ variant: "cta", size: "lg" }),
+                  "h-12 px-5 text-base",
                 )}
-                style={{
-                  background:
-                    "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-                }}
               >
                 {locale === "ru" ? "Открыть инструменты" : "See the tools"}
                 <ArrowUpRight className="size-4" />

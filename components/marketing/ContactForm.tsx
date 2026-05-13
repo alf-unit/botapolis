@@ -206,15 +206,13 @@ export function ContactForm({
 
         <Button
           type="submit"
+          variant="cta"
           size="lg"
           disabled={status === "submitting"}
           className={cn(
-            "h-12 mt-2 text-[15px] text-white",
+            "h-12 mt-2 text-[15px]",
             "disabled:opacity-70 disabled:cursor-not-allowed",
           )}
-          style={{
-            background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-          }}
         >
           {status === "submitting" ? strings.submitLoading : strings.submitCta}
           {status !== "submitting" && (

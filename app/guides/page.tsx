@@ -134,7 +134,7 @@ export default async function GuidesIndexPage() {
               <p className="text-[15px] text-[var(--text-secondary)]">{t.empty}</p>
               <Link
                 href={`${localePrefix}/#newsletter`}
-                className="mt-5 inline-flex h-10 items-center rounded-md bg-[var(--brand)] px-4 text-[14px] font-medium text-[var(--brand-fg)] hover:bg-[var(--brand-hover)] transition-colors"
+                className="btn-cta mt-5 inline-flex h-10 items-center rounded-md px-4 text-[14px] font-semibold text-white"
               >
                 {locale === "ru" ? "Подписаться" : "Subscribe"}
               </Link>

@@ -1231,12 +1231,9 @@ function ToolCardSide({
           rel="sponsored nofollow noopener"
           target="_blank"
           className={cn(
-            buttonVariants({ size: "lg" }),
-            "h-11 px-4 text-[14px] text-white justify-between",
+            buttonVariants({ variant: "cta", size: "lg" }),
+            "h-11 px-4 text-[14px] justify-between",
           )}
-          style={{
-            background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-          }}
         >
           <span>{tryLabel}</span>
           <ArrowUpRight className="size-4" />
@@ -1306,12 +1303,9 @@ function CtaCard({
         rel="sponsored nofollow noopener"
         target="_blank"
         className={cn(
-          buttonVariants({ size: "lg" }),
-          "relative mt-5 w-full h-11 px-4 text-[14px] text-white justify-between",
+          buttonVariants({ variant: "cta", size: "lg" }),
+          "relative mt-5 w-full h-11 px-4 text-[14px] justify-between",
         )}
-        style={{
-          background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-        }}
       >
         <span>{label}</span>
         <ArrowUpRight className="size-4" />

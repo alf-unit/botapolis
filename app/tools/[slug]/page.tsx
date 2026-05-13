@@ -280,13 +280,9 @@ export default async function ToolDetailPage({ params }: PageProps) {
                   rel="sponsored nofollow noopener"
                   target="_blank"
                   className={cn(
-                    buttonVariants({ size: "lg" }),
-                    "h-12 px-5 text-base text-white",
+                    buttonVariants({ variant: "cta", size: "lg" }),
+                    "h-12 px-5 text-base",
                   )}
-                  style={{
-                    background:
-                      "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-                  }}
                 >
                   {t.tryTool}
                   <ArrowUpRight className="size-4" />
@@ -451,13 +447,9 @@ export default async function ToolDetailPage({ params }: PageProps) {
                 rel="sponsored nofollow noopener"
                 target="_blank"
                 className={cn(
-                  buttonVariants({ size: "lg" }),
-                  "h-12 px-6 text-base text-white",
+                  buttonVariants({ variant: "cta", size: "lg" }),
+                  "h-12 px-6 text-base",
                 )}
-                style={{
-                  background:
-                    "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-                }}
               >
                 {t.tryTool}
                 <ArrowUpRight className="size-4" />

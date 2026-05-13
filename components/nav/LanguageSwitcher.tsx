@@ -53,8 +53,14 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
             aria-pressed={active}
             className={cn(
               "h-7 min-w-[34px] px-2 rounded-[5px] transition-colors",
+              // Active label is brand-coloured so it's visually obvious which
+              // language is actually loaded — useful when Chrome's auto-
+              // translate is running on top and the user needs to tell
+              // "site delivered RU" apart from "site delivered EN and
+              // Chrome translated it on the fly". Background stays neutral
+              // so the chip still reads as a segmented control, not a CTA.
               active
-                ? "bg-[var(--bg-muted)] text-[var(--text-primary)]"
+                ? "bg-[var(--bg-muted)] text-[var(--brand)]"
                 : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)]",
             )}
           >

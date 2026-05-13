@@ -11,6 +11,7 @@
     "translate": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/translate-content.ts",
     "translate:missing": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/translate-content.ts --missing",
     "translate:tools": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/translate-tools.ts",
+    "translate:comparisons": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/translate-comparisons.ts",
     "sync:ratings": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/sync-ratings.ts",
     "sync:ratings:apply": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/sync-ratings.ts --apply",
     "validate:content": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/content-validator.ts",

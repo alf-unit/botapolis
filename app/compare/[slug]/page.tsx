@@ -24,6 +24,7 @@ import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
 import { canonicalCompareSlug, isCanonicalCompareSlug } from "@/lib/content/slug"
 import { getToolRatings } from "@/lib/content/rating"
+import { localizeTool } from "@/lib/content/tool-locale"
 import {
   diffIntegrations,
   generateAtAGlance,
@@ -162,16 +163,19 @@ async function fetchRelatedComparisons(
   toolAId:       string,
   toolBId:       string,
   limit:         number,
+  language:      "en" | "ru" = "en",
 ): Promise<RelatedComparison[]> {
   try {
     const supabase = createServiceClient()
     // Match either tool on either side. The `.or()` filter keeps this
     // server-side rather than fanning out to four queries.
+    // Restrict to the same language so /ru/compare/* never surfaces an
+    // English sibling card (would mix languages in the related grid).
     const { data: rows, error } = await supabase
       .from("comparisons")
       .select("slug, tool_a_id, tool_b_id, verdict")
       .eq("status",   "published")
-      .eq("language", "en")
+      .eq("language", language)
       .neq("slug",    currentSlug)
       .or(
         `tool_a_id.eq.${toolAId},tool_a_id.eq.${toolBId},tool_b_id.eq.${toolAId},tool_b_id.eq.${toolBId}`,
@@ -209,13 +213,18 @@ async function fetchRelatedComparisons(
   }
 }
 
-async function fetchComparison(slug: string) {
+async function fetchComparison(slug: string, language: "en" | "ru" = "en") {
   try {
     const supabase = createServiceClient()
+    // After migration 006 the same slug can exist twice (one per language),
+    // so the lookup MUST include language to pick the right copy. Before
+    // that migration both columns existed but only EN rows lived in the
+    // table, so adding the filter is backwards-compatible.
     const { data: cmp, error: cmpErr } = await supabase
       .from("comparisons")
       .select("*")
       .eq("slug", slug)
+      .eq("language", language)
       .eq("status", "published")
       .maybeSingle()
     if (cmpErr) {
@@ -274,7 +283,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // reverse form — search engines following the canonical pointer end
   // up on the same page the runtime redirect below sends humans to.
   const canonicalSlug = canonicalCompareSlug(slug)
-  const row = await fetchComparison(canonicalSlug)
+  // Pass locale through so RU pages see the RU row (introduced by
+  // migration 006 + scripts/translate-comparisons.ts).
+  const row = await fetchComparison(canonicalSlug, locale as "en" | "ru")
 
   if (!row) {
     return buildMetadata({
@@ -343,20 +354,25 @@ export default async function ComparisonPage({ params }: PageProps) {
     redirect(`${prefix}/compare/${canonicalCompareSlug(slug)}`)
   }
 
-  const row = await fetchComparison(slug)
+  const locale = await getLocale()
+  const row = await fetchComparison(slug, locale as "en" | "ru")
   if (!row) notFound()
 
   const { comparison, toolA: rawToolA, toolB: rawToolB } = row
-  const locale = await getLocale()
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 
   // BUG-FIX (May 2026 audit · TZ fixes #3): MDX-resolved rating wins
   // over the DB cache so the compare page never disagrees with the
   // detail review for the same tool.
+  // BUG-FIX (May 2026 i18n audit): also localize each tool through the
+  // shared helper so /ru/compare/* shows RU name / pros / cons inside
+  // each side panel, not English copy bleeding through.
   const ratings = await getToolRatings([rawToolA, rawToolB], locale as "en" | "ru")
-  const toolA: ToolRow = { ...rawToolA, rating: ratings.get(rawToolA.slug) ?? rawToolA.rating }
-  const toolB: ToolRow = { ...rawToolB, rating: ratings.get(rawToolB.slug) ?? rawToolB.rating }
+  const localeA = localizeTool(rawToolA, locale as "en" | "ru")
+  const localeB = localizeTool(rawToolB, locale as "en" | "ru")
+  const toolA: ToolRow = { ...localeA, rating: ratings.get(localeA.slug) ?? localeA.rating }
+  const toolB: ToolRow = { ...localeB, rating: ratings.get(localeB.slug) ?? localeB.rating }
 
   const parsed = parseComparisonData(comparison.comparison_data)
 
@@ -366,7 +382,7 @@ export default async function ComparisonPage({ params }: PageProps) {
   // Pricing, Features, Integrations, Pros & Cons, and Related directly
   // from the `tools` columns so the page is a real comparison even
   // before editorial fills out comparison_data.
-  const related = await fetchRelatedComparisons(slug, toolA.id, toolB.id, 6)
+  const related = await fetchRelatedComparisons(slug, toolA.id, toolB.id, 6, locale as "en" | "ru")
   const integrations = diffIntegrations(toolA, toolB)
   const aHasShopifyPlus = toolA.integrations?.includes("shopify-plus") ?? false
   const bHasShopifyPlus = toolB.integrations?.includes("shopify-plus") ?? false

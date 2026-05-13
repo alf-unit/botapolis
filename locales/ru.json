@@ -46,7 +46,7 @@
         "category": "Email"
       },
       "aiCostComparator": {
-        "title": "AI Cost Comparator",
+        "title": "Калькулятор стоимости AI",
         "desc": "Сравните цены Claude, GPT-4o, Gemini для описаний, поддержки, рекламы и SEO.",
         "metric": "Дешевле всех",
         "value": "$28 /мес",
@@ -87,7 +87,7 @@
     },
     "links": {
       "emailRoi": "Калькулятор Email ROI",
-      "aiCostComparator": "AI Cost Comparator",
+      "aiCostComparator": "Калькулятор стоимости AI",
       "productDescription": "AI-генератор описаний",
       "allTools": "Все инструменты",
       "klaviyoMailchimp": "Klaviyo vs Mailchimp",

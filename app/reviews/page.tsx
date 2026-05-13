@@ -50,10 +50,13 @@ export default async function ReviewsIndexPage() {
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 
-  // EN is canonical — RU index falls back to EN slugs in MVP (per New_Instructions
-  // i18n strategy: thin RU surface for hero pages only, no per-language MDX
-  // requirement yet). Once RU MDX exists, swap to (locale === "ru" ? "ru" : "en").
-  const reviews = await getAllMdxFrontmatter("reviews", "en")
+  // RU MDX now exists for every published review (auto-translated by the
+  // husky pre-commit hook for new commits, manually-translated for the
+  // initial 6). Reading the active locale's frontmatter means RU users
+  // see RU titles + leads instead of English ones. The per-article page
+  // at /ru/reviews/[slug] keeps its own EN fallback inside getMdxContent
+  // for any future review whose RU twin is temporarily missing.
+  const reviews = await getAllMdxFrontmatter("reviews", locale)
 
   const t = {
     eyebrow:

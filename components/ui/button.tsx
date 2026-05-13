@@ -10,17 +10,17 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         // `cta` — primary call-to-action with the brand mint gradient,
-        // glow-on-hover, sheen sweep + press ripple. Use for the
-        // *one* most-important action on a page (Try X, Subscribe,
-        // Get started). Pairs with .btn-cta motion in globals.css.
+        // always-on brand glow, glow-bloom + sheen sweep on hover,
+        // press ripple + inset on click. Use for the *one* most-
+        // important action on a page (Try X, Subscribe, Get started).
+        // All shadow + transition logic lives in .btn-cta (globals.css §7);
+        // this Tailwind class adds only base text, weight and the lift.
         // Text-white + font-semibold passes WCAG large-text 3:1 at the
         // default size; don't drop weight or size below sm for this
         // variant or contrast tips below AA.
         cta:
-          "btn-cta border-0 font-semibold text-white shadow-[var(--shadow-md)] " +
-          "hover:-translate-y-px hover:shadow-[var(--shadow-glow),var(--shadow-md)] " +
-          "active:translate-y-0 active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.18)] " +
-          "transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          "btn-cta border-0 font-semibold text-white " +
+          "hover:-translate-y-px active:translate-y-0",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:

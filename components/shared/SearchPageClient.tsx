@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowRight, FileText, Layers, Loader2, Search, Sparkles } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { track } from "@/lib/analytics/events"
 
 /* ----------------------------------------------------------------------------
@@ -293,64 +292,68 @@ export function SearchPageClient({ strings, locale }: SearchPageClientProps) {
       </header>
 
       {/* ---------------------------------------------------------------- */}
-      {/* Search form                                                       */}
+      {/* Search form — Amazon-style: one field, magnifier-button welded   */}
+      {/* to the right edge. No left adornment, no separate text button.   */}
+      {/* Consistent with <NavbarSearch> after May 2026 audit iteration 3. */}
       {/* ---------------------------------------------------------------- */}
       <form
         onSubmit={onSubmit}
         role="search"
         aria-label={strings.inputLabel}
-        className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-stretch"
+        className={cn(
+          "mt-8 flex items-stretch overflow-hidden",
+          "rounded-xl border border-[var(--border-base)] bg-[var(--bg-surface)]",
+          "h-12 lg:h-14 max-w-3xl shadow-[var(--shadow-sm)]",
+          "transition-[box-shadow,border-color] duration-150",
+          "focus-within:border-[var(--brand)] focus-within:shadow-[0_0_0_4px_var(--focus-ring)]",
+        )}
       >
         <label htmlFor="search-q" className="sr-only">
           {strings.inputLabel}
         </label>
-        <div
+        <input
+          ref={inputRef}
+          id="search-q"
+          type="search"
+          name="q"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={strings.inputPlaceholder}
+          autoComplete="off"
+          spellCheck={false}
+          enterKeyHint="search"
           className={cn(
-            "relative flex-1 flex items-center gap-3 rounded-xl border border-[var(--border-base)]",
-            "bg-[var(--bg-surface)] px-4 h-12 lg:h-14 shadow-[var(--shadow-sm)]",
-            "focus-within:border-[var(--brand)] focus-within:shadow-[0_0_0_4px_var(--focus-ring)]",
-            "transition-[box-shadow,border-color] duration-150",
+            "flex-1 min-w-0 bg-transparent outline-none border-none",
+            "pl-4 lg:pl-5 pr-3 text-[15px] lg:text-[16px]",
+            "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
           )}
-        >
-          <Search className="size-4 text-[var(--text-tertiary)]" aria-hidden="true" />
-          <input
-            ref={inputRef}
-            id="search-q"
-            type="search"
-            name="q"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={strings.inputPlaceholder}
-            autoComplete="off"
-            spellCheck={false}
-            enterKeyHint="search"
-            className={cn(
-              "flex-1 bg-transparent outline-none border-none",
-              "text-[15px] lg:text-[16px] text-[var(--text-primary)]",
-              "placeholder:text-[var(--text-tertiary)]",
-            )}
-          />
-          {status === "loading" && (
-            <Loader2
-              className="size-4 text-[var(--text-tertiary)] animate-spin"
-              aria-hidden="true"
-            />
-          )}
-        </div>
-        <Button
+        />
+        {/* Loader badge — replaces nothing visible; appears only while the
+            Pagefind round-trip is in flight, so users get clear feedback
+            that submission worked while the index loads on first query. */}
+        {status === "loading" && (
+          <span className="flex items-center pr-1 text-[var(--text-tertiary)]" aria-hidden="true">
+            <Loader2 className="size-4 animate-spin" />
+          </span>
+        )}
+        <button
           type="submit"
-          size="lg"
           disabled={trimmedDraft.length < 2}
+          aria-label={strings.submit}
+          title={strings.submit}
           className={cn(
-            "h-12 lg:h-14 px-6 text-[14px] text-white",
+            "flex shrink-0 items-center justify-center h-full w-14 lg:w-16",
+            "text-white border-l border-[color-mix(in_oklch,var(--brand)_30%,transparent)]",
+            "transition-opacity duration-150",
             "disabled:cursor-not-allowed disabled:opacity-50",
+            "hover:brightness-105 active:brightness-95",
           )}
           style={{
             background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
           }}
         >
-          {strings.submit}
-        </Button>
+          <Search className="size-5" strokeWidth={2.25} aria-hidden="true" />
+        </button>
       </form>
 
       {/* Too-short hint (under the form) */}

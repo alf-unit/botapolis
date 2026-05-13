@@ -97,17 +97,16 @@
   --shadow-xl:   0 8px 16px rgba(15,15,15,0.06), 0 24px 48px rgba(15,15,15,0.12);
   --shadow-glow: 0 0 0 1px rgba(16,185,129,0.20), 0 0 24px rgba(16,185,129,0.15);
 
-  /* CTA-specific glow tokens — three intensities (idle / hover / press).
-     The global --shadow-glow above is intentionally subtle for ambient
-     use (badges, focus halos); a primary money-CTA wants more presence.
-     Light mode uses --accent-500 (#10B981); dark mode (below) brightens
-     to --accent-400 (#34D399) so the glow stays visible on dark surfaces. */
-  --shadow-cta-idle:  0 4px 14px rgba(16,185,129,0.22), 0 0 0 1px rgba(16,185,129,0.12);
-  --shadow-cta-hover: 0 10px 28px rgba(16,185,129,0.45),
-                      0 0 36px rgba(16,185,129,0.30),
-                      0 0 0 2px rgba(16,185,129,0.25);
-  --shadow-cta-press: inset 0 1px 2px rgba(0,0,0,0.18),
-                      0 2px 8px rgba(16,185,129,0.30);
+  /* CTA shadows — second iteration after live-test feedback (May 2026).
+     Same-color outer glow (mint on mint) read as blur, not light; replaced
+     with: idle = inner top highlight only (polished glass feel), hover =
+     violet contrast ring (no blur — sharp 2px brand outline), press =
+     dark inset (physical depth). Violet is already our AI accent so the
+     ring slots naturally into the palette instead of feeling imported. */
+  --shadow-cta-idle:  inset 0 1px 0 rgba(255,255,255,0.20);
+  --shadow-cta-hover: inset 0 1px 0 rgba(255,255,255,0.30),
+                      0 0 0 2px rgba(139,92,246,0.55);
+  --shadow-cta-press: inset 0 1px 3px rgba(0,0,0,0.28);
 
   /* ============================================================
      shadcn / Base-UI tokens — driven by Botapolis values
@@ -217,14 +216,13 @@
   --shadow-xl:   0 8px 16px rgba(0,0,0,0.50), 0 24px 64px rgba(0,0,0,0.50);
   --shadow-glow: 0 0 0 1px rgba(52,211,153,0.25), 0 0 32px rgba(52,211,153,0.20);
 
-  /* CTA glow — dark mode bumps the brand color to --accent-400 (#34D399)
-     and lifts the opacities a touch since dark backgrounds eat ambient light. */
-  --shadow-cta-idle:  0 4px 14px rgba(52,211,153,0.28), 0 0 0 1px rgba(52,211,153,0.18);
-  --shadow-cta-hover: 0 12px 32px rgba(52,211,153,0.55),
-                      0 0 40px rgba(52,211,153,0.40),
-                      0 0 0 2px rgba(52,211,153,0.35);
-  --shadow-cta-press: inset 0 1px 2px rgba(0,0,0,0.35),
-                      0 2px 10px rgba(52,211,153,0.35);
+  /* CTA shadows — dark mode mirrors light: inner highlight + violet ring +
+     dark press inset. Violet uses --violet-400 (#A78BFA) for dark surfaces
+     and the inset goes a touch deeper because dark mode swallows shadows. */
+  --shadow-cta-idle:  inset 0 1px 0 rgba(255,255,255,0.16);
+  --shadow-cta-hover: inset 0 1px 0 rgba(255,255,255,0.24),
+                      0 0 0 2px rgba(167,139,250,0.65);
+  --shadow-cta-press: inset 0 1px 3px rgba(0,0,0,0.45);
 
   /* ---------- shadcn token re-points (dark) ----------------------------- */
   --background:           var(--bg-base);
@@ -575,14 +573,21 @@
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  background: var(--gradient-cta);
-  /* Always-on brand glow so the CTA reads as the most important thing on
-     the page even before the user hovers. Transitions between three
-     shadow tiers tied to interaction state — see :hover / :active below. */
+  /* Stacked backgrounds: a top-edge white highlight gives the surface
+     a glass / polished-enamel quality (light catching the upper rim);
+     below it the mint gradient does the actual color work. This is
+     the replacement for the previous outer green glow — depth comes
+     from inner light, not from same-color blur leaking outward. */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 35%),
+    var(--gradient-cta);
   box-shadow: var(--shadow-cta-idle);
+  /* Filter transitions are short (fast tier) because brightness shift
+     should feel immediate on press — anything slower reads as lag. */
   transition:
     transform   var(--duration-base) var(--ease-out-expo),
-    box-shadow  var(--duration-base) var(--ease-out-expo);
+    box-shadow  var(--duration-base) var(--ease-out-expo),
+    filter      var(--duration-fast) var(--ease-out-expo);
 }
 
 .btn-cta > * {
@@ -590,30 +595,36 @@
   z-index: 2;
 }
 
+/* Hover / focus-visible — lift, brighter top edge, gain a violet
+   contrast ring (sharp 2px, no blur). Violet (#8B5CF6 / dark #A78BFA)
+   is already our AI accent color, so the ring lives inside the brand
+   palette instead of feeling like a stray neon outline. */
 .btn-cta:hover,
 .btn-cta:focus-visible {
+  transform: translateY(-1px);
   box-shadow: var(--shadow-cta-hover);
 }
 
+/* Active — physical "compress + dim". Replaces the white radial ripple,
+   which fought the shimmer (both white, both motion). Now: surface
+   shrinks slightly, top highlight vanishes (light not catching it
+   anymore), brightness drops 10% (eaten by inset shadow). Feels like
+   a real mechanical key being pushed in. */
 .btn-cta:active {
+  transform: translateY(0) scale(0.97);
   box-shadow: var(--shadow-cta-press);
+  filter: brightness(0.90);
 }
 
-.btn-cta::before,
-.btn-cta::after {
+/* Single pseudo-element — shimmer only. The press effect is now done
+   via filter+transform on the button itself, no ::after layer needed. */
+.btn-cta::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
   z-index: 1;
-}
-
-/* Shimmer sweep on hover/focus-visible.
-   Diagonal angle (105deg) reads as "light catching the surface" rather
-   than a flat horizontal wipe. translateX(-120%) parks it off-left;
-   on hover it travels to +120%. Single pass — never loops. */
-.btn-cta::before {
   background: linear-gradient(
     105deg,
     transparent 35%,
@@ -626,29 +637,4 @@
 .btn-cta:hover::before,
 .btn-cta:focus-visible::before {
   transform: translateX(120%);
-}
-
-/* Press ripple — radial expansion from center.
-   Duration capped at 350ms (was 600ms) so it fully renders before a
-   <Link>-based CTA navigates away and tears down the DOM. White at
-   0.65 alpha for visibility against the mint gradient. Not pointer-
-   tracked — a centered radial reads as "the whole button reacted"
-   and is more on-brand than a Material pointer ripple here. */
-.btn-cta::after {
-  background: radial-gradient(
-    circle at center,
-    rgba(255, 255, 255, 0.65) 0%,
-    rgba(255, 255, 255, 0) 70%
-  );
-  opacity: 0;
-  transform: scale(0.3);
-}
-.btn-cta:active::after {
-  animation: btn-cta-ripple 350ms var(--ease-out-expo);
-}
-
-@keyframes btn-cta-ripple {
-  0%   { transform: scale(0.3); opacity: 1; }
-  60%  { opacity: 0.8; }
-  100% { transform: scale(2.4); opacity: 0; }
 }

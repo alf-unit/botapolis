@@ -38,7 +38,15 @@ const csp = [
   // strict CSP without this directive — that's what was silently making
   // the search modal return zero results post-launch. Adding the token
   // only loosens WASM compilation, not JS eval, so no XSS surface gain.
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://plausible.io https://us.i.posthog.com https://challenges.cloudflare.com",
+  //
+  // us-assets.i.posthog.com (May 2026 audit fix): PostHog moved its
+  // client config + recorder shards to a separate assets CDN. The main
+  // ingest host (us.i.posthog.com) keeps receiving events, but the
+  // initial array/<key> fetch and the lazy-loaded feature bundles now
+  // load from us-assets — without it, the snippet hits a CSP wall mid-
+  // init and emits a chain of unhandled rejections that we've observed
+  // cascade into renderer crashes on some pages.
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://plausible.io https://us.i.posthog.com https://us-assets.i.posthog.com https://challenges.cloudflare.com",
 
   // Styles: Sonner + next/font + Tailwind inline-critical all need 'unsafe-inline'.
   "style-src 'self' 'unsafe-inline'",
@@ -57,7 +65,7 @@ const csp = [
   // runtime, not the browser), so technically CSP wouldn't block it. We
   // keep it allowlisted anyway for honesty — if we ever expose direct
   // client calls (streaming UI?), the header is already correct.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://plausible.io https://us.i.posthog.com https://api.beehiiv.com https://openrouter.ai",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://plausible.io https://us.i.posthog.com https://us-assets.i.posthog.com https://api.beehiiv.com https://openrouter.ai",
 
   // Frames: only Turnstile renders a child frame today.
   "frame-src https://challenges.cloudflare.com",

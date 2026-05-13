@@ -154,7 +154,15 @@ export function UserMenu({
 
   return (
     <DropdownMenu>
+      {/* Base UI 1.4+ runtime-validates that `render` resolves to a native
+          <button> for Trigger / a button or link for Item. Our custom <Button>
+          eventually renders one, but the validator counts the wrapper layer
+          and throws Base UI error #31 ("not rendered as a native <button>").
+          Same story on the Items below where we render <Link> (an <a>).
+          `nativeButton={false}` opts out of the assertion — semantics are
+          preserved by the rendered element's own role / type. */}
       <DropdownMenuTrigger
+        nativeButton={false}
         render={
           <Button
             variant="ghost"
@@ -181,6 +189,7 @@ export function UserMenu({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem
+          nativeButton={false}
           render={
             <Link href={`${localePrefix}/dashboard`} className="flex items-center gap-2">
               <LayoutDashboard className="size-4" />
@@ -189,6 +198,7 @@ export function UserMenu({
           }
         />
         <DropdownMenuItem
+          nativeButton={false}
           render={
             <Link href={`${localePrefix}/saved`} className="flex items-center gap-2">
               <Bookmark className="size-4" />

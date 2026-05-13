@@ -1,0 +1,91 @@
+# Weekly Supabase database backup → GitHub artifact.
+# Runs every Monday 04:00 UTC + can be triggered manually.
+# Restore: download the .sql.gz artifact, gunzip, `psql $DB_URL < file.sql`.
+#
+# Required GitHub Secret:
+#   SUPABASE_DB_URL — Supabase Session-mode pooler connection string.
+#   Get it in: Supabase Dashboard → Project Settings → Database →
+#              Connection string → "Session pooler" tab → URI.
+#              Format: postgresql://postgres.[ref]:[pw]@aws-0-[region].pooler.supabase.com:5432/postgres
+#   IMPORTANT: must be SESSION mode (port 5432), not Transaction (port 6543).
+#   pg_dump needs session-level statements that Transaction mode rejects.
+
+name: Database backup
+
+on:
+  schedule:
+    # Mondays at 04:00 UTC (07:00 Moscow). Cron is UTC.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+    # Manual trigger: Actions tab → "Database backup" → "Run workflow".
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Install PostgreSQL 17 client
+        # Ubuntu's default postgresql-client is too old to dump newer Postgres
+        # versions cleanly. Pull pg_dump 17 from the official PG APT repo —
+        # 17 can dump any 14+ server (Supabase runs 15/17 depending on project).
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Dump database
+        env:
+          # Never expose this in logs. `set +x` is the default; no echo of $DB_URL anywhere.
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DB_URL:-}" ]; then
+            echo "::error::SUPABASE_DB_URL secret is empty or unset."
+            exit 1
+          fi
+          DATE=$(date -u +%Y-%m-%d)
+          mkdir -p backups
+          OUT="backups/botapolis-${DATE}.sql"
+          # --clean + --if-exists → drop-then-create on restore (idempotent).
+          # --no-owner / --no-privileges → portable across Supabase projects.
+          # --quote-all-identifiers → defensive against reserved-word collisions.
+          # --exclude-schema=auth → Supabase Auth schema is managed by Supabase;
+          #   restoring it can collide with the live auth system. We back up
+          #   our public schema; Supabase manages auth.users separately.
+          pg_dump "$DB_URL" \
+            --clean --if-exists \
+            --no-owner --no-privileges \
+            --quote-all-identifiers \
+            --exclude-schema=auth \
+            --exclude-schema=storage \
+            --exclude-schema=realtime \
+            --exclude-schema=supabase_functions \
+            --exclude-schema=vault \
+            > "$OUT"
+          gzip -9 "$OUT"
+          ls -lh backups/
+          # Sanity: gzipped dump should be > 1KB. Empty/near-empty = something went wrong.
+          SIZE=$(stat -c%s "${OUT}.gz")
+          if [ "$SIZE" -lt 1024 ]; then
+            echo "::error::Dump suspiciously small ($SIZE bytes). Check connection or schema."
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backups/*.sql.gz
+          retention-days: 90
+          if-no-files-found: error
+          compression-level: 0 # already gzipped

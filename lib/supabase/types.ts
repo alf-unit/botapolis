@@ -96,6 +96,16 @@ export type ToolRow = {
   cons: string[]
   best_for: string | null
   not_for: string | null
+  // Russian-locale columns (migration 005). Null = "not yet translated";
+  // consumers fall back to the English column. Use the localizeTool helper
+  // from @/lib/content/tool-locale so the fallback pattern is centralised
+  // and every page applies it the same way.
+  name_ru: string | null
+  tagline_ru: string | null
+  description_ru: string | null
+  pros_ru: string[] | null
+  cons_ru: string[] | null
+  best_for_ru: string | null
   alternatives_to: string[]
   featured: number
   status: ToolStatus

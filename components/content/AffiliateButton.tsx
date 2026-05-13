@@ -5,6 +5,7 @@ import { TrackedAffiliateLink } from "@/components/content/TrackedAffiliateLink"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createServiceClient } from "@/lib/supabase/service"
+import { localizeToolPartial } from "@/lib/content/tool-locale"
 import type { ToolRow } from "@/lib/supabase/types"
 
 /* ----------------------------------------------------------------------------
@@ -45,7 +46,8 @@ interface AffiliateButtonProps {
 
 type ToolPick = Pick<
   ToolRow,
-  "slug" | "name" | "tagline" | "logo_url" | "pricing_min" | "pricing_max" | "pricing_model"
+  | "slug" | "name" | "name_ru" | "tagline" | "tagline_ru"
+  | "logo_url" | "pricing_min" | "pricing_max" | "pricing_model"
 >
 
 async function fetchTool(slug: string): Promise<ToolPick | null> {
@@ -53,7 +55,7 @@ async function fetchTool(slug: string): Promise<ToolPick | null> {
     const supabase = createServiceClient()
     const { data, error } = await supabase
       .from("tools")
-      .select("slug, name, tagline, logo_url, pricing_min, pricing_max, pricing_model")
+      .select("slug, name, name_ru, tagline, tagline_ru, logo_url, pricing_min, pricing_max, pricing_model")
       .eq("slug", slug)
       .eq("status", "published")
       .maybeSingle()
@@ -83,9 +85,17 @@ export async function AffiliateButton({
   variant = "inline",
   className,
 }: AffiliateButtonProps) {
-  const tool = await fetchTool(slug)
+  const rawTool = await fetchTool(slug)
+  // Resolve RU copy when we're rendering inside a /ru/ route so the CTA's
+  // brand name + tagline match the surrounding article. EN routes get the
+  // English columns untouched.
+  const locale: "en" | "ru" = localePrefix === "/ru" ? "ru" : "en"
+  const tool = rawTool ? localizeToolPartial(rawTool, locale) : null
   const displayName = tool?.name ?? slug
-  const label = cta ?? `Try ${displayName}`
+  // Localize the default CTA verb too — "Open Klaviyo" reads more naturally
+  // on a Russian page than mixing "Try Klaviyo" with the surrounding RU prose.
+  const defaultCta = locale === "ru" ? `Открыть ${displayName}` : `Try ${displayName}`
+  const label = cta ?? defaultCta
   const goHref = `${localePrefix}/go/${slug}${
     campaign ? `?utm_campaign=${encodeURIComponent(campaign)}` : ""
   }`

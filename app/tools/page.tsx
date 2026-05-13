@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { buildMetadata } from "@/lib/seo/metadata"
 import { generateItemListSchema, generateBreadcrumbSchema } from "@/lib/seo/schema"
 import { getToolRatings } from "@/lib/content/rating"
+import { localizeToolPartial } from "@/lib/content/tool-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl } from "@/lib/utils"
@@ -28,12 +29,14 @@ export const revalidate = 3600
 
 // Fields used by the card / filter UI. Selecting narrowly keeps the SSR
 // HTML small (no need to ship `description`/`features` to the browser).
+// We include name_ru / tagline_ru so RU rendering resolves locally without
+// re-querying — see localizeToolPartial below.
 const CARD_SELECT =
-  "slug,name,tagline,logo_url,category,rating,pricing_model,pricing_min,pricing_max,featured,status" as const
+  "slug,name,name_ru,tagline,tagline_ru,logo_url,category,rating,pricing_model,pricing_min,pricing_max,featured,status" as const
 
 type CardTool = Pick<
   ToolRow,
-  | "slug" | "name" | "tagline" | "logo_url"
+  | "slug" | "name" | "name_ru" | "tagline" | "tagline_ru" | "logo_url"
   | "category" | "rating" | "pricing_model" | "pricing_min" | "pricing_max"
   | "featured"
 >
@@ -99,10 +102,16 @@ export default async function ToolsPage() {
   // and detail pages can't disagree. One batch lookup keeps the page
   // server-side, no extra network hop.
   const ratings = await getToolRatings(rawTools, locale as "en" | "ru")
-  const tools = rawTools.map((t) => ({
-    ...t,
-    rating: ratings.get(t.slug) ?? t.rating,
-  }))
+  const tools = rawTools.map((t) => {
+    // Resolve RU/EN copy via the shared helper so the catalog card sees
+    // tool.name / tool.tagline already in the right language (no per-
+    // component fallback knowledge). For EN this is a no-op.
+    const localized = localizeToolPartial(t, locale as "en" | "ru")
+    return {
+      ...localized,
+      rating: ratings.get(t.slug) ?? localized.rating,
+    }
+  })
 
   // JSON-LD: surface the catalog as an ItemList + a Breadcrumb trail.
   const itemList = generateItemListSchema({

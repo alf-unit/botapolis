@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { buildMetadata } from "@/lib/seo/metadata"
 import { generateReviewSchema, generateBreadcrumbSchema } from "@/lib/seo/schema"
 import { getToolRating } from "@/lib/content/rating"
+import { localizeTool } from "@/lib/content/tool-locale"
 import { buttonVariants } from "@/components/ui/button"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
@@ -85,10 +86,10 @@ export async function generateStaticParams() {
 // --------------------------------------------------------------------------
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const tool = await fetchTool(slug)
+  const rawTool = await fetchTool(slug)
   const locale = await getLocale()
 
-  if (!tool) {
+  if (!rawTool) {
     return buildMetadata({
       title:       "Tool not found",
       description: "We couldn't find this tool in the catalog.",
@@ -97,6 +98,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       noIndex:     true,
     })
   }
+
+  // Same locale resolution as the page component below — metadata must
+  // match the rendered <title> / <meta description> the user actually sees.
+  const tool = localizeTool(rawTool, locale as "en" | "ru")
 
   const title = tool.meta_title ?? `${tool.name} review · ${tool.tagline ?? "Shopify tool review"}`
   const description =
@@ -135,12 +140,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // --------------------------------------------------------------------------
 export default async function ToolDetailPage({ params }: PageProps) {
   const { slug } = await params
-  const tool = await fetchTool(slug)
-  if (!tool) notFound()
+  const rawTool = await fetchTool(slug)
+  if (!rawTool) notFound()
 
   const locale = await getLocale()
   const dict   = await getDictionary(locale)
   const localePrefix = locale === "ru" ? "/ru" : ""
+
+  // Resolve name / tagline / description / pros / cons / best_for to the
+  // requested locale via the shared helper. Every reference below this
+  // line uses `tool` — the helper guarantees the right-language copy
+  // (falling back to EN per-field when no Russian translation exists yet).
+  const tool = localizeTool(rawTool, locale as "en" | "ru")
 
   // BUG-FIX (May 2026 audit · TZ fixes #3): the displayed rating is
   // resolved from the MDX review's frontmatter when one exists; the DB

@@ -17,6 +17,7 @@ import {
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { localizeTool, localizeToolPartial } from "@/lib/content/tool-locale"
 import { absoluteUrl, cn } from "@/lib/utils"
 import type { ToolRow } from "@/lib/supabase/types"
 
@@ -48,10 +49,11 @@ interface PageProps {
 }
 
 // Card field set — narrow enough that we never ship long-form fields to
-// the browser that the grid won't render.
+// the browser that the grid won't render. Includes _ru columns so the
+// localizeToolPartial helper has the data it needs in one trip.
 type AltCard = Pick<
   ToolRow,
-  | "id" | "slug" | "name" | "tagline" | "logo_url"
+  | "id" | "slug" | "name" | "name_ru" | "tagline" | "tagline_ru" | "logo_url"
   | "category" | "rating" | "pricing_model" | "pricing_min" | "pricing_max"
 >
 
@@ -77,8 +79,10 @@ async function fetchSource(slug: string): Promise<ToolRow | null> {
 
 async function fetchAlternatives(source: ToolRow, limit = 8): Promise<AltCard[]> {
   const supabase = createServiceClient()
+  // Includes name_ru / tagline_ru so localizeToolPartial below can resolve
+  // RU copy from the same row without a follow-up query.
   const select =
-    "id, slug, name, tagline, logo_url, category, rating, pricing_model, pricing_min, pricing_max"
+    "id, slug, name, name_ru, tagline, tagline_ru, logo_url, category, rating, pricing_model, pricing_min, pricing_max"
 
   // First pass — same category, exclude self. Most users land here from
   // category-intent searches ("klaviyo alternatives" → email tools).
@@ -133,9 +137,9 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const locale = await getLocale()
-  const source = await fetchSource(slug)
+  const rawSource = await fetchSource(slug)
 
-  if (!source) {
+  if (!rawSource) {
     return buildMetadata({
       title:       locale === "ru" ? "Альтернативы не найдены" : "Alternatives not found",
       description: locale === "ru" ? "Не нашли такой инструмент." : "We couldn't find this tool.",
@@ -144,6 +148,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       noIndex:     true,
     })
   }
+
+  // Localize source name so the SEO title / description on /ru/* uses the
+  // Russian display name when one exists. Falls back to .name (EN) when
+  // name_ru hasn't been filled yet.
+  const source = localizeTool(rawSource, locale as "en" | "ru")
 
   const title =
     locale === "ru"
@@ -174,13 +183,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // ============================================================================
 export default async function AlternativesPage({ params }: PageProps) {
   const { slug } = await params
-  const source = await fetchSource(slug)
-  if (!source) notFound()
+  const rawSource = await fetchSource(slug)
+  if (!rawSource) notFound()
 
-  const alternatives = await fetchAlternatives(source)
+  const rawAlternatives = await fetchAlternatives(rawSource)
   const locale = await getLocale()
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
+
+  // Locale-resolve the source tool (full ToolRow → all _ru fields) and
+  // each alternative card (partial picked shape). For EN both helpers are
+  // no-ops; for RU each falls back to the EN field per-attribute when the
+  // _ru value is null.
+  const source = localizeTool(rawSource, locale as "en" | "ru")
+  const alternatives = rawAlternatives.map((alt) =>
+    localizeToolPartial(alt, locale as "en" | "ru"),
+  )
 
   const t =
     locale === "ru"

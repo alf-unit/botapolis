@@ -156,12 +156,12 @@ export async function AffiliateButton({
         campaign={campaign}
         locale={eventLocale}
         className={cn(
-          buttonVariants({ size: "lg" }),
-          "h-11 shrink-0 px-4 text-[14px] text-white",
+          // Switched May 2026 from inline gradient style → `cta` variant:
+          // the variant carries mint gradient + glow + shimmer-on-hover +
+          // press ripple. One source of truth in components/ui/button.tsx.
+          buttonVariants({ variant: "cta", size: "lg" }),
+          "h-11 shrink-0 px-4 text-[14px]",
         )}
-        style={{
-          background: "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-        }}
       >
         <span>{label}</span>
         <ArrowUpRight className="size-4" aria-hidden="true" />

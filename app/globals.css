@@ -526,3 +526,88 @@
 @media (hover: none) {
   .hover-only { transition: none !important; }
 }
+
+/* ============================================================================
+   7. CTA button effects — shimmer-on-hover + ripple-on-press
+   ----------------------------------------------------------------------------
+   Companion to the `cta` variant in components/ui/button.tsx. The variant
+   ships the base look (mint gradient + white text + lift/glow on hover);
+   this block adds the two motion primitives that make it feel premium:
+
+     · A diagonal "sheen" sweeps across the surface on hover/focus —
+       ::before pseudo, light-to-transparent gradient at 105deg, slides
+       from off-left to off-right in one slow pass. Suggests catching
+       light, like a polished metal surface.
+     · A radial ripple expands on press — ::after pseudo, soft white
+       radial that scales 0.4 → 2.2 and fades over 600ms. Tactile
+       feedback for the click without any JS / pointer tracking.
+
+   Both gated by §5's prefers-reduced-motion rule — transitions and
+   animations collapse to ~0ms there, so the button still works but
+   stops moving.
+
+   `isolation: isolate` + z-index layering ensures pseudo-elements stay
+   inside the rounded corner mask without bleeding shadow.
+   ============================================================================ */
+
+.btn-cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--gradient-cta);
+}
+
+.btn-cta > * {
+  position: relative;
+  z-index: 2;
+}
+
+.btn-cta::before,
+.btn-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Shimmer sweep on hover/focus-visible.
+   Diagonal angle (105deg) reads as "light catching the surface" rather
+   than a flat horizontal wipe. translateX(-120%) parks it off-left;
+   on hover it travels to +120%. Single pass — never loops. */
+.btn-cta::before {
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  transition: transform var(--duration-slow) var(--ease-out-expo);
+}
+.btn-cta:hover::before,
+.btn-cta:focus-visible::before {
+  transform: translateX(120%);
+}
+
+/* Press ripple — radial expansion from center.
+   Not pointer-position-tracked (that'd require JS); a centered ripple
+   reads as "the whole button reacted" and is well within taste for a
+   refined CTA. Triggered fresh on every :active state. */
+.btn-cta::after {
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.45) 0%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  opacity: 0;
+}
+.btn-cta:active::after {
+  animation: btn-cta-ripple var(--duration-slow) var(--ease-out-expo);
+}
+
+@keyframes btn-cta-ripple {
+  0%   { transform: scale(0.4); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}

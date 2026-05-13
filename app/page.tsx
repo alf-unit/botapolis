@@ -79,13 +79,12 @@ export default async function HomePage() {
                   <Link
                     href={`${localePrefix}/tools`}
                     className={cn(
-                      buttonVariants({ size: "lg" }),
-                      "h-12 px-5 text-base text-white border-0",
+                      // Switched May 2026 from inline gradient style →
+                      // `cta` variant. Same mint gradient + adds glow,
+                      // hover-shimmer and press ripple. See globals.css §7.
+                      buttonVariants({ variant: "cta", size: "lg" }),
+                      "h-12 px-5 text-base",
                     )}
-                    style={{
-                      background:
-                        "linear-gradient(180deg, #34D399 0%, #10B981 100%)",
-                    }}
                   >
                     {dict.hero.ctaPrimary}
                     <ArrowRight className="size-4" data-icon="inline-end" />

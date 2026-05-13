@@ -127,7 +127,12 @@ insert into public.tools (
     {"name":"Product picker in editor","description":"Drag your Shopify products straight into emails","included":true}
   ]'::jsonb,
   array['shopify','shopify-plus','bigcommerce','wix','woocommerce'],
-  8.1,
+  -- BUG-FIX (May 2026 audit): bumped to 8.5 to match
+  -- content/reviews/en/omnisend-review-2026.mdx frontmatter, which is the
+  -- editorial source of truth. The DB row is derived from the MDX rating;
+  -- migration 003 enforces this post-seed, and scripts/sync-ratings.ts
+  -- + the content-validator pre-commit hook prevent future drift.
+  8.5,
   '{"ease_of_use": 9.0, "value": 9.0, "support": 7.5, "features": 7.5}'::jsonb,
   array[
     'Best price-to-feature ratio in the email category',
@@ -212,7 +217,10 @@ insert into public.tools (
     {"name":"Ticketing","description":"Lightweight ticket system","included":true}
   ]'::jsonb,
   array['shopify','wordpress','shopify-plus','wix'],
-  7.4,
+  -- BUG-FIX (May 2026 audit): bumped to 8.2 to match
+  -- content/reviews/en/tidio-review-2026.mdx frontmatter (MDX is source of
+  -- truth; migration 003 syncs prod DB).
+  8.2,
   '{"ease_of_use": 9.0, "value": 8.5, "support": 7.0, "features": 6.5}'::jsonb,
   array[
     'Genuinely free tier — useful for stores under 50 chats/mo',
@@ -255,7 +263,10 @@ insert into public.tools (
     {"name":"Klaviyo integration","description":"Bi-directional audience sync","included":true}
   ]'::jsonb,
   array['shopify','shopify-plus','klaviyo','attentive','gorgias','recharge'],
-  8.2,
+  -- BUG-FIX (May 2026 audit): bumped to 8.6 to match
+  -- content/reviews/en/postscript-review-2026.mdx frontmatter (MDX is
+  -- source of truth; migration 003 syncs prod DB).
+  8.6,
   '{"ease_of_use": 8.0, "value": 7.5, "support": 8.5, "features": 9.0}'::jsonb,
   array[
     'Specialist focus — SMS gets the attention it deserves',
@@ -623,15 +634,19 @@ select
 on conflict (slug) do update set
   verdict = excluded.verdict, updated_at = now();
 
+-- BUG-FIX (May 2026 audit · TZ fixes #1): slug must be alphabetical so
+-- only one canonical URL exists per pair. Migration 004 enforces this
+-- via trigger + CHECK constraint; keeping the seed canonical means the
+-- trigger never has to rewrite a row on first ingest.
 insert into public.comparisons (slug, tool_a_id, tool_b_id, verdict, language, status, meta_title, meta_description)
 select
-  'omnisend-vs-klaviyo',
-  (select id from public.tools where slug='omnisend'),
+  'klaviyo-vs-omnisend',
   (select id from public.tools where slug='klaviyo'),
+  (select id from public.tools where slug='omnisend'),
   'Under $50k MRR: Omnisend, every time. Past $50k MRR with real segmentation needs: Klaviyo earns its premium.',
   'en', 'published',
-  'Omnisend vs Klaviyo 2026 · the real price/feature comparison',
-  'Omnisend or Klaviyo for Shopify? Both tested on a real store. The honest break-even point, segmentation depth, and SMS comparison.'
+  'Klaviyo vs Omnisend 2026 · the real price/feature comparison',
+  'Klaviyo or Omnisend for Shopify? Both tested on a real store. The honest break-even point, segmentation depth, and SMS comparison.'
 on conflict (slug) do update set
   verdict = excluded.verdict, updated_at = now();
 

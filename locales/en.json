@@ -22,14 +22,15 @@
     "social": "1,247 operators subscribed",
     "rating": "84 reviews tested",
     "widget": {
-      "badge": "AI · live",
+      "badge": "Sample · Email ROI",
       "title": "Email ROI Calculator",
       "try": "try it →",
       "subscribers": "Subscribers",
       "openRate": "Open rate",
+      "cto": "CTO rate",
       "aov": "Average order value",
       "resultLabel": "Estimated monthly revenue",
-      "resultMeta": "Based on 4 sends/mo · 2.1% click · 1.8% conversion"
+      "resultMeta": "4 sends/mo · 2.5% click-to-order · sample inputs"
     }
   },
   "tools": {
@@ -40,8 +41,8 @@
       "emailRoi": {
         "title": "Email ROI Calculator",
         "desc": "Estimate revenue per send across subscribers, open rate, and AOV.",
-        "metric": "Live result",
-        "value": "$18,420 /mo",
+        "metric": "Sample result",
+        "value": "$4,410 /mo",
         "category": "Email"
       },
       "aiCostComparator": {

@@ -266,6 +266,25 @@ export default async function HomePage() {
 /* ----------------------------------------------------------------------------
    Hero · DemoWidget — Email ROI calculator preview (visual only on homepage;
    the live calculator lives at /tools/email-roi-calculator).
+   ----------------------------------------------------------------------------
+   BUG-FIX (May 2026 audit · TZ fixes #5): until the audit, this preview
+   advertised "Estimated monthly revenue: $18,420" against inputs that
+   couldn't reproduce that figure under any plausible formula. The
+   "AI · live" badge implied the number was real-time, which made the
+   broken math worse — visitors could compute the inconsistency.
+
+   The fix is "Variant A" from the TZ: a static mockup whose numbers
+   *do* reconcile under the same formula the live calculator uses, with
+   an explicit "Sample · Email ROI" badge so no one confuses it for a
+   personalised live estimate.
+
+   Math (matches /tools/email-roi-calculator):
+     subs    = 12,500
+     sends   = subs × 4/mo = 50,000
+     opens   = sends × 28%  = 14,000
+     clicks  = opens × 15%  = 2,100      (CTO, not CTR)
+     orders  = clicks × 2.5% = 52.5
+     revenue = orders × $84  = $4,410/mo
 ---------------------------------------------------------------------------- */
 function DemoWidget({
   strings,
@@ -276,15 +295,19 @@ function DemoWidget({
     try: string
     subscribers: string
     openRate: string
+    cto: string
     aov: string
     resultLabel: string
     resultMeta: string
   }
 }) {
+  // Slider-fill % are visual hints only — picked to look balanced, not
+  // computed from the input values (these inputs aren't user-editable).
   const rows = [
     { label: strings.subscribers, value: "12,500", fill: 42 },
-    { label: strings.openRate,    value: "28.4%",  fill: 56 },
-    { label: strings.aov,         value: "$84",   fill: 34 },
+    { label: strings.openRate,    value: "28%",    fill: 47 },
+    { label: strings.cto,         value: "15%",    fill: 40 },
+    { label: strings.aov,         value: "$84",    fill: 34 },
   ]
 
   return (
@@ -312,12 +335,12 @@ function DemoWidget({
         </div>
 
         {/* Body */}
-        <div className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-3.5 p-5">
           {rows.map((row) => (
             <div key={row.label} className="flex flex-col gap-2">
               <label className="flex items-center justify-between text-[13px] font-medium">
                 <span>{row.label}</span>
-                <span className="font-mono text-[var(--text-secondary)]">
+                <span className="font-mono text-[var(--text-secondary)] tabular-nums">
                   {row.value}
                 </span>
               </label>
@@ -347,8 +370,8 @@ function DemoWidget({
             <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--brand)]">
               {strings.resultLabel}
             </span>
-            <span className="font-mono text-[36px] font-medium leading-none tracking-[-0.02em]">
-              $18,420
+            <span className="font-mono text-[36px] font-medium leading-none tracking-[-0.02em] tabular-nums">
+              $4,410
             </span>
             <span className="text-[12px] text-[var(--text-tertiary)]">
               {strings.resultMeta}

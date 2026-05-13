@@ -7,6 +7,7 @@ import { cn, absoluteUrl } from "@/lib/utils"
 import { createServiceClient } from "@/lib/supabase/service"
 import { buildMetadata } from "@/lib/seo/metadata"
 import { generateReviewSchema, generateBreadcrumbSchema } from "@/lib/seo/schema"
+import { getToolRating } from "@/lib/content/rating"
 import { buttonVariants } from "@/components/ui/button"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
@@ -141,6 +142,12 @@ export default async function ToolDetailPage({ params }: PageProps) {
   const dict   = await getDictionary(locale)
   const localePrefix = locale === "ru" ? "/ru" : ""
 
+  // BUG-FIX (May 2026 audit · TZ fixes #3): the displayed rating is
+  // resolved from the MDX review's frontmatter when one exists; the DB
+  // row is a fallback. This keeps /tools/<slug> and /reviews/<slug> in
+  // lockstep without depending on the seed.sql / migration cycle.
+  const rating = await getToolRating(tool, locale as "en" | "ru")
+
   // i18n strings — kept inline here so we don't blow up the locale JSON
   // with every section heading. Move to dictionaries once RU is real.
   const t = {
@@ -160,9 +167,10 @@ export default async function ToolDetailPage({ params }: PageProps) {
     breadcrumbHome:  locale === "ru" ? "Главная" : "Home",
   }
 
-  // JSON-LD
+  // JSON-LD — use the MDX-resolved rating so the structured data
+  // matches what users see in the hero.
   const reviewSchema = generateReviewSchema({
-    tool,
+    tool: { ...tool, rating },
     authorName:  "Botapolis editorial",
     publishedAt: tool.created_at,
     updatedAt:   tool.updated_at,
@@ -256,8 +264,8 @@ export default async function ToolDetailPage({ params }: PageProps) {
                 )}
 
                 <div className="mt-1 flex items-center gap-4">
-                  <RatingStars rating={tool.rating} size="lg" />
-                  {tool.rating != null && (
+                  <RatingStars rating={rating} size="lg" />
+                  {rating != null && (
                     <span className="text-[13px] text-[var(--text-tertiary)] font-mono">
                       {locale === "ru" ? "из 10" : "out of 10"}
                     </span>

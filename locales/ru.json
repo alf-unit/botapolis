@@ -22,14 +22,15 @@
     "social": "1247 операторов подписаны",
     "rating": "84 обзора протестировано",
     "widget": {
-      "badge": "AI · live",
+      "badge": "Пример · Email ROI",
       "title": "Калькулятор Email ROI",
       "try": "попробовать →",
       "subscribers": "Подписчики",
       "openRate": "Open rate",
+      "cto": "CTO rate",
       "aov": "Средний чек",
       "resultLabel": "Прогноз выручки в месяц",
-      "resultMeta": "При 4 рассылках/мес · 2.1% клика · 1.8% конверсии"
+      "resultMeta": "4 рассылки/мес · 2.5% click-to-order · демо-данные"
     }
   },
   "tools": {
@@ -40,8 +41,8 @@
       "emailRoi": {
         "title": "Калькулятор Email ROI",
         "desc": "Оцените выручку с рассылки по числу подписчиков, open rate и AOV.",
-        "metric": "Live-результат",
-        "value": "$18,420 /мес",
+        "metric": "Демо-результат",
+        "value": "$4,410 /мес",
         "category": "Email"
       },
       "aiCostComparator": {

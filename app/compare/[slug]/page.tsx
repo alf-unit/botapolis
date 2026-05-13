@@ -1,12 +1,13 @@
 import Link from "next/link"
-import { notFound } from "next/navigation"
-import { ArrowUpRight, ExternalLink } from "lucide-react"
+import { notFound, redirect } from "next/navigation"
+import { ArrowUpRight, Check, ExternalLink, Minus } from "lucide-react"
 import type { Metadata } from "next"
 
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { PageViewEvent } from "@/components/analytics/PageViewEvent"
 import { ToolLogo } from "@/components/tools/ToolLogo"
+import { ProsConsList } from "@/components/tools/ProsConsList"
 import {
   ComparisonTable,
   type ComparisonFeatureRow,
@@ -20,8 +21,16 @@ import {
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
-import { absoluteUrl, cn } from "@/lib/utils"
-import type { ComparisonRow, ToolRow } from "@/lib/supabase/types"
+import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
+import { canonicalCompareSlug, isCanonicalCompareSlug } from "@/lib/content/slug"
+import { getToolRatings } from "@/lib/content/rating"
+import {
+  diffIntegrations,
+  generateAtAGlance,
+  generatePricingNarrative,
+  generateVerdictFallback,
+} from "@/lib/content/pseo"
+import type { ToolRow } from "@/lib/supabase/types"
 
 /* ----------------------------------------------------------------------------
    /compare/[slug] — head-to-head comparison page
@@ -134,6 +143,72 @@ function parseComparisonData(
 // ============================================================================
 // Data
 // ============================================================================
+
+interface RelatedComparison {
+  slug: string
+  toolA: { slug: string; name: string; logo_url: string | null }
+  toolB: { slug: string; name: string; logo_url: string | null }
+  verdict: string | null
+}
+
+/**
+ * Fetch up to N other published comparisons that share at least one tool
+ * with the current pair. Results exclude the current comparison and
+ * unpublished rows. Tool metadata (name + logo) is hydrated in a single
+ * second query so we don't N+1 the cards.
+ */
+async function fetchRelatedComparisons(
+  currentSlug:   string,
+  toolAId:       string,
+  toolBId:       string,
+  limit:         number,
+): Promise<RelatedComparison[]> {
+  try {
+    const supabase = createServiceClient()
+    // Match either tool on either side. The `.or()` filter keeps this
+    // server-side rather than fanning out to four queries.
+    const { data: rows, error } = await supabase
+      .from("comparisons")
+      .select("slug, tool_a_id, tool_b_id, verdict")
+      .eq("status",   "published")
+      .eq("language", "en")
+      .neq("slug",    currentSlug)
+      .or(
+        `tool_a_id.eq.${toolAId},tool_a_id.eq.${toolBId},tool_b_id.eq.${toolAId},tool_b_id.eq.${toolBId}`,
+      )
+      .order("updated_at", { ascending: false })
+      .limit(limit)
+
+    if (error || !rows || rows.length === 0) return []
+
+    const ids = Array.from(
+      new Set(rows.flatMap((r) => [r.tool_a_id, r.tool_b_id])),
+    )
+    const { data: tools } = await supabase
+      .from("tools")
+      .select("id, slug, name, logo_url")
+      .in("id", ids)
+
+    const byId = new Map(tools?.map((t) => [t.id, t]) ?? [])
+    return rows
+      .map((r): RelatedComparison | null => {
+        const a = byId.get(r.tool_a_id)
+        const b = byId.get(r.tool_b_id)
+        if (!a || !b) return null
+        return {
+          slug:    r.slug,
+          toolA:   { slug: a.slug, name: a.name, logo_url: a.logo_url },
+          toolB:   { slug: b.slug, name: b.name, logo_url: b.logo_url },
+          verdict: r.verdict,
+        }
+      })
+      .filter((r): r is RelatedComparison => r !== null)
+  } catch (err) {
+    console.error(`[/compare] related fetch threw:`, err)
+    return []
+  }
+}
+
 async function fetchComparison(slug: string) {
   try {
     const supabase = createServiceClient()
@@ -195,13 +270,17 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const locale = await getLocale()
-  const row = await fetchComparison(slug)
+  // Always advertise the canonical URL even if the visitor landed on the
+  // reverse form — search engines following the canonical pointer end
+  // up on the same page the runtime redirect below sends humans to.
+  const canonicalSlug = canonicalCompareSlug(slug)
+  const row = await fetchComparison(canonicalSlug)
 
   if (!row) {
     return buildMetadata({
       title:       "Comparison not found",
       description: "We couldn't find this comparison.",
-      path:        `/compare/${slug}`,
+      path:        `/compare/${canonicalSlug}`,
       locale,
       noIndex:     true,
     })
@@ -216,12 +295,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     comparison.verdict ??
     `Compare ${toolA.name} and ${toolB.name} on pricing, features, and Shopify integration.`
 
-  const ogPath = `/compare/${slug}/opengraph-image`
+  const ogPath = `/compare/${canonicalSlug}/opengraph-image`
 
   return buildMetadata({
     title,
     description,
-    path:    `/compare/${slug}`,
+    path:    `/compare/${canonicalSlug}`,
     locale,
     ogImage: ogPath,
     type:    "article",
@@ -247,26 +326,69 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // ============================================================================
 export default async function ComparisonPage({ params }: PageProps) {
   const { slug } = await params
+
+  // BUG-FIX (May 2026 audit · TZ fixes #1): a single comparison should
+  // resolve to one URL. If the visitor hit the reverse-ordered slug
+  // (e.g. /compare/omnisend-vs-klaviyo when the canonical is
+  // klaviyo-vs-omnisend), 301 to the canonical form. Migration 004
+  // prevents the DB from holding both forms, but link-rot and old
+  // backlinks still point at reversed slugs in the wild.
+  //
+  // The locale-aware path is preserved (proxy.ts sets x-locale from
+  // /ru prefix; this handler lives under /compare and /ru/compare both
+  // re-export it, so a bare path works in either tree).
+  if (!isCanonicalCompareSlug(slug)) {
+    const locale = await getLocale()
+    const prefix = locale === "ru" ? "/ru" : ""
+    redirect(`${prefix}/compare/${canonicalCompareSlug(slug)}`)
+  }
+
   const row = await fetchComparison(slug)
   if (!row) notFound()
 
-  const { comparison, toolA, toolB } = row
+  const { comparison, toolA: rawToolA, toolB: rawToolB } = row
   const locale = await getLocale()
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 
+  // BUG-FIX (May 2026 audit · TZ fixes #3): MDX-resolved rating wins
+  // over the DB cache so the compare page never disagrees with the
+  // detail review for the same tool.
+  const ratings = await getToolRatings([rawToolA, rawToolB], locale as "en" | "ru")
+  const toolA: ToolRow = { ...rawToolA, rating: ratings.get(rawToolA.slug) ?? rawToolA.rating }
+  const toolB: ToolRow = { ...rawToolB, rating: ratings.get(rawToolB.slug) ?? rawToolB.rating }
+
   const parsed = parseComparisonData(comparison.comparison_data)
+
+  // BUG-FIX (May 2026 audit · TZ fixes #2): the compare page used to
+  // render a near-empty shell when comparison_data was unset (which is
+  // the case for every seeded row today). We now derive Quick stats,
+  // Pricing, Features, Integrations, Pros & Cons, and Related directly
+  // from the `tools` columns so the page is a real comparison even
+  // before editorial fills out comparison_data.
+  const related = await fetchRelatedComparisons(slug, toolA.id, toolB.id, 6)
+  const integrations = diffIntegrations(toolA, toolB)
+  const aHasShopifyPlus = toolA.integrations?.includes("shopify-plus") ?? false
+  const bHasShopifyPlus = toolB.integrations?.includes("shopify-plus") ?? false
+  const aHasShopify     = toolA.integrations?.includes("shopify")      ?? false
+  const bHasShopify     = toolB.integrations?.includes("shopify")      ?? false
 
   // i18n strings — local until comparisons earn a dict section.
   const t = {
-    breadcrumbHome: locale === "ru" ? "Главная" : "Home",
-    eyebrow:        locale === "ru" ? "Сравнение" : "Comparison",
-    introHeading:  locale === "ru" ? "Кратко"    : "At a glance",
-    featuresHeading: locale === "ru" ? "Сравнение по фичам" : "Feature-by-feature",
+    breadcrumbHome:  locale === "ru" ? "Главная" : "Home",
+    eyebrow:         locale === "ru" ? "Сравнение" : "Comparison",
+    introHeading:    locale === "ru" ? "Кратко"             : "At a glance",
+    quickStatsHeading: locale === "ru" ? "Быстрая сводка"   : "Quick stats",
     pricingHeading:  locale === "ru" ? "Цены"               : "Pricing",
+    featuresHeading: locale === "ru" ? "Возможности"        : "Features",
+    integrationsHeading: locale === "ru" ? "Интеграции"     : "Integrations",
+    shopifyHeading:  locale === "ru" ? "Shopify-интеграция" : "Shopify integration",
+    supportHeading:  locale === "ru" ? "Поддержка"          : "Customer support",
+    prosConsHeading: locale === "ru" ? "Плюсы и минусы"     : "Pros & cons",
     useCasesHeading: locale === "ru" ? "Когда что лучше"    : "When each one wins",
     verdictHeading:  locale === "ru" ? "Наш вердикт"        : "Our verdict",
-    methodologyHeading: locale === "ru" ? "Методология" : "Methodology",
+    methodologyHeading: locale === "ru" ? "Методология"     : "Methodology",
+    relatedHeading:  locale === "ru" ? "Связанные сравнения" : "Related comparisons",
     tryA:           locale === "ru" ? `Открыть ${toolA.name}` : `Try ${toolA.name}`,
     tryB:           locale === "ru" ? `Открыть ${toolB.name}` : `Try ${toolB.name}`,
     visitA:         locale === "ru" ? "Сайт"  : "Website",
@@ -278,6 +400,28 @@ export default async function ComparisonPage({ params }: PageProps) {
     bestFor:        locale === "ru" ? "Лучше выбрать" : "Pick this when",
     featureCol:     locale === "ru" ? "Параметр"      : "Feature",
     winner:         locale === "ru" ? "Победитель"    : "Winner",
+    pros:           locale === "ru" ? "Плюсы"         : "Pros",
+    cons:           locale === "ru" ? "Минусы"        : "Cons",
+    bothLabel:      locale === "ru" ? "У обоих"       : "Both",
+    onlyLabel:      locale === "ru" ? "Только у"      : "Only",
+    rating:         locale === "ru" ? "Оценка"        : "Rating",
+    integrationsCount: locale === "ru" ? "Интеграций" : "Integrations",
+    startingPrice:  locale === "ru" ? "Старт от"      : "Starting price",
+    perMonth:       locale === "ru" ? "/мес"          : "/mo",
+    upTo:           locale === "ru" ? "до"            : "up to",
+    pricingModel:   locale === "ru" ? "Модель"        : "Model",
+    shopifyDeep:    locale === "ru"
+      ? "Глубокая Shopify-интеграция (включая Shopify Plus)."
+      : "Deep Shopify integration (including Shopify Plus).",
+    shopifyBasic:   locale === "ru"
+      ? "Базовая Shopify-интеграция через стандартное приложение."
+      : "Standard Shopify integration via the official app.",
+    shopifyNone:    locale === "ru"
+      ? "Прямая Shopify-интеграция не заявлена — нужен middleware (Zapier/Make)."
+      : "No native Shopify integration listed — middleware (Zapier/Make) required.",
+    noData:         locale === "ru" ? "Пока без данных" : "No data yet",
+    moreCount:      locale === "ru" ? "ещё" : "more",
+    out_of_10:      locale === "ru" ? "из 10" : "/10",
   }
 
   // JSON-LD: breadcrumb + a SoftwareApplication node per tool.
@@ -289,11 +433,28 @@ export default async function ComparisonPage({ params }: PageProps) {
   const softwareA = generateSoftwareApplicationSchema(toolA)
   const softwareB = generateSoftwareApplicationSchema(toolB)
 
+  // Intro: prefer editorial copy, else auto-narrate from the tools' data
+  // so two different pairs never share identical text.
   const introCopy =
-    comparison.custom_intro ??
-    (locale === "ru"
-      ? `Прямое сравнение ${toolA.name} и ${toolB.name} на одном Shopify-магазине. Без ничьих и без «оба отличные».`
-      : `Head-to-head between ${toolA.name} and ${toolB.name} on a single Shopify store. No "they're both great" — a real call at the bottom.`)
+    comparison.custom_intro ?? generateAtAGlance(toolA, toolB, locale as "en" | "ru")
+
+  const pricingNarrative = generatePricingNarrative(toolA, toolB, locale as "en" | "ru")
+  const verdictBody = comparison.verdict ?? generateVerdictFallback(toolA, toolB, locale as "en" | "ru")
+
+  // Tiny support summary: pulls from `not_for` so the section says
+  // something concrete instead of a stock "both are responsive" line.
+  const supportNarrative =
+    locale === "ru"
+      ? `${toolA.name}: ${toolA.not_for ? `не подходит, когда ${toolA.not_for.toLowerCase()}.` : "стандартная email/chat поддержка по тарифу."} ${toolB.name}: ${toolB.not_for ? `не подходит, когда ${toolB.not_for.toLowerCase()}.` : "стандартная email/chat поддержка по тарифу."}`
+      : `${toolA.name}: ${toolA.not_for ? `not the right pick when ${toolA.not_for.toLowerCase()}.` : "standard email/chat support per plan."} ${toolB.name}: ${toolB.not_for ? `not the right pick when ${toolB.not_for.toLowerCase()}.` : "standard email/chat support per plan."}`
+
+  const shopifyNarrative = (tool: ToolRow): string => {
+    const hasPlus  = tool.integrations?.includes("shopify-plus")
+    const hasCore  = tool.integrations?.includes("shopify")
+    if (hasPlus) return t.shopifyDeep
+    if (hasCore) return t.shopifyBasic
+    return t.shopifyNone
+  }
 
   return (
     <>
@@ -416,56 +577,95 @@ export default async function ComparisonPage({ params }: PageProps) {
         </section>
 
         {/* ==================================================================
-            INTRO
+            01 · At a glance
             ================================================================== */}
-        <Section title={t.introHeading} eyebrow="01">
+        <Section id="at-a-glance" title={t.introHeading} eyebrow="01">
           <p className="max-w-3xl text-[17px] leading-[1.7] text-[var(--text-secondary)]">
             {introCopy}
           </p>
+        </Section>
 
-          {/* Quick stats (if comparison_data.quickStats exists) */}
+        {/* ==================================================================
+            02 · Quick stats (auto from tools columns; jsonb override
+            below if present)
+            ================================================================== */}
+        <Section id="quick-stats" title={t.quickStatsHeading} eyebrow="02">
+          <ul role="list" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <StatBlock
+              label={t.startingPrice}
+              valueA={
+                toolA.pricing_min != null
+                  ? formatPrice(toolA.pricing_min, { locale: locale as "en" | "ru", maximumFractionDigits: 0 }) + t.perMonth
+                  : "—"
+              }
+              valueB={
+                toolB.pricing_min != null
+                  ? formatPrice(toolB.pricing_min, { locale: locale as "en" | "ru", maximumFractionDigits: 0 }) + t.perMonth
+                  : "—"
+              }
+              nameA={toolA.name}
+              nameB={toolB.name}
+            />
+            <StatBlock
+              label={t.rating}
+              valueA={toolA.rating != null ? `${toolA.rating}${t.out_of_10}` : "—"}
+              valueB={toolB.rating != null ? `${toolB.rating}${t.out_of_10}` : "—"}
+              nameA={toolA.name}
+              nameB={toolB.name}
+            />
+            <StatBlock
+              label={t.integrationsCount}
+              valueA={`${toolA.integrations?.length ?? 0}`}
+              valueB={`${toolB.integrations?.length ?? 0}`}
+              nameA={toolA.name}
+              nameB={toolB.name}
+            />
+          </ul>
+
+          {/* Override layer: if `comparison_data.quickStats` is present in
+              the DB, editorial-provided rows render below the auto row.
+              Keeps the unique-content promise of TZ-2 §5.2 — hand-tuned
+              copy when we have it, auto when we don't. */}
           {parsed.quickStats.length > 0 && (
-            <ul
-              role="list"
-              className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-            >
+            <ul role="list" className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {parsed.quickStats.map((stat) => (
-                <li
+                <StatBlock
                   key={stat.label}
-                  className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5"
-                >
-                  <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-                    {stat.label}
-                  </p>
-                  <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
-                    <div>
-                      <p className="text-[var(--text-tertiary)] text-[11px] uppercase tracking-[0.06em]">
-                        {toolA.name}
-                      </p>
-                      <p className="mt-1 font-mono text-[15px] text-[var(--text-primary)]">
-                        {stat.a}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[var(--text-tertiary)] text-[11px] uppercase tracking-[0.06em]">
-                        {toolB.name}
-                      </p>
-                      <p className="mt-1 font-mono text-[15px] text-[var(--text-primary)]">
-                        {stat.b}
-                      </p>
-                    </div>
-                  </div>
-                </li>
+                  label={stat.label}
+                  valueA={stat.a}
+                  valueB={stat.b}
+                  nameA={toolA.name}
+                  nameB={toolB.name}
+                />
               ))}
             </ul>
           )}
         </Section>
 
         {/* ==================================================================
-            FEATURES TABLE
+            03 · Pricing
             ================================================================== */}
-        {parsed.features.length > 0 && (
-          <Section title={t.featuresHeading} eyebrow="02">
+        <Section id="pricing" title={t.pricingHeading} eyebrow="03">
+          <div className="grid gap-4 md:grid-cols-2">
+            <PriceTierCard tool={toolA} locale={locale as "en" | "ru"} t={t} />
+            <PriceTierCard tool={toolB} locale={locale as "en" | "ru"} t={t} />
+          </div>
+          <p className="mt-6 max-w-3xl text-[14px] leading-[1.6] text-[var(--text-secondary)]">
+            {pricingNarrative}
+          </p>
+          {parsed.pricing?.details && (
+            <p className="mt-3 max-w-3xl text-[14px] leading-[1.6] text-[var(--text-secondary)]">
+              {parsed.pricing.details}
+            </p>
+          )}
+        </Section>
+
+        {/* ==================================================================
+            04 · Features
+            Auto-overlap when jsonb is empty; the editorial table wins.
+            ================================================================== */}
+        <Section id="features" title={t.featuresHeading} eyebrow="04">
+          {parsed.features.length > 0 ? (
             <ComparisonTable
               toolA={{ name: toolA.name, slug: toolA.slug }}
               toolB={{ name: toolB.name, slug: toolB.slug }}
@@ -473,41 +673,112 @@ export default async function ComparisonPage({ params }: PageProps) {
               featureHeader={t.featureCol}
               caption={`${toolA.name} vs ${toolB.name} feature comparison`}
             />
-          </Section>
-        )}
-
-        {/* ==================================================================
-            PRICING
-            ================================================================== */}
-        {parsed.pricing && (parsed.pricing.a || parsed.pricing.b || parsed.pricing.details) && (
-          <Section title={t.pricingHeading} eyebrow="03">
+          ) : (
             <div className="grid gap-4 md:grid-cols-2">
-              {parsed.pricing.a && (
-                <PriceCard
-                  toolName={toolA.name}
-                  body={parsed.pricing.a}
-                />
-              )}
-              {parsed.pricing.b && (
-                <PriceCard
-                  toolName={toolB.name}
-                  body={parsed.pricing.b}
-                />
-              )}
+              <FeatureBucket
+                toolName={toolA.name}
+                features={toolA.features ?? []}
+                empty={t.noData}
+              />
+              <FeatureBucket
+                toolName={toolB.name}
+                features={toolB.features ?? []}
+                empty={t.noData}
+              />
             </div>
-            {parsed.pricing.details && (
-              <p className="mt-6 max-w-3xl text-[14px] leading-[1.6] text-[var(--text-secondary)]">
-                {parsed.pricing.details}
-              </p>
-            )}
-          </Section>
-        )}
+          )}
+        </Section>
 
         {/* ==================================================================
-            USE CASES — "When each one wins"
+            05 · Shopify integration
+            ================================================================== */}
+        <Section id="shopify-integration" title={t.shopifyHeading} eyebrow="05">
+          <div className="grid gap-4 md:grid-cols-2">
+            <ShopifyCard
+              toolName={toolA.name}
+              hasShopify={aHasShopify}
+              hasShopifyPlus={aHasShopifyPlus}
+              narrative={shopifyNarrative(toolA)}
+            />
+            <ShopifyCard
+              toolName={toolB.name}
+              hasShopify={bHasShopify}
+              hasShopifyPlus={bHasShopifyPlus}
+              narrative={shopifyNarrative(toolB)}
+            />
+          </div>
+        </Section>
+
+        {/* ==================================================================
+            06 · Integrations (Venn-style A/Both/B)
+            ================================================================== */}
+        <Section id="integrations" title={t.integrationsHeading} eyebrow="06">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <IntegrationsBucket
+              label={`${t.onlyLabel} ${toolA.name}`}
+              items={integrations.onlyA}
+              accent="brand"
+              empty={t.noData}
+            />
+            <IntegrationsBucket
+              label={t.bothLabel}
+              items={integrations.both}
+              accent="muted"
+              empty={t.noData}
+            />
+            <IntegrationsBucket
+              label={`${t.onlyLabel} ${toolB.name}`}
+              items={integrations.onlyB}
+              accent="brand"
+              empty={t.noData}
+            />
+          </div>
+        </Section>
+
+        {/* ==================================================================
+            07 · Customer support
+            ================================================================== */}
+        <Section id="support" title={t.supportHeading} eyebrow="07">
+          <p className="max-w-3xl text-[15px] leading-[1.7] text-[var(--text-secondary)]">
+            {supportNarrative}
+          </p>
+        </Section>
+
+        {/* ==================================================================
+            08 · Pros & Cons
+            ================================================================== */}
+        <Section id="pros-cons" title={t.prosConsHeading} eyebrow="08">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div>
+              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                {toolA.name}
+              </p>
+              <ProsConsList
+                pros={toolA.pros ?? []}
+                cons={toolA.cons ?? []}
+                prosLabel={t.pros}
+                consLabel={t.cons}
+              />
+            </div>
+            <div>
+              <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                {toolB.name}
+              </p>
+              <ProsConsList
+                pros={toolB.pros ?? []}
+                cons={toolB.cons ?? []}
+                prosLabel={t.pros}
+                consLabel={t.cons}
+              />
+            </div>
+          </div>
+        </Section>
+
+        {/* ==================================================================
+            Use cases (jsonb-driven; optional)
             ================================================================== */}
         {parsed.useCases.length > 0 && (
-          <Section title={t.useCasesHeading} eyebrow="04">
+          <Section title={t.useCasesHeading} eyebrow="09">
             <ul role="list" className="grid gap-4 md:grid-cols-2">
               {parsed.useCases.map((u) => {
                 const winnerName =
@@ -538,28 +809,26 @@ export default async function ComparisonPage({ params }: PageProps) {
         )}
 
         {/* ==================================================================
-            VERDICT
+            09 · Verdict (always renders — falls back to auto narrative)
             ================================================================== */}
-        {comparison.verdict && (
-          <Section title={t.verdictHeading} eyebrow={parsed.features.length > 0 ? "05" : "02"}>
-            <div className="relative max-w-3xl">
-              <div
-                aria-hidden="true"
-                className="absolute -left-4 top-0 h-full w-1 rounded-full"
-                style={{ background: "var(--gradient-cta)" }}
-              />
-              <p className="pl-6 text-[18px] lg:text-[19px] leading-[1.7] text-[var(--text-primary)]">
-                {comparison.verdict}
-              </p>
-            </div>
-          </Section>
-        )}
+        <Section id="verdict" title={t.verdictHeading} eyebrow={parsed.useCases.length > 0 ? "10" : "09"}>
+          <div className="relative max-w-3xl">
+            <div
+              aria-hidden="true"
+              className="absolute -left-4 top-0 h-full w-1 rounded-full"
+              style={{ background: "var(--gradient-cta)" }}
+            />
+            <p className="pl-6 text-[18px] lg:text-[19px] leading-[1.7] text-[var(--text-primary)]">
+              {verdictBody}
+            </p>
+          </div>
+        </Section>
 
         {/* ==================================================================
-            METHODOLOGY (only if custom_methodology supplied)
+            Methodology (only if custom_methodology supplied)
             ================================================================== */}
         {comparison.custom_methodology && (
-          <Section title={t.methodologyHeading} eyebrow="06">
+          <Section title={t.methodologyHeading}>
             <p className="max-w-3xl text-[15px] leading-[1.7] text-[var(--text-secondary)]">
               {comparison.custom_methodology}
             </p>
@@ -569,7 +838,7 @@ export default async function ComparisonPage({ params }: PageProps) {
         {/* ==================================================================
             CTA TAIL — two-tool side-by-side
             ================================================================== */}
-        <section className="container-default pb-20">
+        <section className="container-default py-12 lg:py-16">
           <div className="grid gap-4 md:grid-cols-2">
             <CtaCard
               tool={toolA}
@@ -583,6 +852,59 @@ export default async function ComparisonPage({ params }: PageProps) {
             />
           </div>
         </section>
+
+        {/* ==================================================================
+            10 · Related comparisons
+            ================================================================== */}
+        {related.length > 0 && (
+          <Section id="related" title={t.relatedHeading}>
+            <ul role="list" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {related.map((r) => (
+                <li key={r.slug}>
+                  <Link
+                    href={`${localePrefix}/compare/${r.slug}`}
+                    className={cn(
+                      "group block h-full rounded-2xl border border-[var(--border-base)]",
+                      "bg-[var(--bg-surface)] p-5 transition-all duration-200",
+                      "hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] hover:border-[var(--border-strong)]",
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <ToolLogo
+                        src={r.toolA.logo_url}
+                        name={r.toolA.name}
+                        size={32}
+                        className="shrink-0 rounded-md"
+                      />
+                      <span className="text-[14px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+                        {r.toolA.name}
+                      </span>
+                      <span className="font-mono text-[11px] text-[var(--text-tertiary)]">vs</span>
+                      <span className="text-[14px] font-semibold tracking-[-0.01em] text-[var(--text-primary)]">
+                        {r.toolB.name}
+                      </span>
+                      <ToolLogo
+                        src={r.toolB.logo_url}
+                        name={r.toolB.name}
+                        size={32}
+                        className="shrink-0 rounded-md"
+                      />
+                    </div>
+                    {r.verdict && (
+                      <p className="mt-3 line-clamp-3 text-[13px] leading-[1.55] text-[var(--text-secondary)]">
+                        {r.verdict}
+                      </p>
+                    )}
+                    <p className="mt-3 inline-flex items-center gap-1 text-[12px] font-mono text-[var(--brand)] transition-colors group-hover:text-[var(--brand-hover)]">
+                      {locale === "ru" ? "Открыть" : "Open"}
+                      <ArrowUpRight className="size-3" />
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
       </main>
 
       <Footer
@@ -631,16 +953,21 @@ export default async function ComparisonPage({ params }: PageProps) {
 // Reusable section primitive (mirrors /tools/[slug]'s Section)
 // ============================================================================
 function Section({
+  id,
   title,
   eyebrow,
   children,
 }: {
+  id?: string
   title: string
   eyebrow?: string
   children: React.ReactNode
 }) {
   return (
-    <section className="container-default py-10 lg:py-14 border-b border-[var(--border-subtle)]">
+    <section
+      id={id}
+      className="container-default py-10 lg:py-14 border-b border-[var(--border-subtle)]"
+    >
       <div className="flex items-center gap-3">
         {eyebrow && (
           <span className="inline-flex h-6 items-center rounded-full border border-[var(--border-base)] bg-[var(--bg-muted)] px-2 text-[11px] font-mono text-[var(--text-tertiary)]">
@@ -651,6 +978,218 @@ function Section({
       </div>
       <div className="mt-6">{children}</div>
     </section>
+  )
+}
+
+// ============================================================================
+// StatBlock — one row in the Quick stats grid
+// ----------------------------------------------------------------------------
+// Two-column "A vs B" presentation. Used twice on the page: once for the
+// auto-derived stats (price/rating/integrations) and again for any
+// editorial overrides coming from comparison_data.jsonb.
+// ============================================================================
+function StatBlock({
+  label,
+  valueA,
+  valueB,
+  nameA,
+  nameB,
+}: {
+  label: string
+  valueA: string
+  valueB: string
+  nameA: string
+  nameB: string
+}) {
+  return (
+    <li className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5">
+      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+        {label}
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
+        <div>
+          <p className="text-[var(--text-tertiary)] text-[11px] uppercase tracking-[0.06em]">{nameA}</p>
+          <p className="mt-1 font-mono text-[15px] text-[var(--text-primary)] tabular-nums">{valueA}</p>
+        </div>
+        <div>
+          <p className="text-[var(--text-tertiary)] text-[11px] uppercase tracking-[0.06em]">{nameB}</p>
+          <p className="mt-1 font-mono text-[15px] text-[var(--text-primary)] tabular-nums">{valueB}</p>
+        </div>
+      </div>
+    </li>
+  )
+}
+
+// ============================================================================
+// PriceTierCard — per-tool pricing breakdown (entry / max / model)
+// ============================================================================
+function PriceTierCard({
+  tool,
+  locale,
+  t,
+}: {
+  tool: ToolRow
+  locale: "en" | "ru"
+  t: {
+    startingPrice: string
+    upTo:          string
+    perMonth:      string
+    pricingModel:  string
+  }
+}) {
+  const min = tool.pricing_min
+  const max = tool.pricing_max
+  return (
+    <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6">
+      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+        {tool.name}
+      </p>
+      <p className="mt-3 font-mono text-[24px] tracking-[-0.02em] text-[var(--text-primary)] tabular-nums">
+        {min != null ? formatPrice(min, { locale, maximumFractionDigits: 0 }) : "—"}
+        <span className="ml-1 text-[13px] text-[var(--text-tertiary)]">{t.perMonth}</span>
+      </p>
+      <dl className="mt-4 space-y-1.5 text-[13px]">
+        <div className="flex justify-between gap-3">
+          <dt className="text-[var(--text-tertiary)]">{t.upTo}</dt>
+          <dd className="font-mono text-[var(--text-secondary)] tabular-nums">
+            {max != null ? formatPrice(max, { locale, maximumFractionDigits: 0 }) + t.perMonth : "—"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-[var(--text-tertiary)]">{t.pricingModel}</dt>
+          <dd className="text-[var(--text-secondary)]">{tool.pricing_model ?? "—"}</dd>
+        </div>
+      </dl>
+      {tool.pricing_notes && (
+        <p className="mt-3 text-[12px] leading-[1.5] text-[var(--text-tertiary)]">
+          {tool.pricing_notes}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// FeatureBucket — fallback "feature list per tool" when there's no
+// jsonb-driven head-to-head table
+// ============================================================================
+function FeatureBucket({
+  toolName,
+  features,
+  empty,
+}: {
+  toolName: string
+  features: ReadonlyArray<{ name: string; description?: string }>
+  empty: string
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6">
+      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+        {toolName}
+      </p>
+      {features.length === 0 ? (
+        <p className="mt-3 text-[13px] italic text-[var(--text-tertiary)]">{empty}</p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-2">
+          {features.slice(0, 6).map((f) => (
+            <li key={f.name} className="flex gap-2 text-[14px] leading-[1.5] text-[var(--text-primary)]">
+              <Check
+                className="mt-1 size-3.5 shrink-0 text-[var(--success)]"
+                strokeWidth={2.5}
+              />
+              <span>
+                <span className="font-medium">{f.name}</span>
+                {f.description && (
+                  <span className="text-[var(--text-secondary)]"> — {f.description}</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// ShopifyCard — per-tool Shopify integration depth callout
+// ============================================================================
+function ShopifyCard({
+  toolName,
+  hasShopify,
+  hasShopifyPlus,
+  narrative,
+}: {
+  toolName: string
+  hasShopify:     boolean
+  hasShopifyPlus: boolean
+  narrative: string
+}) {
+  const accent = hasShopifyPlus
+    ? "var(--success)"
+    : hasShopify
+      ? "var(--brand)"
+      : "var(--text-tertiary)"
+  const Icon = hasShopify ? Check : Minus
+  return (
+    <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6">
+      <div className="flex items-center justify-between">
+        <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+          {toolName}
+        </p>
+        <span
+          className="inline-flex size-7 items-center justify-center rounded-full text-white"
+          style={{ background: accent }}
+          aria-hidden="true"
+        >
+          <Icon className="size-3.5" strokeWidth={2.6} />
+        </span>
+      </div>
+      <p className="mt-3 text-[14px] leading-[1.6] text-[var(--text-primary)]">
+        {narrative}
+      </p>
+    </div>
+  )
+}
+
+// ============================================================================
+// IntegrationsBucket — one column of the Venn (Only-A / Both / Only-B)
+// ============================================================================
+function IntegrationsBucket({
+  label,
+  items,
+  accent,
+  empty,
+}: {
+  label: string
+  items: string[]
+  accent: "brand" | "muted"
+  empty: string
+}) {
+  const ring =
+    accent === "brand"
+      ? "border-[color-mix(in_oklch,var(--brand)_25%,transparent)] bg-[color-mix(in_oklch,var(--brand)_5%,transparent)]"
+      : "border-[var(--border-base)] bg-[var(--bg-surface)]"
+  return (
+    <div className={cn("rounded-2xl border p-5 lg:p-6", ring)}>
+      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+        {label}
+      </p>
+      {items.length === 0 ? (
+        <p className="mt-3 text-[13px] italic text-[var(--text-tertiary)]">{empty}</p>
+      ) : (
+        <ul className="mt-3 flex flex-wrap gap-1.5">
+          {items.map((i) => (
+            <li
+              key={i}
+              className="inline-flex items-center rounded-full border border-[var(--border-base)] bg-[var(--bg-base)] px-2.5 py-0.5 text-[12px] text-[var(--text-secondary)]"
+            >
+              {i.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
@@ -719,24 +1258,11 @@ function ToolCardSide({
   )
 }
 
-function PriceCard({
-  toolName,
-  body,
-}: {
-  toolName: string
-  body: string
-}) {
-  return (
-    <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6">
-      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-        {toolName}
-      </p>
-      <p className="mt-2 text-[15px] leading-[1.6] text-[var(--text-primary)]">
-        {body}
-      </p>
-    </div>
-  )
-}
+// PriceCard removed in May 2026 audit (TZ fixes #2): the page now always
+// renders an auto-derived PriceTierCard for each tool, so the editorial
+// "free-form pricing prose" lane through comparison_data.pricing was
+// dropped. If editorial later wants per-tool prose back, add a third
+// field on ParsedComparisonData and surface it under the auto card.
 
 function CtaCard({
   tool,

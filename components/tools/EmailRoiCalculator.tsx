@@ -107,17 +107,34 @@ function recommendPlatform(subscribers: number, monthlyRevenue: number): Platfor
 }
 
 // --------------------------------------------------------------------------
-// Conservative defaults — match what the homepage hero widget hints at.
+// Defaults — TZ § 11.1 + May 2026 audit fixes #4.
+// ----------------------------------------------------------------------------
+// `clickRatePct` is the *click-to-open* rate (CTR-as-% of opens), not the
+// older CTR-as-% of sends — the math chains opens → clicks → orders, so
+// CTO is the rate that belongs here. The slider label says "Click-to-open
+// rate" to match. Sliders run on the TZ-mandated ranges:
+//   open:  10–60% (default 20%)
+//   CTO:    5–30% (default 12%)
+//   AOV:    $5–$500 (default $75)
+// Conversion uses the TZ-specified 2.5% (orders per click) so the result
+// box's "Revenue per subscriber" can be sanity-checked against the
+// $0.82 industry benchmark we cite in the result strip.
 // --------------------------------------------------------------------------
 const DEFAULTS = {
   subscribers:       5_000,
-  openRatePct:       28,    // %
-  clickRatePct:      2.4,   // %
-  conversionRatePct: 1.8,   // %
-  aov:               80,    // $
+  openRatePct:       20,    // %  (was 28 — TZ spec is 20)
+  clickRatePct:      12,    // %  CTO (was 2.4 with wrong label — TZ spec is 12)
+  conversionRatePct: 2.5,   // %  orders per click (TZ § 11.1)
+  aov:               75,    // $  (was 80 — TZ spec is $75)
   campaignsPerMonth: 4,     // 1/week is the canonical "good" cadence
   platform:          "omnisend" as PlatformId,
 }
+
+/** Operator benchmark we cite in the result strip. ~$0.82/sub/mo is the
+ *  median Klaviyo/Omnisend operator number for established Shopify
+ *  stores; the strip flags above/below average in plain text so the user
+ *  knows what "good" looks like without a separate chart. */
+const REVENUE_PER_SUB_BENCHMARK_USD = 0.82
 
 // --------------------------------------------------------------------------
 // Strings — passed in from the page so RU/EN flow through dictionaries.
@@ -129,6 +146,13 @@ export interface EmailRoiStrings {
   annualLabel:          string
   platformCostLabel:    string
   roiLabel:             string
+  /** "Revenue per subscriber: $X.XX/mo" — added in May 2026 audit. */
+  revPerSubLabel:       string
+  /** Benchmark line under the rev/sub metric, e.g. "Industry avg $0.82/sub". */
+  revPerSubBenchmarkAbove: string
+  revPerSubBenchmarkBelow: string
+  /** Embed-mode footer link back to the live tool. */
+  embedFooter:          string
   inputs: {
     subscribers:  string
     openRate:     string
@@ -194,6 +218,12 @@ export function EmailRoiCalculator({
   }, [subscribers, openRate, clickRate, aov, platform, locale])
 
   // ----- Derived numbers (pure functions of inputs) ------------------------
+  // BUG-FIX (May 2026 audit · TZ fixes #4): `clickRate` is treated as a
+  // *click-to-open* rate (% of opens that click), matching the slider's
+  // new label. The formula chains sends → opens → clicks → orders, with
+  // orders = clicks × 2.5% (TZ § 11.1 conversion). ROI is reported as a
+  // percent integer (`230%`) rather than the old "2.3×" multiplier,
+  // because operators read percentages without a key.
   const result = React.useMemo(() => {
     const emailsPerMonth = subscribers * DEFAULTS.campaignsPerMonth
     const opens          = emailsPerMonth * (openRate     / 100)
@@ -203,14 +233,21 @@ export function EmailRoiCalculator({
     const annualRevenue  = monthlyRevenue * 12
     const cost           = platformCost(platform, subscribers)
     const annualCost     = cost * 12
-    // ROI multiplier: net return per $1 spent on the platform.
-    const roi = cost > 0 ? (monthlyRevenue - cost) / cost : null
+    // ROI as a *percentage*: net return per $1 spent, ×100.
+    //   cost = 0 → undefined (free tier — ROI is infinite by definition,
+    //   so we hide rather than show "Infinity%").
+    const roiPct = cost > 0 ? ((monthlyRevenue - cost) / cost) * 100 : null
+    // Revenue per subscriber per month — the headline operator metric.
+    // Guard against zero subs (slider can't reach 0, but the math should
+    // stay safe if someone wires this widget into a different form).
+    const revenuePerSub = subscribers > 0 ? monthlyRevenue / subscribers : 0
     return {
       monthlyRevenue,
       annualRevenue,
       monthlyCost:  cost,
       annualCost,
-      roi,
+      roiPct,
+      revenuePerSub,
     }
   }, [subscribers, openRate, clickRate, aov, platform])
 
@@ -243,7 +280,8 @@ export function EmailRoiCalculator({
             monthlyRevenue: result.monthlyRevenue,
             annualRevenue:  result.annualRevenue,
             monthlyCost:    result.monthlyCost,
-            roi:            result.roi,
+            roiPct:         result.roiPct,
+            revenuePerSub:  result.revenuePerSub,
           },
         }),
       })
@@ -305,19 +343,19 @@ export function EmailRoiCalculator({
         <SliderField
           label={strings.inputs.openRate}
           value={openRate}
-          min={5}
+          min={10}
           max={60}
-          step={0.5}
+          step={1}
           unit="%"
-          format={(v) => v.toFixed(1)}
+          format={(v) => v.toFixed(0)}
           onChange={setOpenRate}
         />
         <SliderField
           label={strings.inputs.clickRate}
           value={clickRate}
-          min={0.1}
-          max={10}
-          step={0.1}
+          min={5}
+          max={30}
+          step={0.5}
           unit="%"
           format={(v) => v.toFixed(1)}
           onChange={setClickRate}
@@ -409,7 +447,11 @@ export function EmailRoiCalculator({
             {strings.resultMeta}
           </p>
 
-          {/* Secondary numbers row */}
+          {/* Secondary numbers row. BUG-FIX (May 2026 audit · TZ fixes #4):
+              ROI renders as a percent integer ("230%") instead of the old
+              "2.3×" multiplier — operators read percentages without a
+              legend. When platform cost is $0 (free tier), ROI is
+              undefined and we render an em-dash rather than "Infinity%". */}
           <dl className="relative mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border-subtle)] pt-5 text-[12px]">
             <Metric
               label={strings.annualLabel}
@@ -422,13 +464,44 @@ export function EmailRoiCalculator({
             <Metric
               label={strings.roiLabel}
               value={
-                result.roi == null
+                result.roiPct == null
                   ? "—"
-                  : `${formatNumber(result.roi, { locale, maximumFractionDigits: 1 })}×`
+                  : `${formatNumber(Math.round(result.roiPct), { locale, maximumFractionDigits: 0 })}%`
               }
-              accent={result.roi != null && result.roi >= 5}
+              accent={result.roiPct != null && result.roiPct >= 500}
             />
           </dl>
+
+          {/* Revenue per subscriber + industry benchmark. New in May 2026
+              audit per TZ § 11.1 — the strip turns the abstract "monthly
+              revenue" headline into a per-subscriber metric that
+              operators can compare against the $0.82 industry average we
+              cite below. */}
+          <div className="relative mt-4 rounded-2xl border border-[var(--border-base)] bg-[var(--bg-muted)] p-4">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+              {strings.revPerSubLabel}
+            </p>
+            <p className="mt-1 font-mono text-[20px] tabular-nums text-[var(--text-primary)]">
+              {formatPrice(result.revenuePerSub, {
+                locale,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+              <span className="ml-1 text-[12px] font-medium text-[var(--text-tertiary)]">/mo</span>
+            </p>
+            <p
+              className={cn(
+                "mt-1 text-[12px] leading-[1.5]",
+                result.revenuePerSub >= REVENUE_PER_SUB_BENCHMARK_USD
+                  ? "text-[var(--brand)]"
+                  : "text-[var(--text-tertiary)]",
+              )}
+            >
+              {result.revenuePerSub >= REVENUE_PER_SUB_BENCHMARK_USD
+                ? strings.revPerSubBenchmarkAbove
+                : strings.revPerSubBenchmarkBelow}
+            </p>
+          </div>
 
           {/* Recommendation block */}
           <div className="relative mt-6 rounded-2xl border border-[var(--border-base)] bg-[var(--bg-muted)] p-4">

@@ -23,6 +23,22 @@ set -e
 # 1. Find staged EN MDX files. --diff-filter=ACMR catches add/copy/modify/rename.
 staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^content/(reviews|guides)/en/.*\.mdx$' || true)
 
+# Validate frontmatter for any staged MDX (EN or RU) — schema check is
+# cheap and runs without external creds. The rating cross-check inside
+# the validator no-ops gracefully when Supabase env is unset (same
+# pattern as OPENROUTER_API_KEY below). This catches the May 2026 audit
+# failure mode where an MDX rating drifted from the DB row.
+staged_any_mdx=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^content/(reviews|guides)/(en|ru)/.*\.mdx$' || true)
+if [ -n "$staged_any_mdx" ]; then
+  echo ""
+  echo "[pre-commit] validating staged MDX frontmatter:"
+  echo "$staged_any_mdx" | sed 's/^/  /'
+  if ! npm run --silent validate:content -- $staged_any_mdx; then
+    echo "[pre-commit] content validation failed — commit aborted"
+    exit 1
+  fi
+fi
+
 if [ -z "$staged" ]; then
   # Nothing relevant staged — exit fast so unrelated commits aren't slowed
   # down by the API-key check below.

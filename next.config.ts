@@ -94,15 +94,52 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ]
 
+// ----------------------------------------------------------------------------
+// Embed-friendly CSP for /tools/email-roi-calculator (May 2026 audit · TZ #4)
+// ----------------------------------------------------------------------------
+// The Email ROI Calculator ships an "Embed this calculator" snippet — an
+// iframe pointing at `/tools/email-roi-calculator?embed=1`. The default
+// `frame-ancestors 'none'` + `X-Frame-Options: DENY` block that embed.
+// We override to `frame-ancestors *` (anywhere) and drop X-Frame-Options
+// for the calculator path only — every other page keeps the strict
+// no-iframe policy. The headers config below re-emits ALL security
+// headers for this route; same-named keys later in the array override
+// earlier ones in Next.js, so this entry sits beneath the catch-all.
+const embedCsp = csp.replace(
+  "frame-ancestors 'none'",
+  "frame-ancestors *",
+)
+const embedHeaders = [
+  { key: "Content-Security-Policy",   value: embedCsp },
+  // Setting X-Frame-Options to ALLOWALL is non-standard; the modern way
+  // to permit embedding is to simply omit X-Frame-Options entirely. But
+  // because the catch-all sets DENY, we need to *override* it. The
+  // browser-compatible choice is to omit X-Frame-Options from this
+  // response, which Next.js does by NOT including it in the entry's
+  // header array — same-named keys in later entries replace earlier
+  // values, but absent keys leave the earlier value in place. So we
+  // explicitly set the header to an empty string to nullify it.
+  { key: "X-Frame-Options",           value: "" },
+  { key: "X-Content-Type-Options",    value: "nosniff" },
+  { key: "Referrer-Policy",           value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy",        value: "camera=(), microphone=(), geolocation=(), interest-cohort=()" },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+]
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Apply to every route. Specific overrides (e.g. weaker CSP for an
-        // /embed/* iframe path) can be added with more specific `source`
-        // entries above this catch-all if we ever ship them.
+        // Default: strict no-iframe policy for the whole site.
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        // Embed-friendly override for the Email ROI Calculator. Same-named
+        // keys here override the catch-all (Next.js applies later entries
+        // last). Both /tools/... and /ru/tools/... are covered.
+        source: "/:locale(ru)?/tools/email-roi-calculator",
+        headers: embedHeaders,
       },
     ]
   },

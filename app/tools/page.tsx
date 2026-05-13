@@ -7,6 +7,7 @@ import { ToolsCatalog } from "@/components/tools/ToolsCatalog"
 import { createServiceClient } from "@/lib/supabase/service"
 import { buildMetadata } from "@/lib/seo/metadata"
 import { generateItemListSchema, generateBreadcrumbSchema } from "@/lib/seo/schema"
+import { getToolRatings } from "@/lib/content/rating"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl } from "@/lib/utils"
@@ -91,7 +92,17 @@ export default async function ToolsPage() {
   const dict   = await getDictionary(locale)
   const localePrefix = locale === "ru" ? "/ru" : ""
 
-  const tools = await fetchTools()
+  const rawTools = await fetchTools()
+
+  // BUG-FIX (May 2026 audit · TZ fixes #3): the catalog rating shown on
+  // each card must come from the MDX review when one exists, so cards
+  // and detail pages can't disagree. One batch lookup keeps the page
+  // server-side, no extra network hop.
+  const ratings = await getToolRatings(rawTools, locale as "en" | "ru")
+  const tools = rawTools.map((t) => ({
+    ...t,
+    rating: ratings.get(t.slug) ?? t.rating,
+  }))
 
   // JSON-LD: surface the catalog as an ItemList + a Breadcrumb trail.
   const itemList = generateItemListSchema({

@@ -13,7 +13,8 @@
 | **Код + MDX контент** | git tag `stable-*` в `origin` | вечно | вручную, командой ниже |
 | **Билд / деплой** | Vercel Deployments | вечно (Hobby хранит много, Pro — все) | автоматически при каждом push в `main` |
 | **БД Supabase** | GitHub Actions artifact `db-backup-*` | 90 дней | автоматически каждый понедельник 04:00 UTC + ручной запуск |
-| **Доступы (env vars)** | менеджер паролей пользователя | бессрочно | вручную, разово |
+| **API ключи** | **в самих сервисах** (Supabase, OpenRouter, Upstash, Beehiiv, Cloudflare, PostHog) | вечно (живут на стороне провайдера) | не наша задача — сервис хранит ключ, мы при восстановлении его оттуда копируем |
+| **Доступы к аккаунтам сервисов** | менеджер паролей + 2FA-приложение | бессрочно | при создании аккаунта |
 
 ---
 
@@ -108,54 +109,57 @@ psql "$DB_URL" < botapolis-YYYY-MM-DD.sql
 
 **План:**
 1. **GitHub** — у тебя есть локальный клон. Создай новый аккаунт / восстанови старый, создай новый репо, `git remote set-url origin <new>`, `git push origin --all --tags`. Всё на месте.
-2. **Vercel** — создай новый проект, импортируй репо, **заново вписать env vars из менеджера паролей** (см. чеклист ниже). Поэтому env vars в менеджере паролей — критично.
+2. **Vercel** — создай новый проект, импортируй репо. **Env vars НЕ восстанавливаются из бэкапа** — они sensitive и Vercel не отдаёт их даже владельцу после сохранения (это by design, защита от компрометации аккаунта). Вместо этого: для каждого сервиса из списка ниже зайди в его dashboard, **скопируй существующий ключ или перевыдай новый**, вставь в Vercel env. Карта «где какой ключ живёт» — в секции [«Где живут ключи»](#где-живут-ключи) ниже.
 3. **Supabase** — самое больное. Если потерял доступ к проекту:
    - Создай новый проект.
    - Применить миграции: `supabase/migrations/001_initial.sql`, `002_contact_submissions.sql`, `003_sync_tool_ratings.sql`, `004_canonical_compare_slugs.sql` (в порядке номеров).
    - Применить `supabase/seed.sql` (базовые tools).
    - Восстановить пользовательские данные из последнего `db-backup-*` (см. Сценарий 3).
-   - Обновить `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` в Vercel и GitHub Secret `SUPABASE_DB_URL`.
+   - В Supabase Dashboard → Settings → API скопировать новые `URL`, `anon`, `service_role` → положить в Vercel env (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) + обновить GitHub Secret `SUPABASE_DB_URL` (Session pooler из Settings → Database).
+   - Перегенерить `REVALIDATE_SECRET = $(openssl rand -hex 32)` → положить в Vercel env + обновить URL в Supabase Database Webhooks.
 
 ---
 
-## 🔐 Чеклист env vars для менеджера паролей
+## 🔐 Где живут ключи
 
-Список собран из [lib/env.ts](lib/env.ts) и [.env.example](.env.example). Зайди в [Vercel → Settings → Environment Variables](https://vercel.com/alf-unit/botapolis/settings/environment-variables), скопируй значения каждого ключа в свой менеджер паролей (1Password / Bitwarden / Proton Pass).
+**Главное правило: API ключи бэкапить НЕ нужно.** Они живут в своих сервисах-источниках — это и есть их естественный бэкап. При восстановлении проекта ты идёшь в каждый сервис и копируешь / перевыдаёшь ключ оттуда.
 
-### Критичные (без них проект мёртв)
-- [ ] `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
-- [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon (public) key
-- [ ] `SUPABASE_SERVICE_ROLE_KEY` — Supabase service role (server-only, секрет)
-- [ ] `REVALIDATE_SECRET` — секрет для Supabase webhook → ISR
+**Vercel хранит свои env vars как Sensitive variables** — после сохранения значения не показываются никому (включая владельца). Это by design, защита от компрометации Vercel-аккаунта. Поэтому из Vercel вытащить значение **физически нельзя** — даже через CLI (`vercel env pull` возвращает пустые строки для всех secrets).
 
-### Внешние сервисы (без них падают конкретные фичи)
-- [ ] `OPENROUTER_API_KEY` — AI tool generator (`/tools/product-description`)
-- [ ] `OPENROUTER_MODEL` — обычно `anthropic/claude-haiku-4.5` (необязательный override)
-- [ ] `BEEHIIV_API_KEY` — newsletter
-- [ ] `BEEHIIV_PUBLICATION_ID` — newsletter
-- [ ] `TURNSTILE_SECRET_KEY` — анти-бот серверная часть
-- [ ] `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — анти-бот фронт
-- [ ] `UPSTASH_REDIS_REST_URL` — rate-limit
-- [ ] `UPSTASH_REDIS_REST_TOKEN` — rate-limit
-- [ ] `RESEND_API_KEY` — опционально, transactional email
-- [ ] `RESEND_FROM_ADDRESS` — опционально, override адреса отправителя
-- [ ] `RESEND_ADMIN_INBOX` — опционально, куда падают /contact submissions
+### Карта: какой ключ → где его взять при восстановлении
 
-### Публичные (не секреты, но удобно сохранить)
-- [ ] `NEXT_PUBLIC_SITE_URL` = `https://botapolis.com`
-- [ ] `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` = `botapolis.com`
-- [ ] `NEXT_PUBLIC_PLAUSIBLE_ENABLED` = `true`
-- [ ] `NEXT_PUBLIC_POSTHOG_KEY` — public ingest key
-- [ ] `NEXT_PUBLIC_POSTHOG_HOST` = `https://us.i.posthog.com`
+| Env var в Vercel | Источник ключа | Где в источнике |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase | Project Settings → API → `Project URL` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase | Project Settings → API → `anon public` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase | Project Settings → API → `service_role` (⚠ server-only) |
+| `OPENROUTER_API_KEY` | OpenRouter | [openrouter.ai/keys](https://openrouter.ai/keys) → Create / Reveal |
+| `OPENROUTER_MODEL` | (не секрет, default в коде = `anthropic/claude-haiku-4.5`) | — |
+| `BEEHIIV_API_KEY` | Beehiiv | Settings → Integrations → API → Generate / Copy |
+| `BEEHIIV_PUBLICATION_ID` | Beehiiv | URL дашборда: `/publications/pub_<id>` |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare | Dashboard → Turnstile → твой site → Site key |
+| `TURNSTILE_SECRET_KEY` | Cloudflare | Dashboard → Turnstile → твой site → Secret key |
+| `UPSTASH_REDIS_REST_URL` | Upstash | Console → твой Redis DB → REST API → URL |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash | Console → твой Redis DB → REST API → Token |
+| `NEXT_PUBLIC_POSTHOG_KEY` | PostHog | Project Settings → Project ID / API keys |
+| `NEXT_PUBLIC_POSTHOG_HOST` | (не секрет, обычно `https://us.i.posthog.com`) | — |
+| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | (не секрет = `botapolis.com`) | — |
+| `NEXT_PUBLIC_PLAUSIBLE_ENABLED` | (не секрет = `true`) | — |
+| `NEXT_PUBLIC_SITE_URL` | (не секрет = `https://botapolis.com`) | — |
+| `RESEND_API_KEY` (если настроен) | Resend | [resend.com/api-keys](https://resend.com/api-keys) → Create / Copy при создании (потом не видно) |
+| `REVALIDATE_SECRET` | **self-generated**, нет внешнего источника | при восстановлении просто перегенерить: `openssl rand -hex 32` → положить в Vercel env + обновить URL Supabase Database Webhook |
+| `SUPABASE_DB_URL` (в GitHub Secrets, не Vercel) | Supabase | Project Settings → Database → Connection string → **Session pooler** |
+| `CRON_SECRET` | (auto-provisioned Vercel'ом для проектов с `vercel.json` crons, ничего делать не надо) | — |
 
-### Auto-provisioned (Vercel сам ставит, бэкапить не надо)
-- `CRON_SECRET` — генерится Vercel для cron-проектов
-- `NODE_ENV` — auto
+### Что **критично** хранить в менеджере паролей
 
-### Отдельно — GitHub Secrets (не Vercel env)
-- [ ] `SUPABASE_DB_URL` — Session-mode connection string для GitHub Actions backup workflow. [github.com/alf-unit/botapolis/settings/secrets/actions](https://github.com/alf-unit/botapolis/settings/secrets/actions)
+Это то, без чего к источникам ключей не подобраться:
 
-> ⚠ `npx vercel env pull .env.local` на этом проекте отдаёт пустые строки — известный баг (см. [HANDOFF.md](HANDOFF.md) «Подводные камни»). Поэтому копируешь руками из Vercel UI.
+- [ ] **Пароли + 2FA** от аккаунтов: Vercel, Supabase, GitHub, Cloudflare, OpenRouter, Upstash, Beehiiv, PostHog, Plausible, Resend (если будет)
+- [ ] **Supabase database password** (тот, что задавал при создании проекта; используется для Reset DB password)
+- [ ] **Recovery codes 2FA** для каждого из этих аккаунтов (особенно GitHub и Vercel — без них при потере телефона ты теряешь доступ навсегда)
+
+Это **всё**. Сами API-ключи отдельно бэкапить — лишний дрейф (обновил ключ → забыл обновить копию → копия врёт). Лучше доверять источникам.
 
 ---
 
@@ -198,8 +202,8 @@ psql "$DB_URL" < botapolis-YYYY-MM-DD.sql
 | Перед каждой большой правкой | `git tag -a stable-<date> ...` — точка отката кода |
 | Раз в неделю | Бэкап БД работает автоматически (понедельник 04:00 UTC). Иногда заглядывать в Actions tab — убедиться что зелёное |
 | Раз в месяц | Скачать последний artifact и положить в локальную папку — на случай если GitHub упадёт |
-| После смены любого env var в Vercel | Обновить значение в менеджере паролей |
-| После добавления нового env var | Дописать в [lib/env.ts](lib/env.ts), [.env.example](.env.example) и этот чеклист |
+| После добавления нового env var | Дописать в [lib/env.ts](lib/env.ts), [.env.example](.env.example) и в таблицу [«Где живут ключи»](#-где-живут-ключи) — чтобы будущий агент знал откуда брать |
+| После заведения нового сервиса | Сохранить пароль + 2FA в менеджер паролей сразу |
 
 ---
 

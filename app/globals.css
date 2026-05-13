@@ -439,6 +439,24 @@
        iOS — the proper fix is to identify the overflowing element
        and contain it, but this is a robust safety net. */
     overflow-x: clip;
+
+    /* Animated scroll for in-page anchors (Subscribe → #newsletter,
+       TOC heading jumps, etc.). The reduced-motion @media block at
+       §5 overrides this back to `auto !important` so the system
+       preference still wins. Without smooth-scroll an anchor click
+       reads as "nothing happened" because the navbar is sticky and
+       the visible chrome doesn't move. */
+    scroll-behavior: smooth;
+  }
+
+  /* Reserve clearance under the sticky navbar (h-16 = 64px) plus a
+     small breathing gap so anchor targets land below the navbar's
+     glass blur instead of being tucked under it. Applied to every
+     id-bearing element so future anchors (#faq, #pricing, heading
+     IDs from rehype-slug) work without per-target tweaks. Pure
+     scroll-side property — no effect on normal layout. */
+  [id] {
+    scroll-margin-top: 80px;
   }
 
   body {

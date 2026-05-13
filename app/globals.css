@@ -97,16 +97,6 @@
   --shadow-xl:   0 8px 16px rgba(15,15,15,0.06), 0 24px 48px rgba(15,15,15,0.12);
   --shadow-glow: 0 0 0 1px rgba(16,185,129,0.20), 0 0 24px rgba(16,185,129,0.15);
 
-  /* CTA shadows — second iteration after live-test feedback (May 2026).
-     Same-color outer glow (mint on mint) read as blur, not light; replaced
-     with: idle = inner top highlight only (polished glass feel), hover =
-     violet contrast ring (no blur — sharp 2px brand outline), press =
-     dark inset (physical depth). Violet is already our AI accent so the
-     ring slots naturally into the palette instead of feeling imported. */
-  --shadow-cta-idle:  inset 0 1px 0 rgba(255,255,255,0.20);
-  --shadow-cta-hover: inset 0 1px 0 rgba(255,255,255,0.30),
-                      0 0 0 2px rgba(139,92,246,0.55);
-  --shadow-cta-press: inset 0 1px 3px rgba(0,0,0,0.28);
 
   /* ============================================================
      shadcn / Base-UI tokens — driven by Botapolis values
@@ -216,13 +206,6 @@
   --shadow-xl:   0 8px 16px rgba(0,0,0,0.50), 0 24px 64px rgba(0,0,0,0.50);
   --shadow-glow: 0 0 0 1px rgba(52,211,153,0.25), 0 0 32px rgba(52,211,153,0.20);
 
-  /* CTA shadows — dark mode mirrors light: inner highlight + violet ring +
-     dark press inset. Violet uses --violet-400 (#A78BFA) for dark surfaces
-     and the inset goes a touch deeper because dark mode swallows shadows. */
-  --shadow-cta-idle:  inset 0 1px 0 rgba(255,255,255,0.16);
-  --shadow-cta-hover: inset 0 1px 0 rgba(255,255,255,0.24),
-                      0 0 0 2px rgba(167,139,250,0.65);
-  --shadow-cta-press: inset 0 1px 3px rgba(0,0,0,0.45);
 
   /* ---------- shadcn token re-points (dark) ----------------------------- */
   --background:           var(--bg-base);
@@ -573,21 +556,11 @@
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  /* Stacked backgrounds: a top-edge white highlight gives the surface
-     a glass / polished-enamel quality (light catching the upper rim);
-     below it the mint gradient does the actual color work. This is
-     the replacement for the previous outer green glow — depth comes
-     from inner light, not from same-color blur leaking outward. */
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 35%),
-    var(--gradient-cta);
-  box-shadow: var(--shadow-cta-idle);
-  /* Filter transitions are short (fast tier) because brightness shift
-     should feel immediate on press — anything slower reads as lag. */
-  transition:
-    transform   var(--duration-base) var(--ease-out-expo),
-    box-shadow  var(--duration-base) var(--ease-out-expo),
-    filter      var(--duration-fast) var(--ease-out-expo);
+  background: var(--gradient-cta);
+  /* Base Button already supplies `active:translate-y-px` as the universal
+     press-down feedback, so we only need to handle the hover-lift here.
+     Transition lives on the wrapper so the lift settles smoothly. */
+  transition: transform var(--duration-base) var(--ease-out-expo);
 }
 
 .btn-cta > * {
@@ -595,29 +568,27 @@
   z-index: 2;
 }
 
-/* Hover / focus-visible — lift, brighter top edge, gain a violet
-   contrast ring (sharp 2px, no blur). Violet (#8B5CF6 / dark #A78BFA)
-   is already our AI accent color, so the ring lives inside the brand
-   palette instead of feeling like a stray neon outline. */
 .btn-cta:hover,
 .btn-cta:focus-visible {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-cta-hover);
 }
 
-/* Active — physical "compress + dim". Replaces the white radial ripple,
-   which fought the shimmer (both white, both motion). Now: surface
-   shrinks slightly, top highlight vanishes (light not catching it
-   anymore), brightness drops 10% (eaten by inset shadow). Feels like
-   a real mechanical key being pushed in. */
-.btn-cta:active {
-  transform: translateY(0) scale(0.97);
-  box-shadow: var(--shadow-cta-press);
-  filter: brightness(0.90);
-}
+/* Shimmer sweep — the single decorative motion primitive on this button.
+   ----------------------------------------------------------------------
+   Live-tuning log (keep so we can revert quickly):
+     v1 — 105deg, stops 35/50/65, white 0.28α, 600ms, ease-out-expo
+     v2 — same geometry, alpha bumped 0.28 → 0.32 (post first preview)
+     v3 — current. User wanted the streak more readable: band widened
+          to 25/50/75 (50% of surface vs 30%), peak alpha 0.32 → 0.48,
+          duration 600ms → 900ms so the sweep takes longer to cross.
 
-/* Single pseudo-element — shimmer only. The press effect is now done
-   via filter+transform on the button itself, no ::after layer needed. */
+   Three knobs to turn if asked to push it further:
+     · bandwidth = (right_stop − left_stop)         wider = more lit
+     · peak alpha = the 50%-stop's opacity          higher = brighter
+     · duration = how long the streak takes         slower = lingering
+   The 105deg angle deliberately keeps a diagonal lean so it reads as
+   "light catching a surface" rather than a flat horizontal wipe.
+*/
 .btn-cta::before {
   content: "";
   position: absolute;
@@ -627,12 +598,12 @@
   z-index: 1;
   background: linear-gradient(
     105deg,
-    transparent 35%,
-    rgba(255, 255, 255, 0.32) 50%,
-    transparent 65%
+    transparent 25%,
+    rgba(255, 255, 255, 0.48) 50%,
+    transparent 75%
   );
   transform: translateX(-120%);
-  transition: transform var(--duration-slow) var(--ease-out-expo);
+  transition: transform 900ms var(--ease-out-expo);
 }
 .btn-cta:hover::before,
 .btn-cta:focus-visible::before {

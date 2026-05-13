@@ -186,9 +186,6 @@ export function SearchPageClient({ strings, locale }: SearchPageClientProps) {
   const [status, setStatus] = React.useState<"idle" | "loading" | "error">("idle")
   const inputRef = React.useRef<HTMLInputElement | null>(null)
 
-  // Track the in-flight URL update so we don't fight the user's edits.
-  const lastUrlQuery = React.useRef(initialQuery)
-
   // ----- Autofocus on mount -----------------------------------------------
   React.useEffect(() => {
     inputRef.current?.focus()
@@ -238,38 +235,27 @@ export function SearchPageClient({ strings, locale }: SearchPageClientProps) {
     }
   }, [committedQuery, locale])
 
-  // ----- Debounced URL + commit on idle (250 ms) --------------------------
-  // We commit the query whenever the user pauses typing for a beat — that
-  // gives "live" results but skips the URL churn of pushing on every
-  // keystroke. Submit (Enter / button) forces an immediate commit.
-  React.useEffect(() => {
-    const trimmed = draft.trim()
-    const timer = window.setTimeout(() => {
-      if (trimmed === committedQuery) return
-      setCommittedQuery(trimmed)
+  // ----- No auto-commit on type --------------------------------------------
+  // Audit feedback (May 2026): live-as-you-type made the Search button
+  // visually redundant — the button is the user's explicit "go ahead and
+  // search now" affordance, and firing on every keystroke undercuts it.
+  // We now commit exclusively on form submit. The initial query (from
+  // `?q=`) is committed once at mount so deep links keep working.
 
-      // Mirror to URL with replaceState — no history entry per keystroke.
-      if (trimmed === lastUrlQuery.current) return
-      const sp = new URLSearchParams(searchParams.toString())
-      if (trimmed.length === 0) sp.delete("q")
-      else sp.set("q", trimmed)
-      lastUrlQuery.current = trimmed
-      router.replace(sp.toString() ? `?${sp.toString()}` : "?", { scroll: false })
-    }, 250)
-    return () => window.clearTimeout(timer)
-  }, [draft, committedQuery, router, searchParams])
-
-  // ----- Submit handler — force immediate commit --------------------------
+  // ----- Submit handler — the only way to start a search -------------------
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = draft.trim()
+    // Don't commit ultra-short queries — Pagefind would return noise.
+    // The button is disabled in this state anyway; this is a defensive
+    // guard for keyboard submitters with an empty input.
+    if (trimmed.length < 2) return
     setCommittedQuery(trimmed)
     const sp = new URLSearchParams(searchParams.toString())
-    if (trimmed.length === 0) sp.delete("q")
-    else sp.set("q", trimmed)
-    lastUrlQuery.current = trimmed
-    // push (not replace) on submit so back-button restores the previous query.
-    router.push(sp.toString() ? `?${sp.toString()}` : `?`, { scroll: false })
+    sp.set("q", trimmed)
+    // push (not replace) so the back button restores the previous query —
+    // each explicit submit deserves its own history entry.
+    router.push(`?${sp.toString()}`, { scroll: false })
   }
 
   // ----- Group results for display ----------------------------------------

@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Menu, Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -19,6 +18,7 @@ import {
 import { Logo } from "./Logo"
 import { ThemeToggle } from "./ThemeToggle"
 import { LanguageSwitcher } from "./LanguageSwitcher"
+import { NavbarSearch } from "./NavbarSearch"
 import { UserMenu } from "@/components/shared/UserMenu"
 
 /* ----------------------------------------------------------------------------
@@ -85,35 +85,24 @@ function userMenuStrings(localePrefix: "" | "/ru") {
   }
 }
 
-/**
- * Cmd+K (mac) / Ctrl+K (windows) global shortcut → navigate to /search.
- * Used to open the search modal palette; post-May-2026 audit feedback
- * the modal was retired in favour of the standalone /search page, but
- * the shortcut still maps to the new surface so power users keep their
- * muscle memory. Mounting this hook in Navbar guarantees a single
- * listener for the whole app.
- */
-function useGlobalSearchShortcut(targetHref: string) {
-  const router = useRouter()
-  React.useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const isK = e.key === "k" || e.key === "K"
-      if (!isK) return
-      if (!(e.metaKey || e.ctrlKey)) return
-      e.preventDefault()
-      router.push(targetHref)
-    }
-    document.addEventListener("keydown", onKey)
-    return () => document.removeEventListener("keydown", onKey)
-  }, [router, targetHref])
-}
+// Cmd+K / Ctrl+K is now owned by <NavbarSearch> (focuses the inline input
+// rather than navigating). The previous useGlobalSearchShortcut hook was
+// retired alongside the standalone-link pattern.
 
 export function Navbar({ strings, localePrefix = "", user = null, className }: NavbarProps) {
   const [scrolled, setScrolled] = React.useState(false)
+  const locale: "en" | "ru" = localePrefix === "/ru" ? "ru" : "en"
   const searchHref = `${localePrefix}/search`
 
-  // Cmd+K / Ctrl+K → navigate to /search. Mounted once at navbar level.
-  useGlobalSearchShortcut(searchHref)
+  // i18n strings for the inline navbar search. Kept inline (rather than in
+  // NavbarStrings) so the locale JSON doesn't bloat with strings only one
+  // component consumes.
+  const ru = locale === "ru"
+  const navSearchStrings = {
+    placeholder: ru ? "Найти инструмент, обзор…" : "Search tools, reviews…",
+    button:      ru ? "Найти"                     : "Search",
+    aria:        ru ? "Поиск по сайту"            : "Site search",
+  }
 
   // rAF-throttled scroll listener — keeps per-frame work under the 16ms budget.
   React.useEffect(() => {
@@ -185,33 +174,30 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
 
         {/* Right cluster */}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Search — links directly to /search rather than opening a
-              palette modal. Audit feedback (May 2026): the modal pattern
-              was unfamiliar to most visitors AND its WASM compile was
-              CSP-blocked, so the palette returned zero results. The new
-              page-level search uses the same Pagefind index but renders
-              a conventional "input + button + results list" UX. The
-              ⌘K shortcut still applies (see useGlobalSearchShortcut)
-              and navigates to the same destination. */}
+          {/* Search — second iteration of the May 2026 audit fix.
+              Inline input + submit button on lg+ widths (matches the
+              "real search bar" pattern visitors expect from a marketing
+              site); narrower viewports keep the icon-link affordance
+              since the navbar already runs out of horizontal real
+              estate at sm/md. Submit pushes /search?q=… — no live
+              search on keystroke (the standalone page handles the
+              actual query work). */}
+          <NavbarSearch
+            href={searchHref}
+            placeholder={navSearchStrings.placeholder}
+            buttonLabel={navSearchStrings.button}
+            ariaLabel={navSearchStrings.aria}
+            className="hidden lg:flex"
+          />
           <Link
             href={searchHref}
             aria-label={strings.search}
             className={cn(
               buttonVariants({ variant: "ghost", size: "sm" }),
-              "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+              "lg:hidden text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
             )}
           >
-            <Search className="size-4" data-icon="inline-start" />
-            <span className="hidden lg:inline">{strings.search}</span>
-            <kbd
-              className={cn(
-                "hidden lg:inline-flex h-5 items-center rounded border border-[var(--border-base)] bg-[var(--bg-muted)] px-1.5 ml-1",
-                "font-mono text-[10px] text-[var(--text-tertiary)]",
-              )}
-              aria-hidden="true"
-            >
-              ⌘K
-            </kbd>
+            <Search className="size-4" aria-hidden="true" />
           </Link>
 
           <ThemeToggle label={strings.toggleTheme} />

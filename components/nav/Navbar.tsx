@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Menu } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Menu, Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -19,8 +20,6 @@ import { Logo } from "./Logo"
 import { ThemeToggle } from "./ThemeToggle"
 import { LanguageSwitcher } from "./LanguageSwitcher"
 import { UserMenu } from "@/components/shared/UserMenu"
-import { SearchTrigger } from "@/components/shared/SearchTrigger"
-import type { SearchModalStrings } from "@/components/shared/SearchModal"
 
 /* ----------------------------------------------------------------------------
    Navbar
@@ -43,7 +42,11 @@ export interface NavbarStrings {
   guides: string
   directory: string
   search: string
-  searchPlaceholder: string
+  // `searchPlaceholder` retired May 2026 audit (search palette removed; the
+  // navbar button now navigates to /search which owns its own placeholder).
+  // Kept here as optional for backwards compat — dictionaries can leave the
+  // key in JSON without breaking the type contract.
+  searchPlaceholder?: string
   subscribe: string
   openMenu: string
   closeMenu: string
@@ -83,33 +86,34 @@ function userMenuStrings(localePrefix: "" | "/ru") {
 }
 
 /**
- * Locale-resolved SearchModal copy. Kept inline here (rather than threaded
- * through dict.nav.search.*) because the strings are component-specific
- * and live alongside the only consumer.
+ * Cmd+K (mac) / Ctrl+K (windows) global shortcut → navigate to /search.
+ * Used to open the search modal palette; post-May-2026 audit feedback
+ * the modal was retired in favour of the standalone /search page, but
+ * the shortcut still maps to the new surface so power users keep their
+ * muscle memory. Mounting this hook in Navbar guarantees a single
+ * listener for the whole app.
  */
-function searchModalStrings(locale: "en" | "ru", trigger: string, placeholder: string): SearchModalStrings {
-  return {
-    triggerLabel:    trigger,
-    placeholder,
-    closeLabel:      locale === "ru" ? "Закрыть"          : "Close",
-    emptyTitle:      locale === "ru" ? "Что ищем?"        : "What are you looking for?",
-    emptyBody:       locale === "ru"
-      ? "Инструменты, обзоры, гайды, сравнения — всё в одном поле."
-      : "Tools, reviews, guides, comparisons — all in one box.",
-    loadingError:    locale === "ru"
-      ? "Не удалось загрузить поисковый индекс. Попробуй обновить страницу."
-      : "Couldn't load the search index. Try refreshing the page.",
-    noResultsTitle:  locale === "ru" ? "Ничего не нашли"  : "No results",
-    noResultsBody:   locale === "ru"
-      ? "Перефразируй запрос или загляни в каталог инструментов."
-      : "Try a different query, or browse the tools catalog.",
-    resultsLabel:    locale === "ru" ? "Pagefind"         : "Pagefind",
-  }
+function useGlobalSearchShortcut(targetHref: string) {
+  const router = useRouter()
+  React.useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const isK = e.key === "k" || e.key === "K"
+      if (!isK) return
+      if (!(e.metaKey || e.ctrlKey)) return
+      e.preventDefault()
+      router.push(targetHref)
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [router, targetHref])
 }
 
 export function Navbar({ strings, localePrefix = "", user = null, className }: NavbarProps) {
   const [scrolled, setScrolled] = React.useState(false)
-  const locale: "en" | "ru" = localePrefix === "/ru" ? "ru" : "en"
+  const searchHref = `${localePrefix}/search`
+
+  // Cmd+K / Ctrl+K → navigate to /search. Mounted once at navbar level.
+  useGlobalSearchShortcut(searchHref)
 
   // rAF-throttled scroll listener — keeps per-frame work under the 16ms budget.
   React.useEffect(() => {
@@ -181,18 +185,34 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
 
         {/* Right cluster */}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Search trigger — Pagefind-backed modal (block D). Owns its own
-              ⌘K / Ctrl+K listener at the document level so the shortcut
-              fires from anywhere on the page, not just when the trigger
-              has focus. The static index is built post-deploy by
-              scripts/build-search-index.ts. Mounted ONCE so we don't end
-              up with two modals / two listeners — the trigger renders
-              itself responsively (icon-only on phones, full chip with ⌘K
-              hint on desktop). */}
-          <SearchTrigger
-            strings={searchModalStrings(locale, strings.search, strings.searchPlaceholder)}
-            locale={locale}
-          />
+          {/* Search — links directly to /search rather than opening a
+              palette modal. Audit feedback (May 2026): the modal pattern
+              was unfamiliar to most visitors AND its WASM compile was
+              CSP-blocked, so the palette returned zero results. The new
+              page-level search uses the same Pagefind index but renders
+              a conventional "input + button + results list" UX. The
+              ⌘K shortcut still applies (see useGlobalSearchShortcut)
+              and navigates to the same destination. */}
+          <Link
+            href={searchHref}
+            aria-label={strings.search}
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+            )}
+          >
+            <Search className="size-4" data-icon="inline-start" />
+            <span className="hidden lg:inline">{strings.search}</span>
+            <kbd
+              className={cn(
+                "hidden lg:inline-flex h-5 items-center rounded border border-[var(--border-base)] bg-[var(--bg-muted)] px-1.5 ml-1",
+                "font-mono text-[10px] text-[var(--text-tertiary)]",
+              )}
+              aria-hidden="true"
+            >
+              ⌘K
+            </kbd>
+          </Link>
 
           <ThemeToggle label={strings.toggleTheme} />
 
@@ -242,6 +262,23 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
               </SheetHeader>
 
               <nav aria-label="Mobile" className="flex flex-col p-4 gap-1">
+                {/* Search at the top of the mobile menu — first thing
+                    visitors see when they open the drawer. */}
+                <SheetClose
+                  render={
+                    <Link
+                      href={searchHref}
+                      className={cn(
+                        "px-3 h-11 inline-flex items-center gap-2 rounded-md",
+                        "text-base font-medium text-[var(--text-primary)]",
+                        "hover:bg-[var(--bg-muted)]",
+                      )}
+                    >
+                      <Search className="size-4 text-[var(--text-tertiary)]" />
+                      {strings.search}
+                    </Link>
+                  }
+                />
                 {links.map((l) => (
                   <SheetClose
                     key={l.href}

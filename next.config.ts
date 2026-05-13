@@ -32,7 +32,13 @@ const csp = [
 
   // Scripts: 'unsafe-inline' covers next-themes' pre-paint script + Next's
   // hydration payload. Plausible / PostHog / Turnstile are explicit allow.
-  "script-src 'self' 'unsafe-inline' https://plausible.io https://us.i.posthog.com https://challenges.cloudflare.com",
+  // 'wasm-unsafe-eval' is required by Pagefind: the /pagefind/pagefind.js
+  // module compiles a per-language WASM blob to drive the search index.
+  // Chrome 95+, Edge, and Safari 17+ block WebAssembly.compile() under
+  // strict CSP without this directive — that's what was silently making
+  // the search modal return zero results post-launch. Adding the token
+  // only loosens WASM compilation, not JS eval, so no XSS surface gain.
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://plausible.io https://us.i.posthog.com https://challenges.cloudflare.com",
 
   // Styles: Sonner + next/font + Tailwind inline-critical all need 'unsafe-inline'.
   "style-src 'self' 'unsafe-inline'",

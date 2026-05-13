@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -184,9 +185,15 @@ export function UserMenu({
         }
       />
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-56">
-        <DropdownMenuLabel className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-          {email}
-        </DropdownMenuLabel>
+        {/* Base UI 1.4+ throws error #31 ("Menu group parts must be used
+            within <Menu.Group>") if a GroupLabel is rendered without a
+            wrapping Group. We wrap the email label here so the strict
+            structural check passes; the visible result is identical. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+            {email}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           nativeButton={false}

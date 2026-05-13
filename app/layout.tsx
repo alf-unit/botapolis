@@ -47,6 +47,18 @@ export const metadata: Metadata = {
     description:
       "The AI operator's manual for Shopify-native commerce.",
   },
+  // Suppress browser auto-translate. We ship native EN + RU via the
+  // /ru/... routes and the EN/RU chip in the navbar is the single source
+  // of truth for locale. Chrome's auto-translate iframe (`flexible?lang=
+  // auto`) layers on top, fights our CSP loudly in the console, and
+  // delivers a double-translated UX for users who already have a RU
+  // build available one click away. `<meta name="google" content=
+  // "notranslate">` is the Google-specific opt-out; the HTML
+  // `translate="no"` attribute below covers Safari / Edge / Yandex
+  // and any other browser that respects the W3C standard.
+  other: {
+    google: "notranslate",
+  },
 }
 
 export const viewport: Viewport = {
@@ -64,6 +76,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      translate="no"
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >

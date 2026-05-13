@@ -20,6 +20,10 @@ import { ThemeToggle } from "./ThemeToggle"
 import { LanguageSwitcher } from "./LanguageSwitcher"
 import { NavbarSearch } from "./NavbarSearch"
 import { UserMenu } from "@/components/shared/UserMenu"
+import {
+  NewsletterDialog,
+  type NewsletterDialogStrings,
+} from "@/components/marketing/NewsletterDialog"
 
 /* ----------------------------------------------------------------------------
    Navbar
@@ -82,6 +86,45 @@ function userMenuStrings(localePrefix: "" | "/ru") {
     signedOut:     ru ? "Вы вышли из аккаунта" : "Signed out",
     signOutFailed: ru ? "Не удалось выйти"   : "Couldn't sign out",
     openMenu:      ru ? "Открыть меню"        : "Open user menu",
+  }
+}
+
+/**
+ * Newsletter dialog copy — mirrors locales/{en,ru}.json `newsletter` slot
+ * verbatim. Kept inline here for the same reason as userMenuStrings: every
+ * page already passes `dict.nav`, and threading `dict.newsletter` through
+ * every call-site of <Navbar/> just to feed the modal duplicates the JSON
+ * data when this surface is the only client consumer anyway. If the copy
+ * ever drifts from the footer strip's, normalise both then.
+ */
+function newsletterDialogStrings(localePrefix: "" | "/ru"): NewsletterDialogStrings {
+  const ru = localePrefix === "/ru"
+  return {
+    eyebrow:  ru ? "Только для операторов" : "Operators only",
+    title:    ru ? "Получайте operator's brief." : "Get the operator's brief.",
+    subtitle: ru
+      ? "Одно письмо в неделю. Обновления калькуляторов, новые обзоры, найденные нами компромиссы."
+      : "One email a week. Calculator updates, new reviews, the trade-offs we caught.",
+    footnote: ru
+      ? "Уже 1247 Shopify-операторов · Отписаться можно в любой момент"
+      : "Join 1,247 Shopify operators · Unsubscribe anytime",
+    form: {
+      placeholder:       ru ? "you@store.com" : "you@store.com",
+      cta:               ru ? "Подписаться" : "Subscribe",
+      ctaLoading:        ru ? "Подписываем…" : "Subscribing…",
+      ctaSubscribed:     ru ? "Подписаны" : "Subscribed",
+      successTitle:      ru ? "Готово." : "You're in.",
+      successDescription: ru
+        ? "Проверьте почту — там welcome-письмо."
+        : "Check your inbox for a welcome note.",
+      errorTitle:        ru ? "Не удалось подписаться" : "Couldn't subscribe",
+      errorInvalid:      ru
+        ? "В email похоже опечатка — проверь."
+        : "That email looks off — double-check it.",
+      errorRateLimited:  ru
+        ? "Слишком много попыток. Попробуй через пару минут."
+        : "Too many attempts. Try again in a few minutes.",
+    },
   }
 }
 
@@ -214,17 +257,28 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
             initialUser={user}
           />
 
-          <Link
-            href={`${localePrefix}/#newsletter`}
-            className={cn(
-              // CTA variant adds mint gradient + shimmer + lift; no need
-              // for the old bg-/text-/hover- triplet (variant supplies them).
-              buttonVariants({ variant: "cta", size: "sm" }),
-              "hidden md:inline-flex",
-            )}
+          {/* Subscribe used to be an anchor-link to the footer's
+              #newsletter section — two-click UX (click → scroll → click
+              the *other* Subscribe button next to the form). Replaced
+              with an in-place dialog so the form opens right under the
+              navbar from any page. Mobile version still uses the scroll-
+              to-footer path inside the Sheet because the dialog overlay
+              on top of a sheet's overlay gets fiddly with virtual
+              keyboards on iOS Safari. */}
+          <NewsletterDialog
+            strings={newsletterDialogStrings(localePrefix)}
+            source="navbar_modal"
+            language={locale}
           >
-            {strings.subscribe}
-          </Link>
+            <Button
+              type="button"
+              variant="cta"
+              size="sm"
+              className="hidden md:inline-flex"
+            >
+              {strings.subscribe}
+            </Button>
+          </NewsletterDialog>
 
           {/* Mobile menu — uses Base-UI Sheet via render prop */}
           <Sheet>

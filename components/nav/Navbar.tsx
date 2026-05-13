@@ -229,6 +229,7 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
           {/* Mobile menu — uses Base-UI Sheet via render prop */}
           <Sheet>
             <SheetTrigger
+              nativeButton={false}
               render={
                 <Button
                   variant="ghost"
@@ -253,6 +254,7 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
                 {/* Search at the top of the mobile menu — first thing
                     visitors see when they open the drawer. */}
                 <SheetClose
+                  nativeButton={false}
                   render={
                     <Link
                       href={searchHref}
@@ -270,6 +272,7 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
                 {links.map((l) => (
                   <SheetClose
                     key={l.href}
+                    nativeButton={false}
                     render={
                       <Link
                         href={l.href}
@@ -298,6 +301,7 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
                 </div>
 
                 <SheetClose
+                  nativeButton={false}
                   render={
                     <Link
                       href={`${localePrefix}/#newsletter`}

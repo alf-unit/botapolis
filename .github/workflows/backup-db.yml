@@ -27,12 +27,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # PG client major version. Must be >= the Supabase server's PG major.
+    # Supabase = 17 as of May 2026. When they upgrade, bump this single value
+    # and both steps below pick it up via /usr/lib/postgresql/${PG_VERSION}/bin.
+    env:
+      PG_VERSION: "17"
+
     steps:
-      - name: Install PostgreSQL 17 client
-        # Ubuntu's default postgresql-client is too old to dump newer Postgres
-        # versions cleanly. Pull pg_dump 17 from the official PG APT repo —
-        # 17 can dump any 14+ server (Supabase runs 15/17 depending on project).
+      - name: Install PostgreSQL ${{ env.PG_VERSION }} client
+        # ubuntu-latest (24.04) ships with postgresql-client-16 preinstalled.
+        # Installing postgresql-client-17 alongside works, BUT a bare `pg_dump`
+        # call goes through pg_wrapper (postgresql-client-common), which often
+        # still resolves to the older binary. That's exactly why the previous
+        # run failed with "server version: 17.6; pg_dump version: 16.13".
+        # The dump step therefore uses the absolute path; this step just
+        # installs and sanity-checks that the right binary is reachable.
         run: |
+          set -euo pipefail
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
             -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
@@ -40,8 +51,12 @@ jobs:
             https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client-17
-          pg_dump --version
+          sudo apt-get install -y -qq "postgresql-client-${PG_VERSION}"
+          PG_DUMP="/usr/lib/postgresql/${PG_VERSION}/bin/pg_dump"
+          test -x "$PG_DUMP" || { echo "::error::pg_dump not found at $PG_DUMP"; exit 1; }
+          "$PG_DUMP" --version
+          "$PG_DUMP" --version | grep -q " ${PG_VERSION}\." \
+            || { echo "::error::pg_dump version mismatch (expected major ${PG_VERSION})"; exit 1; }
 
       - name: Dump database
         env:
@@ -56,13 +71,15 @@ jobs:
           DATE=$(date -u +%Y-%m-%d)
           mkdir -p backups
           OUT="backups/botapolis-${DATE}.sql"
+          # Absolute path bypasses pg_wrapper — see install-step comment for why.
+          PG_DUMP="/usr/lib/postgresql/${PG_VERSION}/bin/pg_dump"
           # --clean + --if-exists → drop-then-create on restore (idempotent).
           # --no-owner / --no-privileges → portable across Supabase projects.
           # --quote-all-identifiers → defensive against reserved-word collisions.
           # --exclude-schema=auth → Supabase Auth schema is managed by Supabase;
           #   restoring it can collide with the live auth system. We back up
           #   our public schema; Supabase manages auth.users separately.
-          pg_dump "$DB_URL" \
+          "$PG_DUMP" "$DB_URL" \
             --clean --if-exists \
             --no-owner --no-privileges \
             --quote-all-identifiers \

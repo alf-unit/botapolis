@@ -51,18 +51,18 @@ export default async function NotFound() {
   const t = locale === "ru"
     ? {
         statusPill:  "404 · Не найдено",
-        headline:    "Упс! Кажется, ты свернул не туда. Или мы.",
+        headline:    "Упс — похоже, кто-то свернул не туда.",
         lede:
-          "Ссылка могла протухнуть, в URL — опечатка, или страница всё ещё дремлет в черновиках. Что точно живо — вот тут рядом. А ещё есть поиск по инструментам, обзорам и гайдам 👇",
+          "Мёртвая ссылка, опечатка или страница всё ещё застряла в черновиках. Вот что точно живо — или поищи по инструментам, обзорам и гайдам 👇",
         backHome:    "На главную",
         searchSite:  "Поиск по сайту",
         suggestions: "Попробуй вместо этого",
       }
     : {
         statusPill:  "404 · Not found",
-        headline:    "Oops — looks like you took a wrong turn. Or we did.",
+        headline:    "Whoops — looks like somebody took a wrong turn.",
         lede:
-          "The link might've gone stale, the URL might have a typo, or the page is still snoozing in drafts. What's actually live sits right below — plus there's a search across every tool, review, and guide 👇",
+          "Dead link, typo, or a page still stuck in drafts. Here's what's actually live — or search our tools, reviews, and guides 👇",
         backHome:    "Back to homepage",
         searchSite:  "Search the site",
         suggestions: "Try one of these instead",

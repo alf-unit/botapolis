@@ -1,20 +1,20 @@
 # Botapolis — Handoff для следующей сессии
 
-> **Это твой первый файл для чтения. Загрузи также `TZ-2-code.md` и `INSTRUCTIONS.md` (они подгрузятся в чат) для полного контекста ТЗ. Этот документ — карта реальности на момент `HEAD` (`f16bdb7`, май 2026), и приоритет у него ВЫШЕ, чем у TZ-2, потому что TZ был написан до начала работы.**
+> **Это твой первый файл для чтения. Загрузи также `TZ-2-code.md` и `INSTRUCTIONS.md` (они подгрузятся в чат) для полного контекста ТЗ. Этот документ — карта реальности на момент `HEAD` (`69965a5`, май 2026), и приоритет у него ВЫШЕ, чем у TZ-2, потому что TZ был написан до начала работы.**
 
 ---
 
 ## 🎯 Состояние одной строкой
 
-**Сайт инженерно готов и отполирован. Sprint 2 + Blocks A–F + аудит май 2026 + overhaul поиска + iOS-фикс. Прод на `https://botapolis.com` стабильный. Дальше — operational phase (контент + monitoring), не engineering.**
+**Сайт инженерно готов, отполирован, забэкаплен, локализован end-to-end. Sprint 2 + Blocks A–F + три волны аудита + i18n+UX волна май 2026. Прод на `https://botapolis.com` стабильный. Дальше — operational phase (контент + monitoring + welcome email pipeline), не engineering.**
 
 Если пользователь просит «доделать сайт» — он не понимает, что доделывать. Инженерное ТЗ закрыто. Спроси конкретно что нужно (контентная статья? новый UI-блок? фикс конкретной страницы?).
 
 ---
 
-## 🆕 Что добавилось после первого HANDOFF (`4a1a058` → `f16bdb7`)
+## 🆕 Что добавилось после первого HANDOFF (`4a1a058` → `69965a5`)
 
-Две волны полировки после live-аудита прода:
+Три волны полировки после live-аудита прода:
 
 ### Волна 1 — аудит 5 багов (коммит `698b46d`)
 - **#3 Рейтинги MDX↔DB** · MDX — source of truth. `lib/content/rating.ts` helper в `/tools/[slug]` и каталоге. Миграция 003 синканула DB (omnisend 8.5, tidio 8.2, postscript 8.6). `scripts/sync-ratings.ts` + `scripts/content-validator.ts` (pre-commit gate) — больше не разойдутся.
@@ -30,6 +30,63 @@
 - **Submit-only**. Поиск стартует только при submit (Enter / клик по лупе). Auto-fire на каждый символ убран.
 - **Vercel CDN кешировал stale `pagefind-entry.json`** → manifest указывал на хэши шардов из старого билда → 404 на `.pf_meta`. Через `next.config.ts` прибил `Cache-Control: no-store` на `entry.json` + `pagefind.js` + `pagefind-worker.js`. Хэшированные шарды (`.pf_meta`/`.pf_index`) кешируются долго по дефолту — их имя меняется с контентом.
 - **iOS auto-zoom-on-focus**. Input `text-[15px]` < 16px → Safari зумит → viewport съезжает → страница «таскается пальцем». Поднял input до `text-[16px]` mobile / `text-[17px]` lg. Плюс защитный `overflow-x: clip` на `<html>` и `<body>` в `globals.css`.
+
+### Волна 3 — Backup + CTA + Base UI fix + i18n + UX (`f16bdb7` → `69965a5`, ~22 коммита)
+
+Большая сессия конца мая 2026 которая закрыла последние слабые места. **Все восемь под-блоков независимо коммитнуты** — каждое изменение можно ревьювнуть и откатить отдельно.
+
+**A) Backup-инфраструктура** (см. [BACKUP.md](BACKUP.md) и секцию «🛡 Backup & Recovery» ниже).
+- `stable-2026-05-13` git-тэг как точка возврата для кода + MDX
+- `.github/workflows/backup-db.yml` — еженедельный `pg_dump` Supabase в GitHub artifact (90 дней retention). PG client 17 ставится из APT, вызывается по абсолютному пути `/usr/lib/postgresql/17/bin/pg_dump` (pg_wrapper иначе резолвит к старшей предустановленной версии — гарантированный bug на ubuntu-latest).
+- `BACKUP.md` документирует четыре failure-сценария + ровно одну команду на каждый. **Branch-protection / PR-flow намеренно НЕ настроены** — для соло-флоу оба тормозят без выгоды (решение owner'а).
+
+**B) CTA-кнопка получает фирменный mint-glow + shimmer** (`components/ui/button.tsx` variant `cta` + `app/globals.css §7`).
+- **Что включает variant `cta`**: mint-градиент (`var(--gradient-cta)`), белый текст 600, hover-lift `-1px`, диагональный shimmer-sweep слева-направо 900ms через `::before` псевдо-элемент.
+- **Эволюция параметров shimmer задокументирована inline-комментарием v1/v2/v3** в `.btn-cta::before` (band 30→50%, alpha 0.32→0.48, duration 600→900ms). Если попросят покрутить — три «ручки» там же.
+- **Что было выкинуто после live-теста**: same-color outer glow (читался как блюр), violet contrast ring (overshoot), физический squish на press (juser сказал «лишнее»), Material-style ripple (конфликтовал с shimmer — две белые motion-primitive в одном цвете).
+- **Раскатано на 17 primary CTA** в 13 файлах: Subscribe / Send / Generate / Save / Try Tool / affiliate-CTAs / Sign in. **НЕ применять** к utility-кнопкам типа NavbarSearch submit и SearchPageClient submit — они «приварены» к input через общую границу и lift отрывает их визуально.
+
+**C) Base UI 1.4 совместимость** — три отдельных правки, одна причина (1.4 ввёл строгие runtime-валидации). **Шаблоны на запомнить:**
+- `<DropdownMenuTrigger render={<CustomButton>}>` → throws Base UI #31 («not rendered as a native <button>»). Фикс: `nativeButton={false}` prop на Trigger/Item/Close. **Везде в коде где `render={<...>}` теперь стоит этот opt-out** — UserMenu (3 места), Navbar SheetTrigger + SheetClose (4), DialogPrimitive.Close (2), SheetPrimitive.Close (1).
+- `<DropdownMenuLabel>` (= `MenuPrimitive.GroupLabel`) **требует** обёртки `<DropdownMenuGroup>` иначе throws #31. Это **другой** код 31 (тот же formatErrorMessage helper) — оба ошибочно идентичны в production-mode. Источник в `node_modules/@base-ui/react/esm/menu/group/MenuGroupContext.js`. Если когда-нибудь #31 снова — копать в эту сторону.
+- CSP добавлен `https://us-assets.i.posthog.com` в `script-src` + `connect-src` — PostHog перенёс свой config/recorder CDN. Без этого PostHog снippet ловит unhandled rejection → каскад ошибок в Console (не блокирует, но грязно).
+
+**D) Browser auto-translate site-wide off** (`app/layout.tsx`).
+- `<html translate="no">` (W3C, для Safari/Firefox/Yandex) + `<meta name="google" content="notranslate">` (Chrome/Edge через Metadata `other`).
+- Причина: у нас своя RU-локализация через `/ru/*`. Без opt-out Chrome у RU-юзеров с EN-страницей запускает translate-iframe `flexible?lang=auto` который конфликтует с нашим строгим CSP — каскад TrustedHTML/TrustedScript/xr-spatial-tracking errors в Console (не блокирует, но шумит). И **двойной перевод** UX-кашу даёт.
+- Notranslate **НЕ меняет** default-язык сайта (он по-прежнему EN на `/`).
+
+**E) i18n-волна — три источника контента, три скрипта** (большой блок, см. секцию «🌍 i18n регламент» ниже).
+- `app/guides/page.tsx` + `app/reviews/page.tsx` swap'нули hardcoded `getAllMdxFrontmatter("guides", "en")` → `(...., locale)`. RU MDX уже был на диске — просто не читался.
+- `locales/ru.json` — «AI Cost Comparator» → «Калькулятор стоимости AI» (две локации, footer + featured tool tile).
+- **Tools DB**: migration **005** добавила `name_ru` / `tagline_ru` / `description_ru` / `pros_ru[]` / `cons_ru[]` / `best_for_ru`. Read-side helper `lib/content/tool-locale.ts` (`localizeTool` / `localizeToolPartial`) — единая точка fallback `tool.name_ru ?? tool.name`. Подключён в `tools/page`, `tools/[slug]/page`, `alternatives/[slug]/page`, `compare/[slug]/page`, `AffiliateButton`.
+- **Comparisons DB**: migration **006** свапнула UNIQUE(slug) на UNIQUE(slug, language) — один slug может жить в двух языковых строках. `app/compare/[slug]/page.tsx` теперь принимает locale через `fetchComparison(slug, locale)` + `fetchRelatedComparisons(..., locale)`. **Новый файл `app/ru/compare/[slug]/page.tsx`** thin re-export — до волны 3 этого route вообще НЕ существовало, /ru/compare/<slug> возвращал 404.
+- **Скрипты**: `npm run translate:tools` и `npm run translate:comparisons` (как husky-хук переводит MDX, так эти переводят tools / comparisons). Запущены один раз → 7 tools + 6 comparisons переведены в БД. Регламент: после нового insert юзер запускает соответствующий npm-скрипт.
+- Все три translation-скрипта идемпотентны — без `--force` пропускают уже переведённое.
+
+**F) Subscribe-кнопка теперь модалка, не якорь** (`components/marketing/NewsletterDialog.tsx`).
+- Раньше: клик в навбаре → scroll к `<div id="newsletter">` в footer'е → юзер видит **ещё одну Subscribe-кнопку рядом с формой**. Два клика чтобы дойти до одного действия.
+- Теперь: клик → Dialog с тем же `<NewsletterForm>` поверх любой страницы. Footer-форма **остаётся** как long-form копия + JS-disabled fallback.
+- `source` в Supabase теперь `navbar_modal` vs `footer` — funnel-attribution.
+- Mobile (внутри SheetClose) **намеренно** оставлен на scroll-to-footer — модалка-поверх-sheet на iOS Safari фигачит с virtual keyboard z-index.
+
+**G) Smooth-scroll + anchor offset** (`app/globals.css §4`).
+- `html { scroll-behavior: smooth }` + `[id] { scroll-margin-top: 80px }` (64px navbar + 16px breathing). Глобально на все anchor-targets — будущие TOC heading IDs, /#faq, etc. бесплатно получают offset под navbar.
+- Reduced-motion override в §5 (`scroll-behavior: auto !important`) уже был, остаётся честным.
+
+**H) NewsletterForm wait-for-Turnstile** (`components/marketing/NewsletterForm.tsx`).
+- Раньше: submit до того как Turnstile выдал token → fail-fast toast «we're verifying you're human». Особенно плохо в навбар-модалке где widget mount'ится только при open Dialog.
+- Теперь: при submit без токена → button → «Subscribing…» → ref-polling каждые 100ms до 5 sec → отправка. **Ref** (`turnstileTokenRef`) вместо state — closure handleSubmit'a иначе видит stale value.
+- ⚠ **Welcome email не приходит** — отдельная проблема. См. «🛠 TODO» ниже.
+
+### Активация Волны 3 — что юзер должен был сделать (и сделал)
+
+1. ✅ Применить migration 005 в Supabase Dashboard SQL Editor
+2. ✅ Применить migration 006 там же
+3. ✅ Восстановить значения в `.env.local` после того как `vercel env pull` затёр их пустыми кавычками (см. «⚠ Подводные камни» ниже — задокументировано)
+4. ✅ Сгенерить `OPENROUTER_API_KEY` и положить в `.env.local`
+5. ✅ Запустить `npm run translate:tools` (7 tools переведены) и `npm run translate:comparisons` (6 RU comparisons созданы)
+6. ⏳ **НЕ сделано**: получить `BEEHIIV_API_KEY` чтобы welcome email начал приходить. См. TODO.
 
 ---
 
@@ -306,9 +363,11 @@ Helper читает `tool.name_ru ?? tool.name`, `tool.pros_ru ?? tool.pros`, et
 
 | # | Что | Команда / шаг |
 |---|---|---|
-| 1 | **Re-run `supabase/seed.sql`** — добавит 5 новых tools (recharge, loox, judge-me, smile-io, yotpo). После этого `/tools/recharge` 200 и `/alternatives/[slug]` ранжирует на 12 tools | Supabase Dashboard → SQL Editor → paste + Run. Идемпотентно (`ON CONFLICT DO UPDATE`). |
-| 2 | **Решить про Resend** — если хочешь welcome-emails + auto-reply, заведи аккаунт + `npx vercel env add RESEND_API_KEY production`. Если нет — оставь как есть, helper'ы no-op'ятся. **Важно**: Beehiiv тоже шлёт welcome email (`send_welcome_email: true`), отключи один из двух чтобы избежать double-send. | resend.com → API Keys → New Key |
-| 3 | **Реальные social URLs** — когда заведёшь @botapolis на X/LinkedIn/GitHub, обнови `lib/seo/schema.ts` `generateOrganizationSchema().sameAs` (там пока хардкоженные placeholder URL `https://x.com/botapolis` и `https://github.com/botapolis` — они в JSON-LD только, не в Footer markup). Также раскомментировать Footer-блок | edit lib/seo/schema.ts + components/nav/Footer.tsx |
+| 1 | **Re-run `supabase/seed.sql`** — добавит 5 новых tools (recharge, loox, judge-me, smile-io, yotpo). После этого `/tools/recharge` 200 и `/alternatives/[slug]` ранжирует на 12 tools. **После seed обязательно** `npm run translate:tools` чтобы новые tools получили `_ru` поля. | Supabase Dashboard → SQL Editor → paste + Run. Идемпотентно (`ON CONFLICT DO UPDATE`). |
+| 2 | 🔴 **Получить `BEEHIIV_API_KEY`** — без него welcome email не уходит. Подписка работает (Supabase mirror) и success-toast показывается, но юзер ждёт письмо которого нет. План: Beehiiv → publication → Settings → Integrations → API → Create key → положить в `.env.local` И в Vercel env (`Settings → Environment Variables`). Beehiiv-welcome темлейт тоже надо допилить в их UI. | app.beehiiv.com → твой publication → Settings → Integrations |
+| 3 | **Решить про Resend** — если хочешь transactional поверх Beehiiv, заведи аккаунт + `npx vercel env add RESEND_API_KEY production`. Если нет — оставь как есть, helper'ы no-op'ятся. **Важно**: Beehiiv тоже шлёт welcome email (`send_welcome_email: true` в `/api/newsletter`), отключи один из двух чтобы избежать double-send. | resend.com → API Keys → New Key |
+| 4 | **Реальные social URLs** — когда заведёшь @botapolis на X/LinkedIn/GitHub, обнови `lib/seo/schema.ts` `generateOrganizationSchema().sameAs` (там пока хардкоженные placeholder URL `https://x.com/botapolis` и `https://github.com/botapolis` — они в JSON-LD только, не в Footer markup). Также раскомментировать Footer-блок | edit lib/seo/schema.ts + components/nav/Footer.tsx |
+| 5 | **Google OAuth Consent Screen branding** — сейчас Google показывает raw Supabase URL вместо «Sign in to Botapolis». Verification бренда требует подтверждения ownership домена (Search Console → share verification access). Не блокирует — OAuth технически работает, но первый раз показывает «unverified app» warning. | console.cloud.google.com → APIs & Services → OAuth consent screen |
 
 ---
 
@@ -329,12 +388,17 @@ Engineering инструменты для всего этого готовы.
 
 ## ⚠️ Подводные камни и quirks
 
-### Vercel CLI env pull возвращает пустые значения
-На этом аккаунте `npx vercel env pull .env.local` НЕ записывает реальные значения encrypted-секретов (возвращает `KEY=""`). Это известная проблема с проектом. Workaround: inline-env через shell:
-```bash
-OPENROUTER_API_KEY="..." node --experimental-strip-types scripts/foo.ts
+### Vercel CLI env pull ЗАТИРАЕТ значения пустыми кавычками
+На этом аккаунте `npx vercel env pull .env.local` (и `vercel link`) переписывает `.env.local` форматом «по своему», подставляя `KEY=""` вместо реальных encrypted-секретов. Это известная проблема с проектом — **и реально срабатывала** в волне 3, когда юзеру пришлось восстанавливать ключи из бэкапа папки. **Не запускай эти команды без бэкапа `.env.local`.** Если уже случилось — восстанавливать руками из Vercel UI → Settings → Environment Variables → Reveal каждый ключ. Список ключей которые проект ожидает — в [BACKUP.md «Где живут ключи»](BACKUP.md).
+
+Симптомы что это произошло: `OPENROUTER_API_KEY not set` при запуске скрипта; локальный билд жалуется на `NEXT_PUBLIC_SUPABASE_URL`. На проде Vercel вкатывает env правильно из своего UI — это **только** про локальные скрипты + локальный билд.
+
+Workaround на одну команду (без переписывания `.env.local`):
+```powershell
+$env:OPENROUTER_API_KEY="..."
+node --experimental-strip-types scripts/foo.ts
 ```
-Если делаешь локальный билд и видишь `Supabase service client requires NEXT_PUBLIC_SUPABASE_URL` — это та же проблема. На проде Vercel вкатывает env правильно. Локальный билд можно пропустить — TSC + tests достаточно, прод билд это разрулит.
+Но **БЕЗ `--env-file=.env.local`** — иначе пустой файл переопределит твой `$env:` обратно в `""`.
 
 ### `.env.local` НЕ загружается Node автоматически
 Поэтому скрипты `translate` и `search:index` идут с флагом `--env-file=.env.local`. Если пишешь новый скрипт, добавляй тот же флаг.
@@ -362,6 +426,28 @@ OPENROUTER_API_KEY="..." node --experimental-strip-types scripts/foo.ts
 
 ### Vercel cron не активен в Hobby tier (если такой)
 Если деплой на Hobby plan — crons из `vercel.json` могут не выполняться. На Pro+ работает. Проверить через Vercel Dashboard → Settings → Crons.
+
+### Base UI 1.4 — два разных error #31
+В production-mode оба throws показывают один и тот же `Base UI error #31; visit https://base-ui.com/production-error?code=31` (formatErrorMessage minified). На самом деле это **два разных source location**:
+1. **`render` prop валидация** — Trigger / Item / Close требуют render-prop'а который резолвится в native `<button>`. Если у тебя `render={<CustomButton>}` или `render={<Link>}` — нужен `nativeButton={false}` рядом с `render`. Текущие места — UserMenu, Navbar Sheet, Dialog/Sheet Close-X.
+2. **`GroupLabel` без `Group`** — `<DropdownMenuLabel>` (= `MenuPrimitive.GroupLabel`) обязан жить внутри `<DropdownMenuGroup>` (= `MenuPrimitive.Group`). Иначе context-provider null → throw. См. `node_modules/@base-ui/react/esm/menu/group/MenuGroupContext.js`.
+
+Если когда-то #31 снова — копай в одну из этих сторон. Stack trace в minified bundle не покажет имена.
+
+### PostHog ассеты на отдельном CDN — `us-assets.i.posthog.com`
+В январе 2026 PostHog разделил ingest (`us.i.posthog.com`) и assets (`us-assets.i.posthog.com`). В нашем CSP **оба** должны быть в `script-src` + `connect-src`, иначе snippet падает в unhandled rejection прямо на init. Если в будущем посмотришь Console и увидишь «Refused to connect ... us-assets» — добавь домен в обе директивы next.config.ts.
+
+### Cloudflare Turnstile iframe шумит в Console
+Frame `flexible?lang=auto` от Cloudflare генерирует кучу TrustedHTML/TrustedScript/xr-spatial-tracking violations внутри **своего** sandbox iframe. Это **не наш код, не наш CSP**, sub-frame документ имеет свой policy. Юзеры этого не видят. В DevTools фильтруй `-flexible` в Console filter если мешает.
+
+### NewsletterDialog vs NewsletterForm — две поверхности, один Form
+Footer-форма (mounted с страницей) ловит Turnstile-token заранее. Navbar-modal mounts widget только при open Dialog → 500ms-2s race window. NewsletterForm v2 ждёт token до 5 sec через ref-polling (`turnstileTokenRef`), потом sends. Если правишь логику — используй **ref** для значений которые могут обновиться внутри async handler (state читается из stale closure).
+
+### `app/ru/compare/[slug]/page.tsx` существует
+До волны 3 этот файл отсутствовал — `/ru/compare/<slug>` возвращал 404, хотя `/ru/compare` index ссылался туда. Сейчас файл — thin re-export от `@/app/compare/[slug]/page`. Если будешь добавлять новые RU маршруты типа `/ru/blog/[slug]` — не забудь создать thin re-export файл, route group `(marketing)` не используется в этом проекте.
+
+### Migration 005 и 006 — нужны на каждом Supabase environment
+Если когда-то восстанавливаешь Supabase проект с нуля (или клонируешь в новый env) — обе миграции **обязательны**. Без 005 `translate:tools` упадёт на UPDATE неизвестных колонок; без 006 `translate:comparisons` упадёт на duplicate-key violation. См. порядок применения в [BACKUP.md «Сценарий 4»](BACKUP.md).
 
 ---
 
@@ -408,7 +494,33 @@ gh workflow run backup-db.yml --ref main        # триггер дамп БД (
 
 ---
 
-## 📜 Коммиты (базовый `65380d0` → текущий `f16bdb7`)
+## 📜 Коммиты (базовый `65380d0` → текущий `69965a5`)
+
+### Волна 3 — Backup + CTA + Base UI fix + i18n + UX (22 коммита после второго HANDOFF)
+```
+69965a5 fix(newsletter): wait for Turnstile token instead of failing fast on submit
+f74513f feat(nav): Subscribe button now opens an in-place modal instead of scrolling
+6eacf5a fix(nav): smooth-scroll anchors so Subscribe button stops feeling dead
+ce3b1c6 docs(handoff): i18n regimen after May 2026 audit — three locales, three scripts
+1fa4b76 feat(i18n): comparisons get per-language rows + RU detail route + bulk script
+967c296 feat(i18n): tools table gets Russian columns + helper + bulk-translation script
+58665eb fix(i18n): RU index pages now read RU MDX + missing tool-name translations
+0e780fd feat(i18n): opt out of browser auto-translate site-wide
+3c76d3c fix(ui): wrap DropdownMenuLabel in Group — real source of Base UI #31
+aa5baa9 fix(ui): every Base UI `render={<Custom>}` site gets nativeButton={false}
+ab6973e fix(ui): UserMenu crash on Base UI 1.4 — opt out of native-button assertion
+b4264b9 fix(nav): paint active locale chip brand-mint so Chrome-translate is distinguishable
+78581f6 feat(ui): roll out CTA variant across all primary call-to-action buttons
+76ae63b feat(ui): strip CTA down to two effects — hover lift + brighter shimmer
+4f3d3a3 feat(ui): swap same-color glow → violet ring + replace ripple → physical squish
+dfb205d fix(ui): CTA glow now actually visible + ripple beats Link navigation
+2250b96 feat(ui): primary CTA gets mint glow + shimmer-on-hover + press ripple
+fcd330a docs(backup): API keys live in their sources — don't bother backing them up
+a796b3f fix(ci): pg_dump version mismatch — call PG 17 binary by absolute path
+d9f88e7 docs: BACKUP.md + HANDOFF backup section
+f709e8b chore(ci): weekly Supabase backup workflow → GitHub artifacts
+a9a35bd docs(handoff): update HANDOFF.md for May 2026 audit + search overhaul
+```
 
 ### Волна 2 — search overhaul + iOS fix (коммиты после первого HANDOFF)
 ```

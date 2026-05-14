@@ -5,6 +5,7 @@ import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { ArticleHero } from "@/components/content/ArticleHero"
 import { TableOfContents } from "@/components/content/TableOfContents"
+import { RelatedArticles } from "@/components/content/RelatedArticles"
 import { buildMetadata } from "@/lib/seo/metadata"
 import {
   generateArticleSchema,
@@ -167,6 +168,15 @@ export default async function GuidePage({ params }: PageProps) {
             <TableOfContents entries={toc} label={t.tocLabel} />
           </div>
         </section>
+
+        {/* Wave 3 audit alignment (design v.026) — "Related guides" row
+            below the article body. Mirrors the reviews surface. */}
+        <RelatedArticles
+          type="guides"
+          currentSlug={slug}
+          locale={locale}
+          localePrefix={localePrefix}
+        />
       </main>
 
       <Footer

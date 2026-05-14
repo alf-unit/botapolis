@@ -70,6 +70,11 @@ export function NewsletterForm({
   // Block D — Turnstile token. Stays in state because the widget hands it
   // over asynchronously, and the form needs it at submit time.
   const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null)
+  // Ref mirror of the same value — handleSubmit's wait-loop runs after the
+  // function captured its closure, so a state read would always see `null`
+  // even after the widget actually delivered a token mid-loop. Ref is read
+  // live on every iteration, state still drives UI / disabled props.
+  const turnstileTokenRef = React.useRef<string | null>(null)
   const turnstileRef = React.useRef<TurnstileGateHandle | null>(null)
   // When the site key is unset (dev / preview), TurnstileGate renders null
   // and we never receive a token — the server-side check is also gated on
@@ -86,20 +91,38 @@ export function NewsletterForm({
       return
     }
 
-    // If the widget is configured but the user submitted before it issued
-    // a token, fail fast with a clear toast — better than firing the
-    // request and getting a server-side captcha_required 400.
-    if (turnstileConfigured && !turnstileToken) {
-      toast.error(strings.errorTitle, {
-        description:
-          language === "ru"
-            ? "Подожди секунду — мы проверяем что ты не бот."
-            : "Hang on — we're verifying you're human.",
-      })
-      return
+    // Flip to loading IMMEDIATELY so the button reads "Subscribing…" the
+    // moment the user clicks — even if we still need to wait for Turnstile.
+    setStatus("loading")
+
+    // Wait-for-token instead of fail-fast. NewsletterDialog mounts the
+    // widget the moment its <Dialog> opens, so a quick user can submit
+    // before Cloudflare's invisible challenge finishes (~500ms–2s).
+    // Old behaviour: error toast "verifying you're human" and bail.
+    // New behaviour: poll the ref for up to 5s, then send. If the token
+    // genuinely never arrives, only THEN show the error.
+    let token = turnstileTokenRef.current
+    if (turnstileConfigured && !token) {
+      const deadline = Date.now() + 5_000
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 100))
+        if (turnstileTokenRef.current) {
+          token = turnstileTokenRef.current
+          break
+        }
+      }
+      if (!token) {
+        toast.error(strings.errorTitle, {
+          description:
+            language === "ru"
+              ? "Не удалось пройти проверку 'я не бот'. Перезагрузите страницу."
+              : "Couldn't pass the human-check. Try reloading the page.",
+        })
+        setStatus("idle")
+        return
+      }
     }
 
-    setStatus("loading")
     try {
       const res = await fetch("/api/newsletter", {
         method:  "POST",
@@ -113,7 +136,7 @@ export function NewsletterForm({
           // already a client island, no SSR mismatch concern.
           source_path:
             typeof window !== "undefined" ? window.location.pathname : undefined,
-          turnstileToken: turnstileToken ?? undefined,
+          turnstileToken: token ?? undefined,
         }),
       })
 
@@ -143,6 +166,7 @@ export function NewsletterForm({
       track("newsletter_subscribed", { source, locale: language })
       // One-use Turnstile tokens — reset the widget for the next session.
       setTurnstileToken(null)
+      turnstileTokenRef.current = null
       turnstileRef.current?.reset()
     } catch {
       // Network error / offline / aborted by a unload event.
@@ -150,6 +174,7 @@ export function NewsletterForm({
       setStatus("idle")
       // Bad attempt → fresh token before the user retries.
       setTurnstileToken(null)
+      turnstileTokenRef.current = null
       turnstileRef.current?.reset()
     }
   }
@@ -220,8 +245,14 @@ export function NewsletterForm({
     </div>
     <TurnstileGate
       ref={turnstileRef}
-      onToken={setTurnstileToken}
-      onError={() => setTurnstileToken(null)}
+      onToken={(tok) => {
+        setTurnstileToken(tok)
+        turnstileTokenRef.current = tok
+      }}
+      onError={() => {
+        setTurnstileToken(null)
+        turnstileTokenRef.current = null
+      }}
     />
     </form>
   )

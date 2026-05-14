@@ -162,8 +162,16 @@ export default async function GuidePage({ params }: PageProps) {
         />
 
         <section className="container-default py-12 lg:py-16">
+          {/* Post-Wave-3 audit follow-up: `max-w-[68ch]` was constraining the
+              article to ~620px while the grid column was still claiming the
+              full `1fr` slack. The empty space between the article's right
+              edge and the TOC visually read as a much wider gap on /guides
+              than on /reviews or /compare. Removing the cap lets the article
+              fill its grid column the same way /reviews/[slug] already does,
+              which keeps the TOC right against the content like the other
+              editorial pages. */}
           <div className="grid gap-10 lg:grid-cols-[1fr_220px] lg:gap-14">
-            <article className="min-w-0 max-w-[68ch]">{content}</article>
+            <article className="min-w-0">{content}</article>
 
             <TableOfContents entries={toc} label={t.tocLabel} />
           </div>

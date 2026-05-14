@@ -51,18 +51,18 @@ export default async function NotFound() {
   const t = locale === "ru"
     ? {
         statusPill:  "404 · Не найдено",
-        headline:    "Эта страница ушла не туда.",
+        headline:    "Упс! Кажется, ты свернул не туда. Или мы.",
         lede:
-          "Возможно, URL устарел, в нём опечатка или он вёл на черновик. Вот что есть рядом — или запусти поиск по всем инструментам, обзорам и гайдам.",
+          "Ссылка могла протухнуть, в URL — опечатка, или страница всё ещё дремлет в черновиках. Что точно живо — вот тут рядом. А ещё есть поиск по инструментам, обзорам и гайдам 👇",
         backHome:    "На главную",
         searchSite:  "Поиск по сайту",
         suggestions: "Попробуй вместо этого",
       }
     : {
         statusPill:  "404 · Not found",
-        headline:    "This page took the wrong flow.",
+        headline:    "Oops — looks like you took a wrong turn. Or we did.",
         lede:
-          "The URL might be old, mistyped, or pointing at a draft. Here's what's nearby — or you can run a search across every tool, review, and guide.",
+          "The link might've gone stale, the URL might have a typo, or the page is still snoozing in drafts. What's actually live sits right below — plus there's a search across every tool, review, and guide 👇",
         backHome:    "Back to homepage",
         searchSite:  "Search the site",
         suggestions: "Try one of these instead",
@@ -157,11 +157,15 @@ export default async function NotFound() {
             4·0·4
           </div>
 
-          <h1 className="mt-6 text-h2 lg:text-h1 font-semibold tracking-[-0.03em] max-w-[24ch]">
+          {/* `max-w` bumped from 24ch → 30ch on the headline so the
+              two-sentence rewrite breaks at the period rather than
+              mid-clause. Lede goes 50ch → 58ch for the same reason —
+              new copy is ~30% longer than the prior one-liner. */}
+          <h1 className="mt-6 text-h2 lg:text-h1 font-semibold tracking-[-0.03em] max-w-[30ch]">
             {t.headline}
           </h1>
 
-          <p className="mt-4 max-w-[50ch] text-[16px] leading-[1.65] text-[var(--text-secondary)]">
+          <p className="mt-4 max-w-[58ch] text-[16px] leading-[1.65] text-[var(--text-secondary)]">
             {t.lede}
           </p>
 

@@ -4,9 +4,11 @@ import type { Metadata } from "next"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { ProductDescriptionGenerator } from "@/components/tools/ProductDescriptionGenerator"
+import { ToolFaq } from "@/components/tools/ToolFaq"
 import { buildMetadata } from "@/lib/seo/metadata"
 import {
   generateBreadcrumbSchema,
+  generateFAQSchema,
   generateOwnedToolSchema,
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
@@ -67,6 +69,56 @@ export default async function ProductDescriptionPage() {
       ? "Введи название, ключевые фичи, аудиторию и тон. Получи три разных варианта — копируй понравившийся прямо в Shopify."
       : "Drop in the product name, key features, audience, and tone. Get three distinct variations — copy the one that lands straight into Shopify.",
   }
+
+  // Wave 2 (audit alignment): editorial FAQ + JSON-LD. Questions chosen
+  // from real visitor confusion: free tier limits, model under the hood,
+  // commercial use, and the "is this AI slop?" objection. Copy lives
+  // inline — generation-tool-specific, would bloat dict.
+  const faq = locale === "ru"
+    ? [
+        {
+          q: "Почему три варианта, а не один?",
+          a: "Лучший вариант редко совпадает с первой попыткой модели. Три варианта дают три разных тона/угла за одну генерацию — выбираешь, что попадает, и копируешь сразу в Shopify. Если ни один не подошёл — нажми «Ещё варианты» (минус 1 из дневного лимита).",
+        },
+        {
+          q: "Сколько генераций в день бесплатно?",
+          a: "3 генерации/сутки для гостей (IP-based), 20/сутки для залогиненных. Если упёрся в лимит и нужно больше — заведи аккаунт через magic-link или открой Anthropic Console напрямую (партнёрская ссылка в конце страницы).",
+        },
+        {
+          q: "Какая модель под капотом?",
+          a: "Claude Haiku 4.5 от Anthropic — наша рабочая модель для всего креативного на сайте. Отличный баланс скорости (~3-5с/запрос) и качества для product copy в e-com контексте. Те же модели в /tools/ai-cost-comparator если хочешь сравнить с GPT-4o-mini.",
+        },
+        {
+          q: "Можно использовать сгенерированные тексты коммерчески?",
+          a: "Да. Anthropic в своих terms даёт право использовать output без ограничений на commercial use. Botapolis тоже не претендует ни на какие права на сгенерированный текст — это твой контент с момента генерации.",
+        },
+        {
+          q: "Это AI-slop? Google не накажет за такой текст?",
+          a: "AI-slop — это плохо написанный AI-текст без редактирования. Хорошо написанный AI-текст с человеческой проверкой Google не наказывает (см. их helpful content guidelines, март 2024). Правило: всегда перечитай вариант перед публикацией и поправь факты, если модель что-то выдумала — она может.",
+        },
+      ]
+    : [
+        {
+          q: "Why three variations, not one?",
+          a: "The best output rarely lines up with the model's first attempt. Three variations give you three different tones / angles in one request — pick the one that lands and paste it into Shopify. If none fit, hit 'Regenerate' (costs 1 from your daily quota).",
+        },
+        {
+          q: "How many free generations per day?",
+          a: "3 generations per day for guests (rate-limited by IP), 20 per day for signed-in accounts. If you hit the cap and need more, sign in via magic link, or open the Anthropic Console directly (partner link at the bottom of the page).",
+        },
+        {
+          q: "Which model is under the hood?",
+          a: "Claude Haiku 4.5 from Anthropic — our default for all creative work on the site. Solid speed-quality balance (~3-5s per request) for product copy in an e-commerce context. Compare against GPT-4o-mini and others via /tools/ai-cost-comparator.",
+        },
+        {
+          q: "Can I use the generated copy commercially?",
+          a: "Yes. Anthropic's terms grant unrestricted commercial use of output. Botapolis claims no rights to generated text either — it's yours from the moment it's generated.",
+        },
+        {
+          q: "Is this 'AI slop'? Will Google penalize my pages?",
+          a: "AI slop is poorly-written, unedited AI text. Well-written AI text with human review isn't penalized — see Google's helpful-content guidelines from March 2024. The rule: always re-read each variation and fix any facts the model hallucinated (it can and does).",
+        },
+      ]
 
   const widgetStrings = {
     inputs: {
@@ -200,6 +252,19 @@ export default async function ProductDescriptionPage() {
             localePrefix={localePrefix}
           />
         </section>
+
+        {/* ===================================================================
+            FAQ — Wave 2 audit alignment (design v.026)
+            ===================================================================
+            No separate Recommended Tools section here: the widget already
+            ships the Anthropic Console affiliate inside its "Need more"
+            block (and only one paid alternative exists for "open the API
+            directly"). FAQ + FAQPage schema is the higher-value add. */}
+        <ToolFaq
+          eyebrow={locale === "ru" ? "Часто спрашивают" : "FAQ"}
+          title={locale === "ru" ? "Что спрашивают про генератор" : "What visitors ask about this generator"}
+          items={faq}
+        />
       </main>
 
       <Footer
@@ -221,6 +286,14 @@ export default async function ProductDescriptionPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
       />
+      {faq.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(generateFAQSchema(faq)),
+          }}
+        />
+      )}
       <link rel="canonical" href={absoluteUrl(`${localePrefix}${TOOL_PATH}`)} />
     </>
   )

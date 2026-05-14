@@ -1,4 +1,7 @@
+"use client"
+
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 /**
@@ -9,6 +12,19 @@ import { cn } from "@/lib/utils"
  *
  * Gradient `id`s are scoped per-instance so multiple logos on a page don't
  * clash (Navbar + Footer rendered together).
+ *
+ * Click behaviour:
+ *   - On any page OTHER than the logo's destination — plain `<Link>`
+ *     navigation, App Router takes it from there.
+ *   - On the SAME page (e.g. clicking the navbar logo while already on `/`)
+ *     — intercept the click, prevent the no-op same-URL navigation, and
+ *     smooth-scroll to the top instead. Common reader expectation for site
+ *     logos; without it long pages have no fast lift-to-top affordance.
+ *
+ * Honouring reduced motion: the smooth-scroll comes from the global
+ * `html { scroll-behavior: smooth }` rule in globals.css §4, which the
+ * `prefers-reduced-motion: reduce` override at §5 flips to `auto`. So users
+ * who opted out of motion get an instant jump, not a smooth animation.
  */
 interface LogoProps {
   variant?: "default" | "icon"
@@ -24,10 +40,29 @@ export function Logo({
   idSuffix = "nav",
 }: LogoProps) {
   const gradId = `botapolis-grad-${idSuffix}`
+  const pathname = usePathname()
+  // Strip trailing slash so "/" matches `usePathname()` which never returns
+  // it. Important for the localised root case where `href` is "/ru".
+  const normalisedHref = href.replace(/\/$/, "") || "/"
+  const isCurrent = pathname === normalisedHref
+
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (!isCurrent) return
+    // Only intercept the plain primary click — modifier keys (open in new
+    // tab / window) should still navigate normally.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+      return
+    }
+    e.preventDefault()
+    // Behaviour key is omitted so the global CSS rule wins — reduced-motion
+    // users get an instant scroll.
+    window.scrollTo({ top: 0, left: 0 })
+  }
 
   return (
     <Link
       href={href}
+      onClick={handleClick}
       aria-label="Botapolis — home"
       className={cn(
         "inline-flex items-center gap-2 group/logo",

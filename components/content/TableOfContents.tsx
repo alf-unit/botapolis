@@ -21,12 +21,21 @@ interface TocProps {
   entries: TocEntry[]
   /** Locale-aware label. Defaults to "On this page". */
   label?: string
+  /**
+   * Whether the desktop aside should pin itself to top:24px on scroll.
+   * Default `true` matches the original behaviour. Pass `false` when the
+   * parent wants to own the sticky positioning — e.g. when wrapping TOC and
+   * a second sticky block in a single sticky container to avoid them
+   * overlapping at the same `top` offset (see /reviews/[slug]).
+   */
+  sticky?: boolean
   className?: string
 }
 
 export function TableOfContents({
   entries,
   label = "On this page",
+  sticky = true,
   className,
 }: TocProps) {
   if (entries.length < 3) return null
@@ -37,7 +46,8 @@ export function TableOfContents({
       <aside
         aria-label={label}
         className={cn(
-          "hidden lg:block sticky top-24 self-start",
+          "hidden lg:block self-start",
+          sticky && "sticky top-24",
           className,
         )}
       >

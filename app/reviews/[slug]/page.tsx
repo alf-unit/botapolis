@@ -294,8 +294,18 @@ export default async function ReviewPage({ params }: PageProps) {
               </div>
             </article>
 
-            <div>
-              <TableOfContents entries={toc} label={t.tocLabel} />
+            {/* Wave 3 hotfix (post-audit feedback): both TOC and
+                ToolStickyCard previously carried their own `sticky top-24`
+                rule. With two sticky siblings sharing the same `top`,
+                whichever came second in the DOM overlapped the first as the
+                page scrolled — the Try-it CTA covered the TOC entirely.
+                Now the right column is ONE sticky aside that holds both,
+                so they scroll together as a single block and remain
+                independently readable. The aside also caps its height so
+                tall TOCs scroll internally instead of bleeding below the
+                viewport. */}
+            <aside className="lg:sticky lg:top-24 self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto flex flex-col gap-8 lg:gap-10">
+              <TableOfContents entries={toc} label={t.tocLabel} sticky={false} />
               {tool && (
                 <ToolStickyCard
                   tool={tool}
@@ -314,7 +324,7 @@ export default async function ReviewPage({ params }: PageProps) {
                   campaign={`review-${slug}`}
                 />
               )}
-            </div>
+            </aside>
           </div>
         </section>
 
@@ -466,8 +476,13 @@ function ToolStickyCard({
       ? `от $${tool.pricing_min}/мес`
       : `from $${tool.pricing_min}/mo`
 
+  // Wave 3 hotfix: sticky positioning moved up to the parent aside in
+  // /reviews/[slug] so this card no longer competes with the TOC for the
+  // `top: 24px` slot. The outer <div> is kept (just a non-positioning
+  // wrapper) so any future use of this helper that doesn't have a sticky
+  // ancestor still gets a vertical spacing buffer from `mt-8 lg:mt-12`.
   return (
-    <div className="mt-8 lg:mt-12 lg:sticky lg:top-24">
+    <div className="mt-0">
       <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 shadow-[var(--shadow-sm)]">
         <div className="flex items-center gap-3">
           <ToolLogo

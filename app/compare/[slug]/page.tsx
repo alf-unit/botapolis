@@ -638,7 +638,12 @@ export default async function ComparisonPage({ params }: PageProps) {
             the right column without swapping source order.
            ================================================================== */}
         <div className="container-default">
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-12">
+          {/* Gap matched to /reviews/[slug] and /guides/[slug]: 40px on
+              mobile (vertical between TOC accordion and sections) and 56px
+              on desktop (horizontal between content column and sticky TOC).
+              Was lg:gap-12 (48px) before — visually tighter than the other
+              two editorial routes; post-audit consistency pass. */}
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-14">
             <TableOfContents
               entries={tocEntries}
               label={t.tocLabel}

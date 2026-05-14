@@ -191,14 +191,49 @@ function EnBody({ localePrefix }: { localePrefix: "" | "/ru" }) {
 
       <h2>2. Rating criteria</h2>
       <p>
-        Each review carries a <strong>0–10</strong> overall rating plus a four-axis breakdown:
+        Each review carries a <strong>0–10</strong> overall rating computed as a
+        weighted average of four axes. Same weights for every tool in every
+        category — no per-tool fudging.
       </p>
-      <ol>
-        <li><strong>Ease of use (25%):</strong> Onboarding, daily UI fluency, learning curve for a non-technical merchant.</li>
-        <li><strong>Value (25%):</strong> Output quality per dollar at the tier most merchants actually use, not the free tier.</li>
-        <li><strong>Support (20%):</strong> Response time and answer quality across two real support tickets.</li>
-        <li><strong>Features (30%):</strong> Depth at the price point versus the closest two competitors.</li>
-      </ol>
+      {/* Wave 4 audit alignment (design v.026): rubric switches from an `<ol>` to
+          a structured 3-column table (Criterion / What it measures / Weight). The
+          weights become the load-bearing number to the right; the wider middle
+          column carries the editorial description. Same exact data as the prior
+          list, just legible as a reference table instead of a paragraph. */}
+      <div className="my-2 overflow-hidden rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)]">
+        <div className="grid grid-cols-[1fr_2.4fr_auto] gap-4 px-5 py-3 border-b border-[var(--border-base)] bg-[var(--bg-muted)]">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+            Criterion
+          </span>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+            What it measures
+          </span>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)] text-right">
+            Weight
+          </span>
+        </div>
+        {[
+          { name: "Ease of use", desc: "Onboarding, daily UI fluency, learning curve for a non-technical merchant.", weight: 25 },
+          { name: "Value",       desc: "Output quality per dollar at the tier most merchants actually use, not the free tier.", weight: 25 },
+          { name: "Support",     desc: "Response time and answer quality across two real support tickets.", weight: 20 },
+          { name: "Features",    desc: "Depth at the price point versus the closest two competitors.", weight: 30 },
+        ].map(({ name, desc, weight }) => (
+          <div
+            key={name}
+            className="grid grid-cols-[1fr_2.4fr_auto] gap-4 px-5 py-3.5 border-b border-[var(--border-subtle)] last:border-b-0 items-baseline"
+          >
+            <span className="text-[14px] font-semibold tracking-[-0.005em] text-[var(--text-primary)]">
+              {name}
+            </span>
+            <span className="text-[14px] leading-[1.55] text-[var(--text-secondary)]">
+              {desc}
+            </span>
+            <span className="font-mono text-[14px] font-semibold text-[var(--brand)] tabular-nums text-right">
+              {weight}%
+            </span>
+          </div>
+        ))}
+      </div>
       <p>
         A 9.0+ rating means we&rsquo;d switch our own store to it tomorrow. 7–9 is recommended
         for the use case. Below 7 means there is a better choice for most readers and we
@@ -305,14 +340,45 @@ function RuBody({ localePrefix }: { localePrefix: "" | "/ru" }) {
 
       <h2>2. Критерии оценки</h2>
       <p>
-        Каждый обзор получает общий рейтинг <strong>0–10</strong> и разбивку по четырём осям:
+        Каждый обзор получает общий рейтинг <strong>0–10</strong> как взвешенное
+        среднее по четырём осям. Веса одинаковые для всех инструментов в
+        категории — никаких подгонок под конкретный tool.
       </p>
-      <ol>
-        <li><strong>Удобство (25%):</strong> онбординг, повседневный UX, кривая обучения для нетехнаря.</li>
-        <li><strong>Соотношение цена/качество (25%):</strong> качество вывода на ярусе, который реально берут (не free).</li>
-        <li><strong>Поддержка (20%):</strong> время и качество ответа на два настоящих тикета.</li>
-        <li><strong>Функционал (30%):</strong> глубина за свои деньги по сравнению с двумя ближайшими конкурентами.</li>
-      </ol>
+      {/* Wave 4 audit alignment (design v.026) — see EnBody for context. */}
+      <div className="my-2 overflow-hidden rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)]">
+        <div className="grid grid-cols-[1fr_2.4fr_auto] gap-4 px-5 py-3 border-b border-[var(--border-base)] bg-[var(--bg-muted)]">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+            Критерий
+          </span>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+            Что измеряет
+          </span>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)] text-right">
+            Вес
+          </span>
+        </div>
+        {[
+          { name: "Удобство",            desc: "Онбординг, повседневный UX, кривая обучения для нетехнаря.", weight: 25 },
+          { name: "Цена/качество",       desc: "Качество вывода на ярусе, который реально берут (не free).", weight: 25 },
+          { name: "Поддержка",           desc: "Время и качество ответа на два настоящих тикета.", weight: 20 },
+          { name: "Функционал",          desc: "Глубина за свои деньги по сравнению с двумя ближайшими конкурентами.", weight: 30 },
+        ].map(({ name, desc, weight }) => (
+          <div
+            key={name}
+            className="grid grid-cols-[1fr_2.4fr_auto] gap-4 px-5 py-3.5 border-b border-[var(--border-subtle)] last:border-b-0 items-baseline"
+          >
+            <span className="text-[14px] font-semibold tracking-[-0.005em] text-[var(--text-primary)]">
+              {name}
+            </span>
+            <span className="text-[14px] leading-[1.55] text-[var(--text-secondary)]">
+              {desc}
+            </span>
+            <span className="font-mono text-[14px] font-semibold text-[var(--brand)] tabular-nums text-right">
+              {weight}%
+            </span>
+          </div>
+        ))}
+      </div>
       <p>
         9.0+ — мы бы перевели свой магазин на него завтра. 7–9 — рекомендуем под use case.
         Ниже 7 — для большинства читателей есть лучший вариант, и мы скажем об этом прямо.

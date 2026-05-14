@@ -1,21 +1,127 @@
 import Link from "next/link"
-import { ArrowRight, BarChart3, Mail, Sparkles } from "lucide-react"
+import {
+  ArrowRight,
+  ArrowUpRight,
+  BarChart3,
+  Box,
+  Headphones,
+  Mail,
+  Megaphone,
+  PenLine,
+  Sparkles,
+} from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
+import { ComparisonCard } from "@/components/tools/ComparisonCard"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
+import { getAllMdxFrontmatter } from "@/lib/content/mdx"
+import { createServiceClient } from "@/lib/supabase/service"
 import {
   generateOrganizationSchema,
   generateWebSiteSchema,
 } from "@/lib/seo/schema"
+import type { ComparisonRow, ToolRow } from "@/lib/supabase/types"
+
+/* ----------------------------------------------------------------------------
+   Homepage Wave 1 data fetches
+   ----------------------------------------------------------------------------
+   `fetchHomeComparisons` — 4 latest published comparisons in the active
+   locale, joined with their two referenced tools. Mirrors the two-step
+   pattern from /compare/page.tsx (Postgres "Relationships: NoRels" in our
+   handwritten types makes embed-syntax collapse to never, so we fan-out
+   the tool IDs and resolve in-memory).
+
+   `fetchLatestReviews` — 3 newest published MDX reviews via the shared
+   loader. `getAllMdxFrontmatter` already sorts by publishedAt DESC and
+   skips drafts, so we just slice the head.
+
+   Both helpers swallow errors → empty array. Homepage never 500s because
+   the operational store table isn't ready yet — the section simply hides
+   when there's nothing to show.
+---------------------------------------------------------------------------- */
+
+type HomeComparisonRow = {
+  comparison: Pick<ComparisonRow, "slug" | "tool_a_id" | "tool_b_id" | "verdict">
+  toolA: Pick<ToolRow, "slug" | "name" | "logo_url">
+  toolB: Pick<ToolRow, "slug" | "name" | "logo_url">
+}
+
+async function fetchHomeComparisons(
+  language: "en" | "ru",
+): Promise<HomeComparisonRow[]> {
+  try {
+    const supabase = createServiceClient()
+    const { data: cmps, error: cmpErr } = await supabase
+      .from("comparisons")
+      .select("slug, tool_a_id, tool_b_id, verdict, updated_at")
+      .eq("status", "published")
+      .eq("language", language)
+      .order("updated_at", { ascending: false })
+      .limit(4)
+    if (cmpErr || !cmps || cmps.length === 0) return []
+
+    const ids = Array.from(
+      new Set(cmps.flatMap((c) => [c.tool_a_id, c.tool_b_id])),
+    )
+    const { data: tools, error: toolsErr } = await supabase
+      .from("tools")
+      .select("id, slug, name, logo_url")
+      .in("id", ids)
+    if (toolsErr || !tools) return []
+
+    const byId = new Map(tools.map((t) => [t.id, t]))
+    return cmps.reduce<HomeComparisonRow[]>((acc, c) => {
+      const a = byId.get(c.tool_a_id)
+      const b = byId.get(c.tool_b_id)
+      if (!a || !b) return acc
+      acc.push({
+        comparison: {
+          slug:       c.slug,
+          tool_a_id:  c.tool_a_id,
+          tool_b_id:  c.tool_b_id,
+          verdict:    c.verdict,
+        },
+        toolA: { slug: a.slug, name: a.name, logo_url: a.logo_url },
+        toolB: { slug: b.slug, name: b.name, logo_url: b.logo_url },
+      })
+      return acc
+    }, [])
+  } catch (err) {
+    console.error("[homepage] comparisons fetch threw:", err)
+    return []
+  }
+}
+
+async function fetchLatestReviews(locale: "en" | "ru") {
+  try {
+    const all = await getAllMdxFrontmatter("reviews", locale)
+    return all.slice(0, 3)
+  } catch (err) {
+    console.error("[homepage] reviews fetch threw:", err)
+    return []
+  }
+}
+
+// ISR — same window as the rest of the site. /compare and /reviews/page.tsx
+// both refresh on Supabase / MDX mutations via /api/revalidate, so the
+// homepage picks up changes within a deploy or webhook cycle.
+export const revalidate = 3600
 
 export default async function HomePage() {
   const locale = await getLocale()
   const dict = await getDictionary(locale)
   const localePrefix = locale === "ru" ? "/ru" : ""
+
+  // Parallel fetch — homepage's heaviest data calls. `Promise.all` keeps
+  // total wait at max(supabase, fs) rather than supabase + fs serially.
+  const [homeComparisons, latestReviews] = await Promise.all([
+    fetchHomeComparisons(locale),
+    fetchLatestReviews(locale),
+  ])
 
   // Featured-tool icon map. Keys MUST mirror `dict.tools.items` and the
   // slug map below — three calculators we actually ship today (Email ROI,
@@ -25,6 +131,18 @@ export default async function HomePage() {
     aiCostComparator:   BarChart3,
     productDescription: Sparkles,
   } as const
+
+  // Browse-by-category tile config. Slugs match the `category` column in
+  // the `tools` table so /tools?category=<slug> hydrates the catalog with
+  // the right filter pre-applied.
+  const categoryTiles = [
+    { key: "email",     slug: "email",     Icon: Mail },
+    { key: "ads",       slug: "ads",       Icon: Megaphone },
+    { key: "content",   slug: "content",   Icon: PenLine },
+    { key: "support",   slug: "support",   Icon: Headphones },
+    { key: "analytics", slug: "analytics", Icon: BarChart3 },
+    { key: "inventory", slug: "inventory", Icon: Box },
+  ] as const
 
   return (
     <>
@@ -90,10 +208,10 @@ export default async function HomePage() {
                     <ArrowRight className="size-4" data-icon="inline-end" />
                   </Link>
                   <Link
-                    // Was /reviews until the May 2026 audit — that route
-                    // doesn't exist yet (sprint 2 / MDX pipeline pending).
-                    // /compare is the closest editorial surface we ship.
-                    href={`${localePrefix}/compare`}
+                    // Sprint 2 (May 2026) shipped the MDX pipeline, so /reviews
+                    // now resolves to a real index. Restored the design-intent
+                    // CTA target — Wave 1 audit alignment (Botapolis design v.026).
+                    href={`${localePrefix}/reviews`}
                     className={cn(
                       buttonVariants({ variant: "outline", size: "lg" }),
                       "h-12 px-5 text-base border-[var(--border-base)]",
@@ -218,6 +336,186 @@ export default async function HomePage() {
           </div>
         </section>
 
+        {/* =========================================================
+            HEAD-TO-HEAD COMPARISONS
+            ----------------------------------------------------------
+            Wave 1 audit alignment (Botapolis design v.026). Mirrors the
+            "Head-to-head comparisons" 4-card row from the homepage
+            mockup. Data comes from Supabase `comparisons` filtered by
+            the active locale; missing → section hides entirely
+            (operational graceful degradation, see fetcher above).
+           ========================================================= */}
+        {homeComparisons.length > 0 && (
+          <section className="pb-16 lg:pb-20">
+            <div className="container-default">
+              <div className="flex items-end justify-between gap-6 mb-8">
+                <div>
+                  <h2 className="text-h2 font-semibold tracking-[-0.02em]">
+                    {dict.comparisons.title}
+                  </h2>
+                  <p className="mt-2 text-[15px] text-[var(--text-secondary)]">
+                    {dict.comparisons.subtitle}
+                  </p>
+                </div>
+                <Link
+                  href={`${localePrefix}/compare`}
+                  className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-[var(--brand)] hover:text-[var(--brand-hover)]"
+                >
+                  {dict.comparisons.viewAll}
+                </Link>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {homeComparisons.map(({ comparison, toolA, toolB }) => (
+                  <ComparisonCard
+                    key={comparison.slug}
+                    slug={comparison.slug}
+                    toolA={{
+                      slug:    toolA.slug,
+                      name:    toolA.name,
+                      logoUrl: toolA.logo_url,
+                    }}
+                    toolB={{
+                      slug:    toolB.slug,
+                      name:    toolB.name,
+                      logoUrl: toolB.logo_url,
+                    }}
+                    verdict={comparison.verdict}
+                    localePrefix={localePrefix as "" | "/ru"}
+                    cta={dict.comparisons.cta}
+                    verdictLabel={dict.comparisons.verdictLabel}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* =========================================================
+            LATEST DEEP REVIEWS
+            ----------------------------------------------------------
+            Wave 1 audit alignment. Three newest published MDX reviews.
+            Card style mirrors /reviews index so the homepage row and
+            the listing read as a coherent set.
+           ========================================================= */}
+        {latestReviews.length > 0 && (
+          <section className="pb-16 lg:pb-20">
+            <div className="container-default">
+              <div className="flex items-end justify-between gap-6 mb-8">
+                <div>
+                  <h2 className="text-h2 font-semibold tracking-[-0.02em]">
+                    {dict.reviewsSection.title}
+                  </h2>
+                  <p className="mt-2 text-[15px] text-[var(--text-secondary)]">
+                    {dict.reviewsSection.subtitle}
+                  </p>
+                </div>
+                <Link
+                  href={`${localePrefix}/reviews`}
+                  className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-[var(--brand)] hover:text-[var(--brand-hover)]"
+                >
+                  {dict.reviewsSection.viewAll}
+                </Link>
+              </div>
+
+              <ul role="list" className="grid gap-4 md:grid-cols-3">
+                {latestReviews.map(({ slug, frontmatter }) => (
+                  <li key={slug}>
+                    <Link
+                      href={`${localePrefix}/reviews/${slug}`}
+                      className={cn(
+                        "group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl",
+                        "border border-[var(--border-base)] bg-[var(--bg-surface)] p-6",
+                        "shadow-[var(--shadow-sm)] transition-[transform,box-shadow,border-color] duration-200 ease-[var(--ease-out-expo)]",
+                        "hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] hover:border-[var(--border-strong)]",
+                      )}
+                    >
+                      <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                        <span>{frontmatter.publishedAt}</span>
+                        {frontmatter.rating != null && (
+                          <>
+                            <span className="opacity-50">·</span>
+                            <span className="text-[var(--brand)]">
+                              {frontmatter.rating.toFixed(1)}/10
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <h3 className="text-h4 font-semibold tracking-[-0.015em] text-[var(--text-primary)]">
+                        {frontmatter.title}
+                      </h3>
+                      <p className="text-sm leading-[1.55] text-[var(--text-secondary)] line-clamp-3">
+                        {frontmatter.description}
+                      </p>
+                      <span className="mt-auto inline-flex items-center gap-1 text-[13px] font-medium text-[var(--brand)]">
+                        {dict.reviewsSection.readMore}
+                        <ArrowUpRight
+                          className="size-[14px] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
+
+        {/* =========================================================
+            BROWSE BY CATEGORY
+            ----------------------------------------------------------
+            Wave 1 audit alignment. Six category tiles → /tools with the
+            `category` query param pre-filled so the catalog opens with
+            the chip already selected (ToolsCatalog reads category via
+            URLSearchParams).
+           ========================================================= */}
+        <section className="pb-16 lg:pb-20">
+          <div className="container-default">
+            <div className="flex items-end justify-between gap-6 mb-8">
+              <div>
+                <h2 className="text-h2 font-semibold tracking-[-0.02em]">
+                  {dict.categories.title}
+                </h2>
+                <p className="mt-2 text-[15px] text-[var(--text-secondary)]">
+                  {dict.categories.subtitle}
+                </p>
+              </div>
+            </div>
+
+            <ul role="list" className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+              {categoryTiles.map(({ key, slug, Icon }) => (
+                <li key={key}>
+                  <Link
+                    href={`${localePrefix}/tools?category=${slug}`}
+                    className={cn(
+                      "group flex h-full flex-col gap-2 rounded-xl p-4",
+                      "bg-[var(--bg-surface)] border border-[var(--border-base)]",
+                      "shadow-[var(--shadow-sm)]",
+                      "transition-all duration-200 ease-[var(--ease-out-expo)]",
+                      "hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] hover:border-[var(--border-strong)]",
+                    )}
+                  >
+                    <span
+                      className="inline-flex size-8 items-center justify-center rounded-md"
+                      style={{
+                        background:
+                          "color-mix(in oklch, var(--brand) 12%, transparent)",
+                        color: "var(--brand)",
+                      }}
+                    >
+                      <Icon className="size-4" strokeWidth={1.5} />
+                    </span>
+                    <h3 className="text-[15px] font-semibold leading-snug">
+                      {dict.categories.items[key]}
+                    </h3>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
         {/* BUG-FIX (May 2026 polish): removed the standalone homepage
             newsletter feature card. The Footer (rendered immediately
             below) already ships an identical card with the SAME eyebrow,
@@ -302,10 +600,16 @@ function DemoWidget({
 }) {
   // Slider-fill % are visual hints only — picked to look balanced, not
   // computed from the input values (these inputs aren't user-editable).
+  //
+  // Wave 1 audit alignment (Botapolis design v.026): widget shows three
+  // sliders only — Subs / Open / AOV — matching mockups/homepage.html. The
+  // 2.5% click-to-order assumption stays implicit in the result-meta line
+  // since the math doesn't change. `strings.cto` is intentionally left in
+  // the dictionary so the live calculator at /tools/email-roi-calculator
+  // (which DOES expose CTO as a knob) keeps its locale key.
   const rows = [
     { label: strings.subscribers, value: "12,500", fill: 42 },
     { label: strings.openRate,    value: "28%",    fill: 47 },
-    { label: strings.cto,         value: "15%",    fill: 40 },
     { label: strings.aov,         value: "$84",    fill: 34 },
   ]
 

@@ -18,7 +18,7 @@
     "headline": "The AI playbook for serious Shopify operators.",
     "lede": "Calculators that show real ROI. Reviews tested on real stores. Comparisons that pick a winner — not a draw.",
     "ctaPrimary": "Try the tools",
-    "ctaSecondary": "See comparisons",
+    "ctaSecondary": "See reviews",
     "social": "1,247 operators subscribed",
     "rating": "84 reviews tested",
     "widget": {
@@ -59,6 +59,34 @@
         "value": "3 / run",
         "category": "AI"
       }
+    }
+  },
+  "comparisons": {
+    "title": "Head-to-head comparisons",
+    "subtitle": "One winner per category. No fence-sitting.",
+    "viewAll": "All comparisons →",
+    "verdictLabel": "Verdict",
+    "cta": "Read comparison",
+    "empty": "Comparisons will appear here as we publish them."
+  },
+  "reviewsSection": {
+    "title": "Latest deep reviews",
+    "subtitle": "Tested on real stores. We name the trade-offs.",
+    "viewAll": "All reviews →",
+    "empty": "Reviews will appear here as we publish them.",
+    "readMore": "Read review",
+    "minRead": "min read"
+  },
+  "categories": {
+    "title": "Browse by category",
+    "subtitle": "Filtered for Shopify-first.",
+    "items": {
+      "email": "Email & SMS",
+      "ads": "Paid ads",
+      "content": "Content",
+      "support": "Support",
+      "analytics": "Analytics",
+      "inventory": "Inventory"
     }
   },
   "newsletter": {

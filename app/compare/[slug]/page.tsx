@@ -619,23 +619,33 @@ export default async function ComparisonPage({ params }: PageProps) {
         {/* ==================================================================
             Body grid — Wave 3 audit alignment (design v.026)
             ------------------------------------------------------------------
-            Sections 01–10 + methodology render inside a 2-column layout:
-            left rail is a sticky TOC (220px on desktop), right column carries
-            the section content. CTA tail + Related comparisons sit OUTSIDE
-            this grid so they keep their full container-default width.
+            Sections 01–10 + methodology render inside a 2-column layout on
+            desktop: content on the LEFT, sticky TOC on the RIGHT. CTA tail
+            + Related comparisons sit OUTSIDE this grid so they keep their
+            full container-default width.
 
-            Mobile collapses to a single column; TableOfContents itself
-            switches to a `<details>` accordion on widths below `lg`.
+            Layout note (Wave 3 hotfix): TOC was originally on the left to
+            mirror the design mockup, but post-audit feedback flagged the
+            inconsistency with /reviews/[slug] and /guides/[slug] which
+            both keep their TOC on the right. We standardised on
+            right-side TOC across all three editorial routes so navigating
+            between them doesn't shuffle the eye.
+
+            Mobile collapses to a single column; we put TableOfContents
+            FIRST in source order so its `<details>` accordion appears at
+            the top of the body section. On desktop, explicit
+            `lg:col-start-2` + `lg:row-start-1` placement flips it back to
+            the right column without swapping source order.
            ================================================================== */}
         <div className="container-default">
-          <div className="grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-12">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-12">
             <TableOfContents
               entries={tocEntries}
               label={t.tocLabel}
-              className="lg:pt-12"
+              className="lg:col-start-2 lg:row-start-1 lg:pt-12"
             />
 
-            <div className="min-w-0">
+            <div className="min-w-0 lg:col-start-1 lg:row-start-1">
 
         {/* ==================================================================
             01 · At a glance

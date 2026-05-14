@@ -6,6 +6,7 @@ import type { Metadata } from "next"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { PageViewEvent } from "@/components/analytics/PageViewEvent"
+import { TableOfContents } from "@/components/content/TableOfContents"
 import { ToolLogo } from "@/components/tools/ToolLogo"
 import { ProsConsList } from "@/components/tools/ProsConsList"
 import {
@@ -24,6 +25,7 @@ import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
 import { canonicalCompareSlug, isCanonicalCompareSlug } from "@/lib/content/slug"
 import { getToolRatings } from "@/lib/content/rating"
+import type { TocEntry } from "@/lib/content/toc"
 import { localizeTool } from "@/lib/content/tool-locale"
 import {
   diffIntegrations,
@@ -405,6 +407,7 @@ export default async function ComparisonPage({ params }: PageProps) {
     verdictHeading:  locale === "ru" ? "Наш вердикт"        : "Our verdict",
     methodologyHeading: locale === "ru" ? "Методология"     : "Methodology",
     relatedHeading:  locale === "ru" ? "Связанные сравнения" : "Related comparisons",
+    tocLabel:        locale === "ru" ? "Содержание"           : "On this page",
     tryA:           locale === "ru" ? `Открыть ${toolA.name}` : `Try ${toolA.name}`,
     tryB:           locale === "ru" ? `Открыть ${toolB.name}` : `Try ${toolB.name}`,
     visitA:         locale === "ru" ? "Сайт"  : "Website",
@@ -471,6 +474,27 @@ export default async function ComparisonPage({ params }: PageProps) {
     if (hasCore) return t.shopifyBasic
     return t.shopifyNone
   }
+
+  // Wave 3 audit alignment (design v.026): synthetic TOC entries that
+  // mirror the in-page section IDs. We don't extract from MDX (this page
+  // isn't MDX-driven) — entries are listed manually so the TOC stays in
+  // sync with the JSX below. Use-cases is included only when the editorial
+  // override populated `parsed.useCases`; methodology stays out of the TOC
+  // since it's a footnote, not a navigation target.
+  const tocEntries: TocEntry[] = [
+    { id: "at-a-glance",          title: t.introHeading,       level: 2 },
+    { id: "quick-stats",          title: t.quickStatsHeading,  level: 2 },
+    { id: "pricing",              title: t.pricingHeading,     level: 2 },
+    { id: "features",             title: t.featuresHeading,    level: 2 },
+    { id: "shopify-integration",  title: t.shopifyHeading,     level: 2 },
+    { id: "integrations",         title: t.integrationsHeading,level: 2 },
+    { id: "support",              title: t.supportHeading,     level: 2 },
+    { id: "pros-cons",            title: t.prosConsHeading,    level: 2 },
+    ...(parsed.useCases.length > 0
+      ? [{ id: "use-cases", title: t.useCasesHeading, level: 2 as const }]
+      : []),
+    { id: "verdict",              title: t.verdictHeading,     level: 2 },
+  ]
 
   return (
     <>
@@ -593,9 +617,30 @@ export default async function ComparisonPage({ params }: PageProps) {
         </section>
 
         {/* ==================================================================
+            Body grid — Wave 3 audit alignment (design v.026)
+            ------------------------------------------------------------------
+            Sections 01–10 + methodology render inside a 2-column layout:
+            left rail is a sticky TOC (220px on desktop), right column carries
+            the section content. CTA tail + Related comparisons sit OUTSIDE
+            this grid so they keep their full container-default width.
+
+            Mobile collapses to a single column; TableOfContents itself
+            switches to a `<details>` accordion on widths below `lg`.
+           ================================================================== */}
+        <div className="container-default">
+          <div className="grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-12">
+            <TableOfContents
+              entries={tocEntries}
+              label={t.tocLabel}
+              className="lg:pt-12"
+            />
+
+            <div className="min-w-0">
+
+        {/* ==================================================================
             01 · At a glance
             ================================================================== */}
-        <Section id="at-a-glance" title={t.introHeading} eyebrow="01">
+        <Section id="at-a-glance" title={t.introHeading} eyebrow="01" bare>
           <p className="max-w-3xl text-[17px] leading-[1.7] text-[var(--text-secondary)]">
             {introCopy}
           </p>
@@ -605,7 +650,7 @@ export default async function ComparisonPage({ params }: PageProps) {
             02 · Quick stats (auto from tools columns; jsonb override
             below if present)
             ================================================================== */}
-        <Section id="quick-stats" title={t.quickStatsHeading} eyebrow="02">
+        <Section id="quick-stats" title={t.quickStatsHeading} eyebrow="02" bare>
           <ul role="list" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <StatBlock
               label={t.startingPrice}
@@ -661,7 +706,7 @@ export default async function ComparisonPage({ params }: PageProps) {
         {/* ==================================================================
             03 · Pricing
             ================================================================== */}
-        <Section id="pricing" title={t.pricingHeading} eyebrow="03">
+        <Section id="pricing" title={t.pricingHeading} eyebrow="03" bare>
           <div className="grid gap-4 md:grid-cols-2">
             <PriceTierCard tool={toolA} locale={locale as "en" | "ru"} t={t} />
             <PriceTierCard tool={toolB} locale={locale as "en" | "ru"} t={t} />
@@ -680,7 +725,7 @@ export default async function ComparisonPage({ params }: PageProps) {
             04 · Features
             Auto-overlap when jsonb is empty; the editorial table wins.
             ================================================================== */}
-        <Section id="features" title={t.featuresHeading} eyebrow="04">
+        <Section id="features" title={t.featuresHeading} eyebrow="04" bare>
           {parsed.features.length > 0 ? (
             <ComparisonTable
               toolA={{ name: toolA.name, slug: toolA.slug }}
@@ -708,7 +753,7 @@ export default async function ComparisonPage({ params }: PageProps) {
         {/* ==================================================================
             05 · Shopify integration
             ================================================================== */}
-        <Section id="shopify-integration" title={t.shopifyHeading} eyebrow="05">
+        <Section id="shopify-integration" title={t.shopifyHeading} eyebrow="05" bare>
           <div className="grid gap-4 md:grid-cols-2">
             <ShopifyCard
               toolName={toolA.name}
@@ -728,7 +773,7 @@ export default async function ComparisonPage({ params }: PageProps) {
         {/* ==================================================================
             06 · Integrations (Venn-style A/Both/B)
             ================================================================== */}
-        <Section id="integrations" title={t.integrationsHeading} eyebrow="06">
+        <Section id="integrations" title={t.integrationsHeading} eyebrow="06" bare>
           <div className="grid gap-4 lg:grid-cols-3">
             <IntegrationsBucket
               label={`${t.onlyLabel} ${toolA.name}`}
@@ -754,7 +799,7 @@ export default async function ComparisonPage({ params }: PageProps) {
         {/* ==================================================================
             07 · Customer support
             ================================================================== */}
-        <Section id="support" title={t.supportHeading} eyebrow="07">
+        <Section id="support" title={t.supportHeading} eyebrow="07" bare>
           <p className="max-w-3xl text-[15px] leading-[1.7] text-[var(--text-secondary)]">
             {supportNarrative}
           </p>
@@ -763,7 +808,7 @@ export default async function ComparisonPage({ params }: PageProps) {
         {/* ==================================================================
             08 · Pros & Cons
             ================================================================== */}
-        <Section id="pros-cons" title={t.prosConsHeading} eyebrow="08">
+        <Section id="pros-cons" title={t.prosConsHeading} eyebrow="08" bare>
           <div className="grid gap-6 lg:grid-cols-2">
             <div>
               <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
@@ -794,7 +839,7 @@ export default async function ComparisonPage({ params }: PageProps) {
             Use cases (jsonb-driven; optional)
             ================================================================== */}
         {parsed.useCases.length > 0 && (
-          <Section title={t.useCasesHeading} eyebrow="09">
+          <Section id="use-cases" title={t.useCasesHeading} eyebrow="09" bare>
             <ul role="list" className="grid gap-4 md:grid-cols-2">
               {parsed.useCases.map((u) => {
                 const winnerName =
@@ -827,7 +872,7 @@ export default async function ComparisonPage({ params }: PageProps) {
         {/* ==================================================================
             09 · Verdict (always renders — falls back to auto narrative)
             ================================================================== */}
-        <Section id="verdict" title={t.verdictHeading} eyebrow={parsed.useCases.length > 0 ? "10" : "09"}>
+        <Section id="verdict" title={t.verdictHeading} eyebrow={parsed.useCases.length > 0 ? "10" : "09"} bare>
           <div className="relative max-w-3xl">
             <div
               aria-hidden="true"
@@ -844,12 +889,17 @@ export default async function ComparisonPage({ params }: PageProps) {
             Methodology (only if custom_methodology supplied)
             ================================================================== */}
         {comparison.custom_methodology && (
-          <Section title={t.methodologyHeading}>
+          <Section title={t.methodologyHeading} bare>
             <p className="max-w-3xl text-[15px] leading-[1.7] text-[var(--text-secondary)]">
               {comparison.custom_methodology}
             </p>
           </Section>
         )}
+
+            </div>
+          </div>
+        </div>
+        {/* /Body grid */}
 
         {/* ==================================================================
             CTA TAIL — two-tool side-by-side
@@ -967,22 +1017,33 @@ export default async function ComparisonPage({ params }: PageProps) {
 
 // ============================================================================
 // Reusable section primitive (mirrors /tools/[slug]'s Section)
+// ----------------------------------------------------------------------------
+// Wave 3 audit alignment (design v.026): added `bare` mode so the page can
+// wrap a sequence of Sections inside a grid (left: sticky TOC, right: this
+// column). When `bare` is true the section drops its own `container-default`
+// since the parent grid is already inside one — otherwise the inner content
+// would be double-padded and shrink visually.
 // ============================================================================
 function Section({
   id,
   title,
   eyebrow,
   children,
+  bare = false,
 }: {
   id?: string
   title: string
   eyebrow?: string
   children: React.ReactNode
+  bare?: boolean
 }) {
   return (
     <section
       id={id}
-      className="container-default py-10 lg:py-14 border-b border-[var(--border-subtle)]"
+      className={cn(
+        "py-10 lg:py-14 border-b border-[var(--border-subtle)]",
+        !bare && "container-default",
+      )}
     >
       <div className="flex items-center gap-3">
         {eyebrow && (

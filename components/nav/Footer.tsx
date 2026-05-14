@@ -267,25 +267,35 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
           <span>{strings.copyright}</span>
 
           {/*
-            Block F (May 2026): the previous footer shipped three social
-            icons pointing at the literal homepages of X / LinkedIn /
-            GitHub. We removed them rather than keeping placeholder URLs
-            in the footer of every page — a generic "/x.com/" link reads
-            as broken trust, especially next to the brand wordmark.
-
-            Re-wire the socials the day there are real Botapolis brand
-            accounts. The two helpers below (TwitterMark / LinkedinMark
-            / GithubMark) are exported above and stay imported because:
-              (a) they're tiny inline SVGs, no bundle cost
-              (b) we want them ready when the URLs land — don't churn the
-                  import graph around the day socials return
-            Wiring template for when real URLs exist:
-              <SocialRow socials={[
-                { Icon: TwitterMark,  href: process.env.NEXT_PUBLIC_SOCIAL_X       ?? "", label: "X / Twitter" },
-                { Icon: LinkedinMark, href: process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN ?? "", label: "LinkedIn"    },
-                { Icon: GithubMark,   href: process.env.NEXT_PUBLIC_SOCIAL_GITHUB   ?? "", label: "GitHub"      },
-              ].filter(s => s.href)} />
+            Wave 1 audit alignment (Botapolis design v.026): the homepage
+            mockup ships visible social icons in the footer strip, so we
+            show them now as placeholders ("#") until real @botapolis URLs
+            exist (HANDOFF TODO #4). The visual presence is the point — a
+            faceless footer reads as half-finished next to the rest of the
+            chrome. When real URLs arrive, swap `href="#"` with the actual
+            handles (or wire env vars per the recipe in git history).
           */}
+          <div className="flex items-center gap-1">
+            {[
+              { Mark: TwitterMark,  href: "#", label: "X / Twitter" },
+              { Mark: LinkedinMark, href: "#", label: "LinkedIn"    },
+              { Mark: GithubMark,   href: "#", label: "GitHub"      },
+            ].map(({ Mark, href, label }) => (
+              <Link
+                key={label}
+                href={href}
+                aria-label={label}
+                className={cn(
+                  "h-9 w-9 inline-flex items-center justify-center rounded-md",
+                  "text-[var(--text-tertiary)]",
+                  "transition-colors duration-150",
+                  "hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+                )}
+              >
+                <Mark className="h-[16px] w-[16px]" />
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </footer>

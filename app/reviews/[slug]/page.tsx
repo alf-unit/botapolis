@@ -9,6 +9,7 @@ import { ArticleHero } from "@/components/content/ArticleHero"
 import { TableOfContents } from "@/components/content/TableOfContents"
 import { ProsConsList } from "@/components/content/ProsConsList"
 import { AffiliateButton } from "@/components/content/AffiliateButton"
+import { RelatedArticles } from "@/components/content/RelatedArticles"
 import { ScrollMilestone } from "@/components/analytics/ScrollMilestone"
 import { ToolLogo } from "@/components/tools/ToolLogo"
 import { buttonVariants } from "@/components/ui/button"
@@ -299,14 +300,33 @@ export default async function ReviewPage({ params }: PageProps) {
                 <ToolStickyCard
                   tool={tool}
                   localePrefix={localePrefix}
+                  locale={locale}
                   tryLabel={`${t.sidebarTry} ${tool.name}`}
                   visitLabel={t.sidebarVisit}
+                  // Wave 3 (audit alignment): rating from the article's own
+                  // frontmatter takes priority over the DB row — the editorial
+                  // verdict in this review is the load-bearing number, not
+                  // the catalog rating which is averaged across all reviews
+                  // of the tool. Falls back to tool.rating when frontmatter
+                  // omits the field (older reviews pre-sync).
+                  articleRating={frontmatter.rating ?? tool.rating}
+                  ratingLabel={locale === "ru" ? "Оценка" : "Rating"}
                   campaign={`review-${slug}`}
                 />
               )}
             </div>
           </div>
         </section>
+
+        {/* Wave 3 audit alignment (design v.026) — "Related reviews" row
+            below the article body. Renders only when there are other
+            published reviews to surface (auto-hidden on a brand-new locale). */}
+        <RelatedArticles
+          type="reviews"
+          currentSlug={slug}
+          locale={locale}
+          localePrefix={localePrefix}
+        />
       </main>
 
       <Footer
@@ -412,16 +432,40 @@ function FellBackNotice({ title, body }: { title: string; body: string }) {
 function ToolStickyCard({
   tool,
   localePrefix,
+  locale,
   tryLabel,
   visitLabel,
   campaign,
+  articleRating,
+  ratingLabel,
 }: {
   tool: Pick<ToolRow, "slug" | "name" | "tagline" | "logo_url" | "website_url" | "pricing_min" | "pricing_model">
   localePrefix: "" | "/ru"
+  locale: "en" | "ru"
   tryLabel: string
   visitLabel: string
   campaign: string
+  /** Effective rating shown on the card — caller decides EN priority. */
+  articleRating?: number | null
+  ratingLabel: string
 }) {
+  // Wave 3 (audit alignment): the design mockup's right rail surfaces both
+  // a rating chip and a pricing line below the brand row. Pricing string
+  // mirrors AffiliateButton/RecommendedTools so the language stays consistent
+  // across surfaces.
+  const priceText =
+    tool.pricing_min == null
+      ? null
+      : tool.pricing_model === "free"
+      ? locale === "ru" ? "Бесплатно" : "Free"
+      : tool.pricing_model === "freemium"
+      ? locale === "ru"
+        ? `Free · от $${tool.pricing_min}/мес`
+        : `Free · from $${tool.pricing_min}/mo`
+      : locale === "ru"
+      ? `от $${tool.pricing_min}/мес`
+      : `from $${tool.pricing_min}/mo`
+
   return (
     <div className="mt-8 lg:mt-12 lg:sticky lg:top-24">
       <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 shadow-[var(--shadow-sm)]">
@@ -443,6 +487,31 @@ function ToolStickyCard({
             )}
           </div>
         </div>
+
+        {/* Rating + pricing strip — only render when at least one value is
+            present so the card stays clean for tools we haven't fully scored. */}
+        {(articleRating != null || priceText) && (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-base)] bg-[var(--bg-muted)] px-3 py-2.5">
+            {articleRating != null ? (
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                  {ratingLabel}
+                </span>
+                <span className="font-mono text-[18px] font-semibold text-[var(--brand)] tabular-nums">
+                  {articleRating.toFixed(1)}
+                  <span className="text-[var(--text-tertiary)] text-[12px] font-normal">/10</span>
+                </span>
+              </div>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            {priceText && (
+              <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+                {priceText}
+              </span>
+            )}
+          </div>
+        )}
 
         <Link
           href={`${localePrefix}/go/${tool.slug}?utm_campaign=${encodeURIComponent(campaign)}`}

@@ -1,4 +1,4 @@
-import slugify from "slugify"
+import GithubSlugger from "github-slugger"
 
 /* ----------------------------------------------------------------------------
    Table-of-contents extractor
@@ -15,6 +15,15 @@ import slugify from "slugify"
      - h1 — there is exactly one per page (the hero) and the TOC starts at h2.
      - Headings deeper than h3 — for editorial copy, h4+ usually means we've
        over-nested and the TOC should not encourage it.
+
+   IMPORTANT: we use `github-slugger` here, NOT the `slugify` library, because
+   `rehype-slug` (which mints the actual `<h2 id="…">` IDs at compile time)
+   uses `github-slugger` internally. The two libraries handle non-ASCII text
+   differently — `slugify` transliterates Cyrillic to Latin (`Генерируй` →
+   `generiruj`), `github-slugger` preserves it (`генерируй`). With slugify the
+   RU TOC links would point at hashes the rendered HTML never produced, so
+   clicks scrolled to top instead of the target section. Keep this aligned:
+   if you change the rehype config, retune this importer in lockstep.
 ---------------------------------------------------------------------------- */
 
 export interface TocEntry {
@@ -26,17 +35,14 @@ export interface TocEntry {
 const HEADING_RE = /^(#{2,3})\s+(.+?)\s*$/gm
 const FENCE_RE = /```[\s\S]*?```/g
 
-/**
- * Match the anchor rehype-slug will produce. Keep this aligned: if you swap
- * the rehype config, retune the slugify options here in lockstep.
- */
-function headingId(text: string): string {
-  return slugify(text, { lower: true, strict: true, trim: true })
-}
-
 export function extractToc(rawMdx: string): TocEntry[] {
   // Strip fenced code blocks first — they can legally contain `## …` lines.
   const withoutCode = rawMdx.replace(FENCE_RE, "")
+
+  // Fresh slugger per page so the duplicate-suffix counter ("foo", "foo-1",
+  // "foo-2") resets between extracts — `rehype-slug` instantiates the same
+  // way at compile time, so the suffix sequence on a single page lines up.
+  const slugger = new GithubSlugger()
 
   const entries: TocEntry[] = []
   for (const match of withoutCode.matchAll(HEADING_RE)) {
@@ -44,7 +50,7 @@ export function extractToc(rawMdx: string): TocEntry[] {
     const title = match[2].trim()
     if (!title) continue
     const level = hashes.length === 2 ? 2 : 3
-    entries.push({ id: headingId(title), title, level })
+    entries.push({ id: slugger.slug(title), title, level })
   }
   return entries
 }

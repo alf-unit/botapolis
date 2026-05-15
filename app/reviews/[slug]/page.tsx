@@ -6,6 +6,7 @@ import type { Metadata } from "next"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { ArticleHero } from "@/components/content/ArticleHero"
+import { ArticleCover } from "@/components/content/ArticleCover"
 import { TableOfContents } from "@/components/content/TableOfContents"
 import { ProsConsList } from "@/components/content/ProsConsList"
 import { AffiliateButton } from "@/components/content/AffiliateButton"
@@ -230,6 +231,12 @@ export default async function ReviewPage({ params }: PageProps) {
             ) : null
           }
         />
+
+        {/* Wave 5 audit alignment (design v.026): decorative 21:9
+            gradient cover sits between the hero text and the article
+            body. Variant is picked deterministically from the slug, so
+            every review has a stable colour identity across deploys. */}
+        <ArticleCover slug={slug} />
 
         {/* Body grid: TOC sidebar (desktop) + article column */}
         <section className="container-default py-12 lg:py-16">

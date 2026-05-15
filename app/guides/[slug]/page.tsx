@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { ArticleHero } from "@/components/content/ArticleHero"
+import { ArticleCover } from "@/components/content/ArticleCover"
 import { TableOfContents } from "@/components/content/TableOfContents"
 import { RelatedArticles } from "@/components/content/RelatedArticles"
 import { buildMetadata } from "@/lib/seo/metadata"
@@ -160,6 +161,11 @@ export default async function GuidePage({ params }: PageProps) {
             ) : null
           }
         />
+
+        {/* Wave 5 audit alignment (design v.026) — see /reviews/[slug]
+            for the same component's role. Deterministic per-slug
+            gradient strip; no per-guide config needed. */}
+        <ArticleCover slug={slug} />
 
         <section className="container-default py-12 lg:py-16">
           {/* Post-Wave-3 audit follow-up: `max-w-[68ch]` was constraining the

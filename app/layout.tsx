@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { PostHogProvider } from "@/components/analytics/PostHogProvider"
 import { PlausibleScript } from "@/components/analytics/PlausibleScript"
+import { ThemeDebugger } from "@/components/shared/ThemeDebugger"
 
 /* ----------------------------------------------------------------------------
    Geist (Sans + Mono) via next/font.
@@ -105,6 +106,12 @@ export default function RootLayout({
               actions, and any future async feedback. Placed outside the
               tooltip provider so toasts aren't constrained by its bounds. */}
           <Toaster position="bottom-right" richColors closeButton />
+          {/* TEMPORARY (May 2026, mobile audit): diagnostic overlay
+              for the "iPhone Chrome incognito loads dark on a Light-Mode
+              device" anomaly. Activated only by `?debug-theme=1` query
+              param so prod visitors never see it. Remove this and the
+              component file once the anomaly is understood. */}
+          <ThemeDebugger />
         </ThemeProvider>
         {/* Plausible — server-rendered <Script> that no-ops unless
             NEXT_PUBLIC_PLAUSIBLE_ENABLED === "true". Sits outside the

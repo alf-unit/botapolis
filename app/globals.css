@@ -732,3 +732,58 @@
 .btn-cta:active::before {
   transform: translateX(120%);
 }
+
+/* ============================================================================
+   8. Scroll Reveal — progressive-enhancement fade-in on viewport entry
+   ----------------------------------------------------------------------------
+   Wrapper class `.scroll-reveal` opts an element into a 24-px translate +
+   opacity fade that plays as the element scrolls into view. Implementation
+   uses `animation-timeline: view()` — modern CSS that drives an animation
+   off the element's own viewport position with zero JS, zero observers,
+   zero re-renders. Animation cost is composited on the GPU and runs in
+   parallel with the scroll, so it costs nothing on the main thread.
+
+   Support matrix (as of May 2026):
+     · Chrome / Edge / Opera 115+   — full support
+     · Safari iOS 18.x              — NO support (Apple committed for 26)
+     · Firefox 131+                 — behind flag, off by default
+
+   The `@supports` gate means non-supporting browsers (Safari iOS being
+   the practical one we care about) render the element at its final state
+   immediately — no JS shim, no broken/invisible content if the feature
+   query fails. Reveal is a nice-to-have; visibility is non-negotiable.
+
+   `prefers-reduced-motion` users skip the animation entirely. The §5
+   global override already collapses animation-duration to 0 for them,
+   but gating here too makes intent explicit and avoids registering the
+   scroll-timeline observer at all on accessibility-sensitive devices.
+
+   Note: this primitive deliberately has NO stagger. Per-card stagger
+   would mean N timeline instances + N animation-delays, which on a
+   homepage with 4-5 visible sections × multiple cards each balloons
+   into composited work. The whole-section fade reads as deliberate
+   without that cost.
+   ============================================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .scroll-reveal {
+      animation: scroll-reveal-in linear both;
+      animation-timeline: view();
+      /* `entry 0% entry 60%` — animation starts when the element's
+         leading edge touches the viewport bottom, completes when 60 %
+         of the element has entered. Snappy enough that the eye sees
+         it land before focusing on the content. */
+      animation-range: entry 0% entry 60%;
+    }
+    @keyframes scroll-reveal-in {
+      from {
+        opacity: 0;
+        transform: translateY(24px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  }
+}

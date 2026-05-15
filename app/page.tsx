@@ -271,7 +271,7 @@ export default async function HomePage() {
         {/* =========================================================
             FEATURED TOOLS
            ========================================================= */}
-        <section className="pb-16 lg:pb-20">
+        <section className="scroll-reveal pb-16 lg:pb-20">
           <div className="container-default">
             <div className="flex items-end justify-between gap-6 mb-8">
               <div>
@@ -366,7 +366,7 @@ export default async function HomePage() {
             (operational graceful degradation, see fetcher above).
            ========================================================= */}
         {homeComparisons.length > 0 && (
-          <section className="pb-16 lg:pb-20">
+          <section className="scroll-reveal pb-16 lg:pb-20">
             <div className="container-default">
               <div className="flex items-end justify-between gap-6 mb-8">
                 <div>
@@ -419,7 +419,7 @@ export default async function HomePage() {
             the listing read as a coherent set.
            ========================================================= */}
         {latestReviews.length > 0 && (
-          <section className="pb-16 lg:pb-20">
+          <section className="scroll-reveal pb-16 lg:pb-20">
             <div className="container-default">
               <div className="flex items-end justify-between gap-6 mb-8">
                 <div>
@@ -490,7 +490,7 @@ export default async function HomePage() {
             the chip already selected (ToolsCatalog reads category via
             URLSearchParams).
            ========================================================= */}
-        <section className="pb-16 lg:pb-20">
+        <section className="scroll-reveal pb-16 lg:pb-20">
           <div className="container-default">
             <div className="flex items-end justify-between gap-6 mb-8">
               <div>

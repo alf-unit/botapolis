@@ -774,10 +774,15 @@
 @media (prefers-reduced-motion: no-preference) {
   .js-scroll-reveal-ready .scroll-reveal {
     opacity: 0;
-    transform: translateY(24px);
+    /* Tuned May 2026: original 24-px translate was too subtle to read
+       as motion — sections "appeared" without a sense of arrival. 56 px
+       (about a card-row's worth of height) makes the rise unmistakable
+       without being theatrical. Pair with the longer 1000 ms duration
+       below so the eye actually sees the trip, not just the endpoints. */
+    transform: translateY(56px);
     transition:
-      opacity   600ms var(--ease-out-expo),
-      transform 600ms var(--ease-out-expo);
+      opacity   1000ms var(--ease-out-expo),
+      transform 1000ms var(--ease-out-expo);
     /* `will-change` only while the section hasn't been revealed yet —
        the controller flips `.in-view` ON visibility AND removes the
        `.scroll-reveal` class once the fade settles is overkill; the

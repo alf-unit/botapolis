@@ -186,7 +186,14 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
       data-scrolled={scrolled || undefined}
       className={cn(
         "sticky top-0 z-40 w-full",
-        "transition-[background-color,backdrop-filter,border-color,box-shadow] duration-200 ease-[var(--ease-out-expo)]",
+        // Mobile audit (May 2026): animating `backdrop-filter` between
+        // 0 → blur(8/16) on every scroll-crossing of the 24-px trigger
+        // was the single most expensive paint on iOS Safari — each
+        // frame had to re-rasterise the blurred area under the navbar.
+        // Limiting the transition to colour + shadow lets the filter
+        // snap in instantly (the visual delta is imperceptible at
+        // 200 ms anyway) and the scroll stays buttery.
+        "transition-[background-color,border-color,box-shadow] duration-200 ease-[var(--ease-out-expo)]",
         scrolled
           ? "surface-glass border-b shadow-[var(--shadow-sm)]"
           : "bg-transparent border-b border-transparent",

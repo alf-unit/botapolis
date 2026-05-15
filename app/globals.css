@@ -17,6 +17,29 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ----------------------------------------------------------------------------
+   Touch-aware `hover:` variant override
+   ----------------------------------------------------------------------------
+   Tailwind v4 ships `hover:` as a bare `&:hover` selector — on touch
+   devices the first tap activates :hover, which visibly "sticks", and
+   the second tap fires the click. Net effect: every link/card/button
+   on iOS Safari needed two taps to follow through. Re-defining the
+   variant here gates all `hover:*` utilities behind `(hover: hover) and
+   (pointer: fine)` so they only apply on devices with a real pointer.
+   One line, fixes every `hover:bg-`, `hover:-translate-y-`,
+   `hover:shadow-`, etc. across 49 files — no per-call-site rewrites.
+
+   Caveats:
+   - Native CSS `:hover` rules elsewhere in this stylesheet (e.g. the
+     CTA shimmer in §7) are NOT affected; gate those manually with the
+     same media query, or pair them with `:active` so they also fire
+     on tap.
+   - shadcn / Base-UI components that bake `[a]:hover:bg-primary/80`
+     etc. inside cva variants go through this same variant pipeline,
+     so they get the gate for free.
+---------------------------------------------------------------------------- */
+@custom-variant hover (@media (hover: hover) and (pointer: fine) { &:hover });
+
 /* ============================================================================
    1. Theme-aware variables — light mode (root) and dark mode (.dark)
    ============================================================================ */
@@ -439,14 +462,24 @@
        iOS — the proper fix is to identify the overflowing element
        and contain it, but this is a robust safety net. */
     overflow-x: clip;
+  }
 
-    /* Animated scroll for in-page anchors (Subscribe → #newsletter,
-       TOC heading jumps, etc.). The reduced-motion @media block at
-       §5 overrides this back to `auto !important` so the system
-       preference still wins. Without smooth-scroll an anchor click
-       reads as "nothing happened" because the navbar is sticky and
-       the visible chrome doesn't move. */
-    scroll-behavior: smooth;
+  /* Smooth-scroll is gated to (hover: hover) + ≥768 px now. On iOS
+     Safari `scroll-behavior: smooth` on <html> fights native momentum:
+     when the user flicks, the engine wants to coast, but the smooth
+     re-targeting clamps frame-by-frame and the page visibly stutters.
+     Anchor jumps on touch still feel fine without it because the
+     browser handles them natively. Mobile-Layout audit (May 2026)
+     pinned the homepage scroll-judder on mobile partly to this rule.
+     Reduced-motion override in §5 still wins.
+
+     If a future anchor-jump UX needs smooth on small viewports,
+     trigger it imperatively (`el.scrollIntoView({ behavior: "smooth" })`)
+     rather than re-enabling globally. */
+  @media (min-width: 768px) and (hover: hover) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   /* Reserve clearance under the sticky navbar (h-16 = 64px) plus a
@@ -468,6 +501,28 @@
     transition:
       background-color var(--duration-base) var(--ease-out-expo),
       color            var(--duration-base) var(--ease-out-expo);
+  }
+
+  /* Touch UX baseline.
+     `touch-action: manipulation` opts every interactive surface out of
+     iOS Safari's double-tap-to-zoom gesture — the recogniser is the
+     reason for the legacy ~300 ms click delay even on viewports that
+     already disable user-scaling. With this in place taps land
+     instantly. Pair with the `hover` variant override above so the
+     :hover state never visibly precedes the click.
+     `-webkit-tap-highlight-color: transparent` swaps the default blue
+     flash for our own `:active` styles (see CTA in §7, plus the
+     browser-supplied `active:translate-y-px` on .button). Keeps tap
+     feedback under our control. */
+  a,
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea,
+  label {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -514,11 +569,31 @@
    6. Utility primitives — small things that don't earn a Tailwind utility
    ============================================================================ */
 
+/* Glass surface — Navbar after scroll, modals, sticky chrome.
+   Mobile baseline is intentionally lighter: blur(8px) + no saturate
+   boost. The 16-px saturated variant is gorgeous on desktop but on
+   iPhone (≤14 / iOS 16-17 we treat as baseline) the GPU rasterises
+   the blurred layer every scroll frame, and at the Hero size that
+   exceeds the ~16 ms budget — frames drop, the area under the navbar
+   reads as "not yet drawn" during a fast flick (May 2026 mobile audit
+   reproduced this on the homepage screenshot).
+   On hover-capable pointers (≥md desktop) we restore the richer
+   blur. Touch laptops with mouse plugged in fall into the richer
+   path too — that's intentional, they have the GPU budget.
+   Note: we don't transition `backdrop-filter` on the wrapper anymore
+   (see Navbar.tsx); animating the filter itself was the second-most
+   expensive frame work on mobile. */
 .surface-glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(16px) saturate(1.5);
-  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--glass-border);
+}
+@media (min-width: 1024px) and (hover: hover) {
+  .surface-glass {
+    backdrop-filter: blur(16px) saturate(1.5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  }
 }
 
 .gradient-hero-text {
@@ -577,8 +652,12 @@
   background: var(--gradient-cta);
   /* Base Button already supplies `active:translate-y-px` as the universal
      press-down feedback, so we only need to handle the hover-lift here.
-     Transition lives on the wrapper so the lift settles smoothly. */
-  transition: transform var(--duration-base) var(--ease-out-expo);
+     Transition lives on the wrapper so the lift settles smoothly. We
+     also transition `filter` so the tap brightness flash below fades
+     back out instead of snapping. */
+  transition:
+    transform var(--duration-base) var(--ease-out-expo),
+    filter    var(--duration-base) var(--ease-out-expo);
 }
 
 .btn-cta > * {
@@ -586,9 +665,23 @@
   z-index: 2;
 }
 
-.btn-cta:hover,
-.btn-cta:focus-visible {
-  transform: translateY(-1px);
+/* Desktop lift on hover/focus (no-op on touch — pointer doesn't dwell). */
+@media (hover: hover) and (pointer: fine) {
+  .btn-cta:hover,
+  .btn-cta:focus-visible {
+    transform: translateY(-1px);
+  }
+}
+
+/* Touch tactile feedback. Without this the CTA felt "dead" on iOS:
+   the shimmer below was hover-only, so a tap produced zero visible
+   reaction beyond the universal `active:translate-y-px` from Button.
+   A brief brightness pop reads as "the button just heard you" and
+   ships in well under the 100 ms responsiveness floor that turns a
+   tap into a perceived double-tap. Filter is cheap to animate and
+   composites on the GPU, unlike background swaps. */
+.btn-cta:active {
+  filter: brightness(1.08);
 }
 
 /* Shimmer sweep — the single decorative motion primitive on this button.
@@ -623,7 +716,14 @@
   transform: translateX(-120%);
   transition: transform 900ms var(--ease-out-expo);
 }
+/* Trigger sheen on three surfaces:
+     hover/focus-visible  → desktop pointer + keyboard nav
+     :active              → touch tap, otherwise the animation was
+                            invisible on iOS (no hover dwell to start it)
+   The 900 ms duration outlasts a brief tap, so even a quick press
+   gets the full diagonal sweep before the state releases. */
 .btn-cta:hover::before,
-.btn-cta:focus-visible::before {
+.btn-cta:focus-visible::before,
+.btn-cta:active::before {
   transform: translateX(120%);
 }

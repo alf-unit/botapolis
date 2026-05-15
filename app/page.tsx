@@ -160,25 +160,28 @@ export default async function HomePage() {
            ========================================================= */}
         <section className="relative overflow-hidden pt-12 lg:pt-20 pb-16 lg:pb-24">
           {/*
-            Atmospheric glows — hidden from a11y tree.
+            Atmospheric glows — desktop only, hidden from a11y tree.
 
-            Mobile audit (May 2026): the two 600-700 px radial blobs
-            with blur-[100/120px] were re-rasterised on every scroll
-            frame, doubling iOS Safari's paint cost for the hero region.
-            Two changes pin them as cheap composited layers:
+            Round 2 of the mobile audit (May 2026): even with shrunk
+            size + GPU-promoted layers, the radial blobs were still
+            costing iOS Safari noticeable scroll-frame budget. At
+            375 px viewport their visual contribution was already
+            faint — the wider section padding + `overflow: hidden`
+            clipped out the bulk of the glow halo anyway.
 
-              · `transform: translateZ(0)` + `will-change: transform`
-                promote each blob to its own GPU layer so the blur
-                is computed once and the scroll just translates the
-                already-rasterised bitmap.
-              · `size-[420px] blur-[60px]` on mobile, original sizes
-                kicking in at lg. The bigger glows really only read on
-                the wider hero column anyway — at 375 px viewport they
-                were spilling out of the section and into the clip.
+            `hidden lg:block` cuts them out of the mobile render tree
+            entirely (no paint cost, no layer compositing) while
+            preserving the rich-mode effect on desktop hero, which
+            has the GPU headroom and the wider canvas to actually
+            display them.
+
+            `transform: translateZ(0)` + `will-change: transform`
+            remain on the desktop instances so the blur is rasterised
+            once per resize, not per frame.
           */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute -top-40 -right-40 size-[420px] lg:size-[700px] rounded-full opacity-50 blur-[60px] lg:blur-[100px] [transform:translateZ(0)] [will-change:transform]"
+            className="hidden lg:block pointer-events-none absolute -top-40 -right-40 size-[700px] rounded-full opacity-50 blur-[100px] [transform:translateZ(0)] [will-change:transform]"
             style={{
               background:
                 "radial-gradient(circle, rgba(16,185,129,0.22), transparent 60%)",
@@ -186,7 +189,7 @@ export default async function HomePage() {
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute -bottom-60 left-1/3 size-[360px] lg:size-[600px] rounded-full opacity-40 blur-[70px] lg:blur-[120px] [transform:translateZ(0)] [will-change:transform]"
+            className="hidden lg:block pointer-events-none absolute -bottom-60 left-1/3 size-[600px] rounded-full opacity-40 blur-[120px] [transform:translateZ(0)] [will-change:transform]"
             style={{
               background:
                 "radial-gradient(circle, rgba(139,92,246,0.18), transparent 60%)",

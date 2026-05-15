@@ -570,27 +570,32 @@
    ============================================================================ */
 
 /* Glass surface — Navbar after scroll, modals, sticky chrome.
-   Mobile baseline is intentionally lighter: blur(8px) + no saturate
-   boost. The 16-px saturated variant is gorgeous on desktop but on
-   iPhone (≤14 / iOS 16-17 we treat as baseline) the GPU rasterises
-   the blurred layer every scroll frame, and at the Hero size that
-   exceeds the ~16 ms budget — frames drop, the area under the navbar
-   reads as "not yet drawn" during a fast flick (May 2026 mobile audit
-   reproduced this on the homepage screenshot).
-   On hover-capable pointers (≥md desktop) we restore the richer
-   blur. Touch laptops with mouse plugged in fall into the richer
-   path too — that's intentional, they have the GPU budget.
-   Note: we don't transition `backdrop-filter` on the wrapper anymore
-   (see Navbar.tsx); animating the filter itself was the second-most
-   expensive frame work on mobile. */
+   ---------------------------------------------------------------
+   Mobile baseline is OPAQUE — no backdrop-filter at all. The
+   sticky navbar on iOS Safari is the single hottest GPU surface
+   on the page: every scroll-frame has to re-rasterise whatever
+   sits underneath the blurred area. Even at blur(8) the iPhone
+   12-14 baseline drops frames during a fast flick, and Round-2
+   audit confirmed a residual Safari stutter that vanishes when
+   backdrop-filter is removed entirely.
+
+   The visual cost of going opaque on mobile is minimal: at
+   375 px viewport widths the navbar covers almost the full width
+   of the page, so a "glass" reveal of what's underneath was
+   already barely readable. Trading it for buttery scroll is a
+   clear win.
+
+   ≥1024 px AND (hover: hover) — i.e. desktop with a real
+   pointer — restores the rich blur(16) saturate(1.5). Tablets in
+   portrait keep the cheap opaque path, which feels correct for
+   their thumb-driven interaction model anyway. */
 .surface-glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--bg-base);
   border: 1px solid var(--glass-border);
 }
 @media (min-width: 1024px) and (hover: hover) {
   .surface-glass {
+    background: var(--glass-bg);
     backdrop-filter: blur(16px) saturate(1.5);
     -webkit-backdrop-filter: blur(16px) saturate(1.5);
   }

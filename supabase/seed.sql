@@ -631,7 +631,10 @@ select
   'en', 'published',
   'Klaviyo vs Mailchimp 2026 · which one for Shopify stores?',
   'Klaviyo or Mailchimp? We compared both on a real Shopify store. Pricing, deliverability, Shopify integration depth — here''s the verdict.'
-on conflict (slug) do update set
+-- Migration 006 swapped UNIQUE(slug) → UNIQUE(slug, language) on comparisons,
+-- so the conflict target must include language. Otherwise Postgres throws
+-- 42P10 — "no unique or exclusion constraint matching the ON CONFLICT spec".
+on conflict (slug, language) do update set
   verdict = excluded.verdict, updated_at = now();
 
 -- BUG-FIX (May 2026 audit · TZ fixes #1): slug must be alphabetical so
@@ -647,7 +650,7 @@ select
   'en', 'published',
   'Klaviyo vs Omnisend 2026 · the real price/feature comparison',
   'Klaviyo or Omnisend for Shopify? Both tested on a real store. The honest break-even point, segmentation depth, and SMS comparison.'
-on conflict (slug) do update set
+on conflict (slug, language) do update set
   verdict = excluded.verdict, updated_at = now();
 
 insert into public.comparisons (slug, tool_a_id, tool_b_id, verdict, language, status, meta_title, meta_description)
@@ -659,5 +662,5 @@ select
   'en', 'published',
   'Gorgias vs Tidio 2026 · the AI agent showdown for Shopify support',
   'Gorgias Auto-Agent or Tidio Lyro? Both AI agents tested on real ticket queues. The verdict on cost-per-deflection and Shopify integration.'
-on conflict (slug) do update set
+on conflict (slug, language) do update set
   verdict = excluded.verdict, updated_at = now();

@@ -256,11 +256,15 @@ export default async function ToolDetailPage({ params }: PageProps) {
                       Featured
                     </span>
                   )}
+                  {/* `notes` deliberately NOT passed here — pricing_notes can
+                      run multiple sentences in the catalog (e.g. judge-me:
+                      "Free tier covers 99% of needs…") and would overflow
+                      the one-line pill. The note renders as its own caption
+                      below the tagline where it has room. */}
                   <PricingBadge
                     model={tool.pricing_model}
                     min={tool.pricing_min}
                     max={tool.pricing_max}
-                    notes={tool.pricing_notes}
                   />
                 </div>
 
@@ -271,6 +275,12 @@ export default async function ToolDetailPage({ params }: PageProps) {
                 {tool.tagline && (
                   <p className="text-lg leading-[1.55] text-[var(--text-secondary)] max-w-2xl">
                     {tool.tagline}
+                  </p>
+                )}
+
+                {tool.pricing_notes && (
+                  <p className="text-[13px] leading-[1.55] text-[var(--text-tertiary)] max-w-2xl">
+                    {tool.pricing_notes}
                   </p>
                 )}
 

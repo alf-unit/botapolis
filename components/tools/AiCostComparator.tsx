@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowUpRight, Info } from "lucide-react"
 
 import { cn, formatPrice, formatNumber } from "@/lib/utils"
+import { LiveNumber } from "@/components/ui/LiveNumber"
 import { buttonVariants } from "@/components/ui/button"
 import { track } from "@/lib/analytics/events"
 
@@ -334,11 +335,24 @@ export function AiCostComparator({
                     </span>
                     <span
                       className={cn(
-                        "font-mono text-[14px] tabular-nums whitespace-nowrap",
+                        "font-mono text-[14px] whitespace-nowrap",
                         isWinner ? "text-[var(--brand)]" : "text-[var(--text-primary)]",
                       )}
                     >
-                      {formatPrice(r.monthlyCost, { locale, maximumFractionDigits: r.monthlyCost < 10 ? 2 : 0 })}
+                      {/* Tween the per-model monthly cost on every volume /
+                          quality / use-case change. Decimal precision flips
+                          at $10 so single-cent costs read like "$0.42" while
+                          tens-of-dollars read like "$47". */}
+                      <LiveNumber
+                        value={r.monthlyCost}
+                        decimals={r.monthlyCost < 10 ? 2 : 0}
+                        formatter={(n) =>
+                          formatPrice(n, {
+                            locale,
+                            maximumFractionDigits: r.monthlyCost < 10 ? 2 : 0,
+                          })
+                        }
+                      />
                       <span className="text-[var(--text-tertiary)] ml-0.5">/mo</span>
                     </span>
                   </div>
@@ -370,7 +384,14 @@ export function AiCostComparator({
               <p className="mt-1.5 text-[15px] font-semibold text-[var(--text-primary)]">
                 {recommended.model.name}{" "}
                 <span className="font-mono text-[12px] font-normal text-[var(--text-tertiary)]">
-                  {formatPrice(recommended.perItemCost, { locale, maximumFractionDigits: 4 })} / {strings.perItemLabel}
+                  <LiveNumber
+                    value={recommended.perItemCost}
+                    decimals={4}
+                    formatter={(n) =>
+                      formatPrice(n, { locale, maximumFractionDigits: 4 })
+                    }
+                  />{" "}
+                  / {strings.perItemLabel}
                 </span>
               </p>
               {recommended.model.affiliate ? (

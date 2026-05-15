@@ -13,6 +13,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { LiveNumber } from "@/components/ui/LiveNumber"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { ComparisonCard } from "@/components/tools/ComparisonCard"
@@ -692,9 +693,22 @@ function DemoWidget({
             <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--brand)]">
               {strings.resultLabel}
             </span>
-            <span className="font-mono text-[36px] font-medium leading-none tracking-[-0.02em] tabular-nums">
-              $4,410
-            </span>
+            {/* Wave-2 polish (May 2026): the headline figure now
+                count-ups from $0 to $4,410 when the widget scrolls
+                into view, instead of just appearing. Adds the "live
+                calculator" feel without making the inputs interactive
+                (those still live at /tools/email-roi-calculator).
+                `startOnView` defers the tween to viewport entry —
+                so on a phone where the widget renders below the fold
+                in the first paint, the animation is still seen later
+                when the user scrolls down. */}
+            <LiveNumber
+              value={4410}
+              prefix="$"
+              duration={1000}
+              startOnView
+              className="font-mono text-[36px] font-medium leading-none tracking-[-0.02em]"
+            />
             <span className="text-[12px] text-[var(--text-tertiary)]">
               {strings.resultMeta}
             </span>

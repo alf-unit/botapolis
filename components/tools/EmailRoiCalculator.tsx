@@ -8,6 +8,7 @@ import { ArrowUpRight, BookmarkPlus, Info, Loader2, Sparkles } from "lucide-reac
 
 import { cn, formatPrice, formatNumber } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { LiveNumber } from "@/components/ui/LiveNumber"
 import { track } from "@/lib/analytics/events"
 
 /* ----------------------------------------------------------------------------
@@ -433,12 +434,21 @@ export function EmailRoiCalculator({
           </p>
           <p
             className={cn(
-              "relative mt-2 font-mono font-medium tabular-nums tracking-[-0.02em]",
+              "relative mt-2 font-mono font-medium tracking-[-0.02em]",
               "text-[40px] leading-none lg:text-[56px]",
               "text-[var(--text-primary)]",
             )}
           >
-            {formatPrice(result.monthlyRevenue, { locale, maximumFractionDigits: 0 })}
+            {/* LiveNumber tweens from previous to new monthly revenue on
+                every slider change — operators see the number "respond"
+                to the input motion instead of jumping. 400 ms ease-out
+                feels live without overshooting the slider's own debounce. */}
+            <LiveNumber
+              value={result.monthlyRevenue}
+              formatter={(n) =>
+                formatPrice(n, { locale, maximumFractionDigits: 0 })
+              }
+            />
             <span className="ml-2 text-[14px] font-medium text-[var(--text-tertiary)] lg:text-[16px]">
               /mo
             </span>
@@ -455,18 +465,49 @@ export function EmailRoiCalculator({
           <dl className="relative mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border-subtle)] pt-5 text-[12px]">
             <Metric
               label={strings.annualLabel}
-              value={formatPrice(result.annualRevenue, { locale, maximumFractionDigits: 0 })}
+              value={
+                <LiveNumber
+                  value={result.annualRevenue}
+                  formatter={(n) =>
+                    formatPrice(n, { locale, maximumFractionDigits: 0 })
+                  }
+                />
+              }
             />
             <Metric
               label={strings.platformCostLabel}
-              value={formatPrice(result.monthlyCost, { locale, maximumFractionDigits: 0 }) + "/mo"}
+              value={
+                <>
+                  <LiveNumber
+                    value={result.monthlyCost}
+                    formatter={(n) =>
+                      formatPrice(n, { locale, maximumFractionDigits: 0 })
+                    }
+                  />
+                  /mo
+                </>
+              }
             />
             <Metric
               label={strings.roiLabel}
+              // ROI is undefined when platform cost is 0 (free tier) — keep
+              // the em-dash render path for that case, only tween when
+              // there's a finite percentage to show.
               value={
-                result.roiPct == null
-                  ? "—"
-                  : `${formatNumber(Math.round(result.roiPct), { locale, maximumFractionDigits: 0 })}%`
+                result.roiPct == null ? (
+                  "—"
+                ) : (
+                  <LiveNumber
+                    value={Math.round(result.roiPct)}
+                    suffix="%"
+                    formatter={(n) =>
+                      formatNumber(Math.round(n), {
+                        locale,
+                        maximumFractionDigits: 0,
+                      })
+                    }
+                  />
+                )
               }
               accent={result.roiPct != null && result.roiPct >= 500}
             />
@@ -481,12 +522,18 @@ export function EmailRoiCalculator({
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
               {strings.revPerSubLabel}
             </p>
-            <p className="mt-1 font-mono text-[20px] tabular-nums text-[var(--text-primary)]">
-              {formatPrice(result.revenuePerSub, {
-                locale,
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+            <p className="mt-1 font-mono text-[20px] text-[var(--text-primary)]">
+              <LiveNumber
+                value={result.revenuePerSub}
+                decimals={2}
+                formatter={(n) =>
+                  formatPrice(n, {
+                    locale,
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                }
+              />
               <span className="ml-1 text-[12px] font-medium text-[var(--text-tertiary)]">/mo</span>
             </p>
             <p
@@ -641,7 +688,9 @@ function Metric({
   accent = false,
 }: {
   label: string
-  value: string
+  // ReactNode (not string) so we can pass a <LiveNumber/> for tween-on-change.
+  // Plain strings still work — string is a valid ReactNode.
+  value: React.ReactNode
   accent?: boolean
 }) {
   return (

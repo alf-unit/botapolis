@@ -83,7 +83,15 @@ export default function RootLayout({
       <body className="min-h-full bg-background text-foreground font-sans">
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          // System-follows-OS by spec. `defaultTheme` in next-themes is the
+          // fallback used *before* the user has expressed a preference (and
+          // also when they explicitly pick "system" in the toggle). Setting
+          // it to "system" means a first-time visitor lands in whichever
+          // theme their OS is currently in; afterwards localStorage remembers
+          // their choice. The hardcoded "dark" here previously overrode the
+          // spec — light-mode users on macOS / iOS always saw a dark site
+          // until they manually flipped the toggle.
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >

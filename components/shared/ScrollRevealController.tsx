@@ -5,33 +5,48 @@ import * as React from "react"
 /* ----------------------------------------------------------------------------
    ScrollRevealController
    ----------------------------------------------------------------------------
-   One-shot IntersectionObserver that walks every `.scroll-reveal` element
-   on the page and flips `.in-view` on the first time each enters the
-   viewport. Pairs with the CSS rule in globals.css §8.
+   Single IntersectionObserver that watches every `.scroll-reveal` element
+   on the page and flips `.in-view` on the first time each intersects.
+   Pairs with the CSS rule in globals.css §8.
 
-   Mounted exactly once (in app/layout.tsx) — a single observer covers
-   the entire page, NOT one observer per element. After all sections
-   have been revealed the observer is disconnected entirely so it stops
-   contributing to per-frame work.
+   Mounted exactly once via app/layout.tsx so one observer covers the
+   whole page — not one observer per section.
 
-   Why a top-level controller instead of per-section client wrappers:
-     · `app/page.tsx` is a server component; wrapping individual
-       sections would force them to become client islands and break
-       async data fetching at the section level.
-     · One controller costs one effect, one observer, one query
-       selector. Wrapping each of 4 sections would cost 4 hydration
-       boundaries.
+   v3 (May 2026) — the critical fix vs v2:
+     Browsers skip a CSS transition when both the "from" and "to" states
+     are observed in the same frame. v2 added `.in-view` synchronously
+     inside the IO callback, which on first mount fired the same frame
+     the invisible state was applied — net effect, no visible fade.
 
-   Honors `prefers-reduced-motion`: when reduced motion is requested,
-   skip observing entirely and flip every section to `.in-view`
-   immediately so nothing fades. The CSS rule won't transition in
-   that case (global reduced-motion override at §5 collapses
-   transition-duration to 0), so this is belt-and-suspenders.
+     v3 wraps the class flip in a double-rAF (`requestAnimationFrame`
+     called twice). This guarantees the browser has painted at least
+     one frame in the invisible state before the visible state is
+     committed, so the transition has a real from→to to animate.
 
-   Falls back gracefully on browsers without IntersectionObserver
-   (any from this decade has it, but defensive): instantly mark every
-   section as in-view.
+   Honors `prefers-reduced-motion`: skips the observer entirely and
+   adds `.in-view` to every section immediately. The CSS rule's
+   `@media (prefers-reduced-motion: no-preference)` gate at §8 ALSO
+   skips the invisible state for these users, so the class flip is
+   a no-op visually — it's still useful so JS-driven code can rely on
+   `.in-view` as a stable "section has been seen" marker downstream.
+
+   Falls back instantly on browsers without IntersectionObserver
+   (rare from this decade, but defensive).
 ---------------------------------------------------------------------------- */
+
+function reveal(el: Element) {
+  // Double-rAF — give the browser one paint frame in the invisible state
+  // before we toggle to the visible state, otherwise the transition
+  // collapses and the fade is invisible. The first rAF callback runs
+  // before layout, the second after layout has been committed; flipping
+  // the class in the second rAF means a real from→to transition.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      el.classList.add("in-view")
+    })
+  })
+}
+
 export function ScrollRevealController() {
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -51,18 +66,16 @@ export function ScrollRevealController() {
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            entry.target.classList.add("in-view")
+            reveal(entry.target)
             io.unobserve(entry.target)
           }
         }
       },
       {
-        // 15 % of the section needs to be on screen before the fade
-        // fires — far enough into the entry that the user has clearly
-        // arrived, close enough to the edge that the fade still reads
-        // as "appearing as I scroll" rather than "popping into view
-        // late."
-        threshold: 0.15,
+        // 10 % of the section visible is enough to consider it "arrived."
+        // Lower than the v2 15 % so the fade starts earlier in the scroll
+        // and the eye has more time to register the motion.
+        threshold: 0.1,
       },
     )
 

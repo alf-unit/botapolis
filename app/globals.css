@@ -736,60 +736,53 @@
 /* ============================================================================
    8. Scroll Reveal — fade-in on viewport entry (JS-driven, all browsers)
    ----------------------------------------------------------------------------
-   Wrapper class `.scroll-reveal` opts an element into a 24-px translate +
-   opacity fade that plays as the element scrolls into view.
+   Wrapper class `.scroll-reveal` opts an element into a translate + opacity
+   fade that plays as the element scrolls into view. <ScrollRevealController/>
+   in the root layout walks every `.scroll-reveal` element via a single
+   IntersectionObserver and flips `.in-view` on the first time each enters
+   the viewport.
 
-   The first iteration of this primitive used `animation-timeline: view()`
-   (zero JS, CSS-only). Beautiful idea — only works in Chrome/Edge/Opera
-   115+. Safari (Mac AND iOS through 18.x) and Firefox just rendered
-   the static end state, so most visitors saw no reveal at all.
+   v3 (May 2026) — the v2 implementation gated the invisible state on a
+   `.js-scroll-reveal-ready` ancestor class added by an inline boot script.
+   The gate was meant to protect no-JS users from blank sections, but in
+   practice it meant invisible-state and `.in-view` could both apply in
+   the same frame, and the browser silently dropped the transition
+   ("no observable change between frames"). Result: sections appeared
+   instantly, no fade visible — the symptom that prompted this rewrite.
 
-   Replaced with a tiny `IntersectionObserver` controller that adds
-   `.in-view` to each `.scroll-reveal` element the first time it
-   intersects the viewport, then disconnects from that element. CSS
-   handles the actual transition. The observer is mounted once via
-   <ScrollRevealController/> in the root layout — one observer covers
-   every `.scroll-reveal` on the page, not one per element.
+   Working approach:
+     · Invisible state lives directly on `.scroll-reveal` — no ancestor
+       gate. SSR delivers sections with the class already, so the very
+       first paint shows them in their hidden state.
+     · Controller waits one rAF tick after observing, then flips
+       `.in-view`. The rAF gap guarantees the invisible state has been
+       painted at least once, so the transition has a real from→to to
+       animate (this was the bit v2 quietly missed).
+     · `prefers-reduced-motion` skips the invisible state entirely
+       (media-query gate around the whole rule).
+     · No-JS users get a `<noscript>` style override in the body that
+       forces everything visible — crawlers and JS-off humans never
+       see blank sections.
 
-   Why the `.js-scroll-reveal-ready` ancestor gate:
-     · SSR delivers sections with class="scroll-reveal" already on
-       them, but at that point JS hasn't booted yet. If the invisible
-       state was unconditional, no-JS users (and the brief window
-       before hydration) would see blank space.
-     · An inline script in <body> adds `js-scroll-reveal-ready` to
-       <html> synchronously during HTML parsing, BEFORE first paint.
-       That flips the invisible-by-default switch.
-     · No-JS users (rare; usually crawlers) never get the class, so
-       sections render at their final state. Content visibility is
-       non-negotiable.
+   Translate distance is 56 px (about a card-row's height) over 1 s —
+   tuned May 2026 after 24 px / 600 ms read as "appearing" rather than
+   "rising into view." Pair with the longer duration so the eye sees
+   the trip, not just the endpoints.
 
-   `prefers-reduced-motion` users skip the invisible state entirely
-   (the global override at §5 also collapses transitions, but the
-   `:not(...)` rule below means there's nothing to fade from either).
-
-   Per-card stagger deliberately omitted: 4-5 sections × N cards per
-   section quickly compounds into noticeable composited work, and the
+   Per-section reveal only — no per-card stagger. Nested timelines on
+   a calculator-heavy homepage compound into composited work, and the
    whole-section fade reads as deliberate without it.
    ============================================================================ */
 @media (prefers-reduced-motion: no-preference) {
-  .js-scroll-reveal-ready .scroll-reveal {
+  .scroll-reveal {
     opacity: 0;
-    /* Tuned May 2026: original 24-px translate was too subtle to read
-       as motion — sections "appeared" without a sense of arrival. 56 px
-       (about a card-row's worth of height) makes the rise unmistakable
-       without being theatrical. Pair with the longer 1000 ms duration
-       below so the eye actually sees the trip, not just the endpoints. */
     transform: translateY(56px);
     transition:
       opacity   1000ms var(--ease-out-expo),
       transform 1000ms var(--ease-out-expo);
-    /* `will-change` only while the section hasn't been revealed yet —
-       the controller flips `.in-view` ON visibility AND removes the
-       `.scroll-reveal` class once the fade settles is overkill; the
-       browser already drops the hint after the transition ends. */
     will-change: opacity, transform;
   }
-  .js-scroll-reveal-ready .scroll-reveal.in-view {
+  .scroll-reveal.in-view {
     opacity: 1;
     transform: translateY(0);
   }

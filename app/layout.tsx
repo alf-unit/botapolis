@@ -10,32 +10,6 @@ import { PlausibleScript } from "@/components/analytics/PlausibleScript"
 import { ScrollRevealController } from "@/components/shared/ScrollRevealController"
 
 /* ----------------------------------------------------------------------------
-   Anti-flash script for scroll-reveal
-   ----------------------------------------------------------------------------
-   The `.scroll-reveal` CSS rule (globals.css §8) is gated on the
-   `.js-scroll-reveal-ready` class being present on <html>. Without
-   that class, sections render at their final state — which is what
-   we want for no-JS users.
-
-   For JS users we need the invisible state to be active BEFORE first
-   paint, otherwise sections render visible, then JS hydration starts,
-   the controller adds `.in-view`, and there's a moment where every
-   `.scroll-reveal` section flickers as the transition kicks in.
-
-   This inline script runs synchronously while the parser is still
-   building <body>, before any React hydration and before first paint
-   — so the invisible state lands as part of the initial render.
-   Same pattern next-themes uses for its theme bootstrap.
----------------------------------------------------------------------------- */
-const scrollRevealBootstrap = `
-;(function(){
-  try {
-    document.documentElement.classList.add('js-scroll-reveal-ready');
-  } catch (_) { /* fail silent */ }
-})();
-`
-
-/* ----------------------------------------------------------------------------
    Geist (Sans + Mono) via next/font.
    Cyrillic subset is required for the RU locale.
 ---------------------------------------------------------------------------- */
@@ -108,12 +82,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground font-sans">
-        {/* Anti-flash for scroll-reveal — must be first child of <body>
-            so it runs before any visible paint. See bootstrap script
-            comment above. */}
-        <script
-          dangerouslySetInnerHTML={{ __html: scrollRevealBootstrap }}
-        />
+        {/* No-JS fallback for scroll-reveal — invisible-by-default state
+            (globals.css §8) would leave crawlers and JS-off visitors
+            staring at blank sections. This style block is only honoured
+            when JavaScript is disabled, forcing everything visible. */}
+        <noscript>
+          {/* eslint-disable-next-line react/no-unknown-property */}
+          <style>{`.scroll-reveal{opacity:1!important;transform:none!important;}`}</style>
+        </noscript>
         <ScrollRevealController />
         <ThemeProvider
           attribute="class"

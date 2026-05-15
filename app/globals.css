@@ -734,56 +734,58 @@
 }
 
 /* ============================================================================
-   8. Scroll Reveal — progressive-enhancement fade-in on viewport entry
+   8. Scroll Reveal — fade-in on viewport entry (JS-driven, all browsers)
    ----------------------------------------------------------------------------
    Wrapper class `.scroll-reveal` opts an element into a 24-px translate +
-   opacity fade that plays as the element scrolls into view. Implementation
-   uses `animation-timeline: view()` — modern CSS that drives an animation
-   off the element's own viewport position with zero JS, zero observers,
-   zero re-renders. Animation cost is composited on the GPU and runs in
-   parallel with the scroll, so it costs nothing on the main thread.
+   opacity fade that plays as the element scrolls into view.
 
-   Support matrix (as of May 2026):
-     · Chrome / Edge / Opera 115+   — full support
-     · Safari iOS 18.x              — NO support (Apple committed for 26)
-     · Firefox 131+                 — behind flag, off by default
+   The first iteration of this primitive used `animation-timeline: view()`
+   (zero JS, CSS-only). Beautiful idea — only works in Chrome/Edge/Opera
+   115+. Safari (Mac AND iOS through 18.x) and Firefox just rendered
+   the static end state, so most visitors saw no reveal at all.
 
-   The `@supports` gate means non-supporting browsers (Safari iOS being
-   the practical one we care about) render the element at its final state
-   immediately — no JS shim, no broken/invisible content if the feature
-   query fails. Reveal is a nice-to-have; visibility is non-negotiable.
+   Replaced with a tiny `IntersectionObserver` controller that adds
+   `.in-view` to each `.scroll-reveal` element the first time it
+   intersects the viewport, then disconnects from that element. CSS
+   handles the actual transition. The observer is mounted once via
+   <ScrollRevealController/> in the root layout — one observer covers
+   every `.scroll-reveal` on the page, not one per element.
 
-   `prefers-reduced-motion` users skip the animation entirely. The §5
-   global override already collapses animation-duration to 0 for them,
-   but gating here too makes intent explicit and avoids registering the
-   scroll-timeline observer at all on accessibility-sensitive devices.
+   Why the `.js-scroll-reveal-ready` ancestor gate:
+     · SSR delivers sections with class="scroll-reveal" already on
+       them, but at that point JS hasn't booted yet. If the invisible
+       state was unconditional, no-JS users (and the brief window
+       before hydration) would see blank space.
+     · An inline script in <body> adds `js-scroll-reveal-ready` to
+       <html> synchronously during HTML parsing, BEFORE first paint.
+       That flips the invisible-by-default switch.
+     · No-JS users (rare; usually crawlers) never get the class, so
+       sections render at their final state. Content visibility is
+       non-negotiable.
 
-   Note: this primitive deliberately has NO stagger. Per-card stagger
-   would mean N timeline instances + N animation-delays, which on a
-   homepage with 4-5 visible sections × multiple cards each balloons
-   into composited work. The whole-section fade reads as deliberate
-   without that cost.
+   `prefers-reduced-motion` users skip the invisible state entirely
+   (the global override at §5 also collapses transitions, but the
+   `:not(...)` rule below means there's nothing to fade from either).
+
+   Per-card stagger deliberately omitted: 4-5 sections × N cards per
+   section quickly compounds into noticeable composited work, and the
+   whole-section fade reads as deliberate without it.
    ============================================================================ */
 @media (prefers-reduced-motion: no-preference) {
-  @supports (animation-timeline: view()) {
-    .scroll-reveal {
-      animation: scroll-reveal-in linear both;
-      animation-timeline: view();
-      /* `entry 0% entry 60%` — animation starts when the element's
-         leading edge touches the viewport bottom, completes when 60 %
-         of the element has entered. Snappy enough that the eye sees
-         it land before focusing on the content. */
-      animation-range: entry 0% entry 60%;
-    }
-    @keyframes scroll-reveal-in {
-      from {
-        opacity: 0;
-        transform: translateY(24px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
+  .js-scroll-reveal-ready .scroll-reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+      opacity   600ms var(--ease-out-expo),
+      transform 600ms var(--ease-out-expo);
+    /* `will-change` only while the section hasn't been revealed yet —
+       the controller flips `.in-view` ON visibility AND removes the
+       `.scroll-reveal` class once the fade settles is overkill; the
+       browser already drops the hint after the transition ends. */
+    will-change: opacity, transform;
+  }
+  .js-scroll-reveal-ready .scroll-reveal.in-view {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

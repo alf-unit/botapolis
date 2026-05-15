@@ -9,42 +9,6 @@ import { PostHogProvider } from "@/components/analytics/PostHogProvider"
 import { PlausibleScript } from "@/components/analytics/PlausibleScript"
 
 /* ----------------------------------------------------------------------------
-   Chrome-iOS prefers-color-scheme workaround
-   ----------------------------------------------------------------------------
-   May 2026 mobile audit found a stable anomaly on Chrome iOS:
-   `window.matchMedia('(prefers-color-scheme: dark)').matches` returns
-   `true` in incognito on devices where iOS is in Light Mode. Same
-   page, same iPhone, opened in Safari Private returns `light=true`
-   correctly — proving the device preference is Light and only Chrome
-   iOS is reporting otherwise (likely an anti-fingerprint mask Chrome
-   applies in private browsing). The query is stable across t0 / 250 /
-   1000 ms, so it isn't a hydration race we can wait out.
-
-   Fix: pre-fill `localStorage.theme = "light"` before next-themes
-   reads it, but ONLY when the UA contains `CriOS` (Chrome iOS) AND
-   storage is empty (= first paint, no user override yet). Every
-   other browser falls through to the standard `defaultTheme="system"`
-   pipeline unchanged. Returning visitors who've explicitly clicked
-   the toggle keep their persisted choice because we never overwrite
-   a non-empty value.
-
-   The script is delivered inline as the first child of <body> so it
-   runs synchronously during HTML parsing — before React hydrates,
-   before next-themes' own script reads storage, before any visible
-   paint. This is the same pattern next-themes itself uses for its
-   anti-flash boot script.
----------------------------------------------------------------------------- */
-const chromeIOSThemeBootstrap = `
-;(function(){
-  try {
-    if (/CriOS/.test(navigator.userAgent) && !localStorage.getItem('theme')) {
-      localStorage.setItem('theme', 'light');
-    }
-  } catch (_) { /* private mode storage exceptions — fail silent */ }
-})();
-`
-
-/* ----------------------------------------------------------------------------
    Geist (Sans + Mono) via next/font.
    Cyrillic subset is required for the RU locale.
 ---------------------------------------------------------------------------- */
@@ -117,20 +81,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground font-sans">
-        {/* Chrome-iOS prefers-color-scheme workaround. MUST be the first
-            child of <body> so it runs before next-themes' own boot
-            script reads localStorage. See the chromeIOSThemeBootstrap
-            comment above for the diagnostic that led here. */}
-        <script
-          dangerouslySetInnerHTML={{ __html: chromeIOSThemeBootstrap }}
-        />
         <ThemeProvider
           attribute="class"
           // Spec: follow OS preference for first-time visitors, remember
-          // their pick once they touch the toggle. The CriOS-targeted
-          // bootstrap script above patches the one browser that lies
-          // about its system preference; every other agent flows through
-          // here unchanged.
+          // their pick once they touch the toggle. Some browsers (notably
+          // Chrome iOS in incognito) report `prefers-color-scheme: dark`
+          // regardless of the iOS Display setting — owner-decided we
+          // don't work around that here. If a browser misreports system
+          // preference, that's between the browser and its user.
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange

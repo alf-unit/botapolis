@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 import { PostHogProvider } from "@/components/analytics/PostHogProvider"
 import { PlausibleScript } from "@/components/analytics/PlausibleScript"
-import { ThemeDebugger } from "@/components/shared/ThemeDebugger"
 
 /* ----------------------------------------------------------------------------
    Geist (Sans + Mono) via next/font.
@@ -84,16 +83,21 @@ export default function RootLayout({
       <body className="min-h-full bg-background text-foreground font-sans">
         <ThemeProvider
           attribute="class"
-          // System-follows-OS by spec. `defaultTheme` in next-themes is the
-          // fallback used *before* the user has expressed a preference (and
-          // also when they explicitly pick "system" in the toggle). Setting
-          // it to "system" means a first-time visitor lands in whichever
-          // theme their OS is currently in; afterwards localStorage remembers
-          // their choice. The hardcoded "dark" here previously overrode the
-          // spec — light-mode users on macOS / iOS always saw a dark site
-          // until they manually flipped the toggle.
-          defaultTheme="system"
-          enableSystem
+          // Hard light default, owner-decided May 2026. Earlier iteration
+          // tried `defaultTheme="system"` + `enableSystem` so first paint
+          // mirrored the OS — but iOS Chrome reports `prefers-color-scheme:
+          // dark` based on its own in-app theme setting, NOT the iOS
+          // Display & Brightness setting. Light-Mode iPhone users on
+          // Chrome iOS were still landing on a dark site, defeating the
+          // point of the "follow system" rewrite.
+          //
+          // Verdict: deterministic Light default everywhere. Visitors who
+          // want Dark click the Sun/Moon toggle in the navbar; their
+          // choice is persisted in localStorage so it survives future
+          // visits. enableSystem stays off because there's no longer a
+          // way to express "system" in this 2-state toggle anyway.
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           {/* PostHog is a thin wrapper that initialises posthog-js on the
@@ -106,12 +110,6 @@ export default function RootLayout({
               actions, and any future async feedback. Placed outside the
               tooltip provider so toasts aren't constrained by its bounds. */}
           <Toaster position="bottom-right" richColors closeButton />
-          {/* TEMPORARY (May 2026, mobile audit): diagnostic overlay
-              for the "iPhone Chrome incognito loads dark on a Light-Mode
-              device" anomaly. Activated only by `?debug-theme=1` query
-              param so prod visitors never see it. Remove this and the
-              component file once the anomaly is understood. */}
-          <ThemeDebugger />
         </ThemeProvider>
         {/* Plausible — server-rendered <Script> that no-ops unless
             NEXT_PUBLIC_PLAUSIBLE_ENABLED === "true". Sits outside the

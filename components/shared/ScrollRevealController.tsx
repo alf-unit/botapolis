@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { usePathname } from "next/navigation"
 
 /* ----------------------------------------------------------------------------
    ScrollRevealController
@@ -9,8 +10,16 @@ import * as React from "react"
    on the page and flips `.in-view` on the first time each intersects.
    Pairs with the CSS rule in globals.css §8.
 
-   Mounted exactly once via app/layout.tsx so one observer covers the
-   whole page — not one observer per section.
+   Mounted once via app/layout.tsx so one observer covers the whole page —
+   not one observer per section. The `usePathname()` dependency below
+   means the observer is REBUILT on every client-side navigation, which
+   matters: the layout (and this controller) persist across route swaps
+   in Next App Router, but the children below it get re-mounted with
+   fresh `.scroll-reveal` nodes that the previous observer no longer
+   sees. Without the pathname dep, a click on the logo from /reviews →
+   / would land on a homepage where Featured Tools / Comparisons /
+   Reviews / Categories all stayed at `opacity: 0` forever. (Reproduced
+   May 2026 — half the page just didn't show up.)
 
    v3 (May 2026) — the critical fix vs v2:
      Browsers skip a CSS transition when both the "from" and "to" states
@@ -22,6 +31,10 @@ import * as React from "react"
      called twice). This guarantees the browser has painted at least
      one frame in the invisible state before the visible state is
      committed, so the transition has a real from→to to animate.
+
+   Selector is scoped to `:not(.in-view)` so a returning page (browser
+   back/forward into one we already revealed) doesn't replay the fade —
+   nodes that still carry the class from before stay where they are.
 
    Honors `prefers-reduced-motion`: skips the observer entirely and
    adds `.in-view` to every section immediately. The CSS rule's
@@ -48,10 +61,14 @@ function reveal(el: Element) {
 }
 
 export function ScrollRevealController() {
+  const pathname = usePathname()
+
   React.useEffect(() => {
     if (typeof window === "undefined") return
 
-    const all = document.querySelectorAll<HTMLElement>(".scroll-reveal")
+    const all = document.querySelectorAll<HTMLElement>(
+      ".scroll-reveal:not(.in-view)",
+    )
     if (all.length === 0) return
 
     const reduced = window.matchMedia(
@@ -81,7 +98,7 @@ export function ScrollRevealController() {
 
     all.forEach((el) => io.observe(el))
     return () => io.disconnect()
-  }, [])
+  }, [pathname])
 
   return null
 }

@@ -228,12 +228,15 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
               // from the locale prefix the page passed in.
               language={localePrefix === "/ru" ? "ru" : "en"}
               className="mt-6 w-full max-w-[480px]"
-              // Mobile: the form stacks (flex-col), where a bare <input>
-              // (a replaced element) won't stretch under align-stretch and
-              // collapses to its intrinsic ~20ch width while the button
-              // fills. `w-full` forces full width. Harmless on desktop —
-              // there the row layout's `flex-1` already drives the width.
-              inputClassName="w-full"
+              // Mobile: the form stacks (flex-col). A bare <input> is a
+              // replaced element — without an explicit `display:block`,
+              // `width:100%` alone doesn't reliably make it fill, so it
+              // collapses to its intrinsic ~20ch width while the
+              // inline-flex button stretches full. `block w-full` mirrors
+              // the design-v.026 `.input { display:block; width:100% }`
+              // recipe and is bulletproof across engines. Harmless on
+              // desktop — there the row layout's `flex-1` drives width.
+              inputClassName="block w-full"
             />
             <p className="mt-3 text-[12px] text-[var(--text-tertiary)]">
               {strings.newsletter.footnote}

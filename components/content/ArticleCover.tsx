@@ -133,25 +133,49 @@ function CoverFill({
   ogCoverHref?: string
   sizes: string
 }) {
-  // Tier 1 wins over tier 2; tier 3 (gradient) only when both are absent.
-  const imageSrc = coverImage ?? ogCoverHref ?? null
-  const isOg = !coverImage && !!ogCoverHref
-
-  if (imageSrc) {
+  // Tier 1 — a real produced/licensed photo. Theme-agnostic, single
+  // optimised render (AVIF/WebP pipeline).
+  if (coverImage) {
     return (
       <Image
         // Decorative: the article <h1> / card title already carry the
         // name, so an empty alt avoids a duplicate SR announcement.
-        src={imageSrc}
+        src={coverImage}
         alt=""
         fill
         sizes={sizes}
         className="object-cover"
-        // The OG cover is an already-generated, edge-cached raster from
-        // our own route; re-running the optimiser on it is pure waste.
-        // Real photos still get the AVIF/WebP pipeline.
-        unoptimized={isOg}
       />
+    )
+  }
+
+  // Tier 2 — the programmatic OG cover. It's a static raster baked with
+  // a fixed background, so a single image would sit on the page as a
+  // foreign dark (or light) block in the opposite theme. Render BOTH
+  // theme bakes and let CSS show the one matching the site theme — no
+  // JS, no FOUC, no layout shift (both fill the same box, one is
+  // display:none). Same OG cache key per theme; unoptimized (already
+  // an edge-cached raster from our own route).
+  if (ogCoverHref) {
+    return (
+      <>
+        <Image
+          src={`${ogCoverHref}&theme=light`}
+          alt=""
+          fill
+          sizes={sizes}
+          className="object-cover dark:hidden"
+          unoptimized
+        />
+        <Image
+          src={`${ogCoverHref}&theme=dark`}
+          alt=""
+          fill
+          sizes={sizes}
+          className="hidden object-cover dark:block"
+          unoptimized
+        />
+      </>
     )
   }
 

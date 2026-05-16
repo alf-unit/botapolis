@@ -13,10 +13,13 @@
  * site OG and as a smoke-test from /api/og itself.
  *
  * `?variant=cover` switches to a logo-forward in-page cover composition
- * (used by <ArticleCover>): big brand plate + eyebrow + optional rating,
- * deliberately NO title/description so it never duplicates the H1 that
- * sits right next to it on the article page. Extra params:
- *   &eyebrow=Klaviyo+review   &rating=8.7
+ * (used by <ArticleCover> / <ReviewCardCover>): big brand plate + eyebrow
+ * + optional rating, deliberately NO title/description so it never
+ * duplicates the H1 that sits right next to it on the article page.
+ * Extra params:
+ *   &eyebrow=Klaviyo+review   &rating=8.7   &theme=light|dark (default dark)
+ * The caller renders both themes and CSS shows the one matching the
+ * site theme, so the cover blends into the page surface in both modes.
  */
 import { ImageResponse } from "next/og"
 import type { NextRequest } from "next/server"
@@ -58,6 +61,27 @@ export async function GET(req: NextRequest) {
   // centred so the 21:9 crop <ArticleCover> applies never clips it.
   // --------------------------------------------------------------------------
   if (variant === "cover") {
+    // Theme-matched palette. The cover is a static raster, so it can't
+    // follow CSS vars — <CoverFill> renders BOTH themes and CSS shows the
+    // one matching the site theme. Hex values mirror globals.css tokens
+    // (:root = light, .dark = dark) so the cover blends into the page
+    // surface instead of sitting on it as a foreign dark/light block.
+    const dark = searchParams.get("theme") !== "light"
+    const P = dark
+      ? {
+          bg: "#0A0A0B", text: "#A1A1AA", sep: "#3F3F46",
+          plate: "#FFFFFF", plateBorder: "#27272A",
+          mintGlow: "rgba(16,185,129,0.34)", violetGlow: "rgba(139,92,246,0.26)",
+          pillBorder: "rgba(16,185,129,0.35)", pillBg: "rgba(16,185,129,0.10)",
+        }
+      : {
+          // --bg-base / --text-secondary / --border-base (light tokens).
+          // Softer glows so the tint stays atmospheric on a light canvas.
+          bg: "#FAFAF9", text: "#52525B", sep: "#D4D4D8",
+          plate: "#FFFFFF", plateBorder: "#E4E4E7",
+          mintGlow: "rgba(16,185,129,0.18)", violetGlow: "rgba(139,92,246,0.14)",
+          pillBorder: "rgba(16,185,129,0.40)", pillBg: "rgba(16,185,129,0.12)",
+        }
     return new ImageResponse(
       (
         <div
@@ -69,8 +93,8 @@ export async function GET(req: NextRequest) {
             alignItems:     "center",
             justifyContent: "center",
             gap:            36,
-            background:     "#0A0A0B",
-            color:          "#FAFAFA",
+            background:     P.bg,
+            color:          P.text,
             fontFamily:     "Geist, system-ui, sans-serif",
             position:       "relative",
           }}
@@ -81,7 +105,7 @@ export async function GET(req: NextRequest) {
             style={{
               position: "absolute", top: -260, right: -180,
               width: 760, height: 760, borderRadius: "9999px",
-              background: "radial-gradient(circle, rgba(16,185,129,0.34), rgba(16,185,129,0) 64%)",
+              background: `radial-gradient(circle, ${P.mintGlow}, rgba(16,185,129,0) 64%)`,
               filter: "blur(46px)",
             }}
           />
@@ -89,13 +113,13 @@ export async function GET(req: NextRequest) {
             style={{
               position: "absolute", bottom: -280, left: -160,
               width: 720, height: 720, borderRadius: "9999px",
-              background: "radial-gradient(circle, rgba(139,92,246,0.26), rgba(139,92,246,0) 60%)",
+              background: `radial-gradient(circle, ${P.violetGlow}, rgba(139,92,246,0) 60%)`,
               filter: "blur(54px)",
             }}
           />
 
           {/* Brand plate — mirrors <ToolLogo>'s constant white plate so a
-              mono-dark vendor mark stays legible on the dark canvas. */}
+              mono-dark vendor mark stays legible on either canvas. */}
           {logoSrc && (
             <div
               style={{
@@ -105,8 +129,8 @@ export async function GET(req: NextRequest) {
                 width:          176,
                 height:         176,
                 borderRadius:   32,
-                background:     "#FFFFFF",
-                border:         "1px solid #27272A",
+                background:     P.plate,
+                border:         `1px solid ${P.plateBorder}`,
                 position:       "relative",
               }}
             >
@@ -135,14 +159,14 @@ export async function GET(req: NextRequest) {
                 letterSpacing:  "0.14em",
                 fontSize:       24,
                 fontWeight:     600,
-                color:          "#A1A1AA",
+                color:          P.text,
               }}
             >
               {eyebrow}
             </span>
             {rating && (
               <>
-                <span style={{ color: "#3F3F46", fontSize: 24 }}>·</span>
+                <span style={{ color: P.sep, fontSize: 24 }}>·</span>
                 {/* Mint rating pill — the one warm signal on the cover. */}
                 <span
                   style={{
@@ -154,8 +178,8 @@ export async function GET(req: NextRequest) {
                     fontSize:      24,
                     fontWeight:    600,
                     color:         "#10B981",
-                    border:        "1px solid rgba(16,185,129,0.35)",
-                    background:    "rgba(16,185,129,0.10)",
+                    border:        `1px solid ${P.pillBorder}`,
+                    background:    P.pillBg,
                   }}
                 >
                   <span style={{ fontSize: 18 }}>●</span>

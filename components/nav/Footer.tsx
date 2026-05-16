@@ -226,8 +226,23 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
               source="footer"
               language={localePrefix === "/ru" ? "ru" : "en"}
               className="mt-6 w-full max-w-[480px]"
-              inputClassName="block w-full h-14 text-base px-4"
-              buttonClassName="h-14 px-6 text-base"
+              // design-v.026 newsletter geometry, copied verbatim from
+              // New_Design/mockups/styles.css `.input` + `.btn` (both
+              // height:40px, radius-md). ROOT CAUSE of the "thin strip"
+              // bug: NewsletterForm's base input carries `flex-1`
+              // (flex-basis:0%). On mobile the form is `flex-col`, so on
+              // the COLUMN main axis flex-basis:0% overrode every height
+              // the previous fixes set (h-11 → h-14 all swallowed) and
+              // the input collapsed to ~content height while the button
+              // (no flex-1) kept its height → thin input + fat button.
+              // Mockup applies `flex:1` to the input only in the desktop
+              // ROW (`.nl-form .input`); on mobile it's a plain `.input`.
+              // So: `flex-none` on mobile (height now actually applies),
+              // `sm:flex-1` in the row. Font kept at 16px (text-base) —
+              // mockup ships 14px but <16px triggers iOS Safari auto-zoom
+              // (HANDOFF hard rule); 16px fits a 40px field fine.
+              inputClassName="block w-full h-10 flex-none sm:flex-1 px-3 text-base"
+              buttonClassName="h-10 px-4 text-base"
             />
             <p className="mt-3 text-[12px] text-[var(--text-tertiary)]">
               {strings.newsletter.footnote}

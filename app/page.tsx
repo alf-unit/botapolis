@@ -17,6 +17,7 @@ import { LiveNumber } from "@/components/ui/LiveNumber"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { ComparisonCard } from "@/components/tools/ComparisonCard"
+import { coverGradient, COVER_STRIPE } from "@/components/content/ArticleCover"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getAllMdxFrontmatter } from "@/lib/content/mdx"
@@ -444,12 +445,29 @@ export default async function HomePage() {
                     <Link
                       href={`${localePrefix}/reviews/${slug}`}
                       className={cn(
-                        "group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl",
-                        "border border-[var(--border-base)] bg-[var(--bg-surface)] p-6",
+                        "group relative flex h-full flex-col overflow-hidden rounded-2xl",
+                        "border border-[var(--border-base)] bg-[var(--bg-surface)]",
                         "shadow-[var(--shadow-sm)] transition-[transform,box-shadow,border-color] duration-200 ease-[var(--ease-out-expo)]",
                         "hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] hover:border-[var(--border-strong)]",
                       )}
                     >
+                      {/* Cover — matches design-v.026 homepage.html
+                          `.review-cover`: full-bleed 16:9 deterministic
+                          brand→violet gradient + diagonal stripe, shared
+                          recipe with <ArticleCover> so the card and the
+                          article page show the same colour per review. */}
+                      <div
+                        aria-hidden="true"
+                        className="relative aspect-[16/9] border-b border-[var(--border-base)]"
+                        style={{ background: coverGradient(slug) }}
+                      >
+                        <div
+                          className="absolute inset-0"
+                          style={{ background: COVER_STRIPE }}
+                        />
+                      </div>
+
+                      <div className="flex flex-1 flex-col gap-4 p-6">
                       <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
                         <span>{frontmatter.publishedAt}</span>
                         {frontmatter.rating != null && (
@@ -474,6 +492,7 @@ export default async function HomePage() {
                           aria-hidden="true"
                         />
                       </span>
+                      </div>
                     </Link>
                   </li>
                 ))}

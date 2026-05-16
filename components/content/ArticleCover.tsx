@@ -71,14 +71,29 @@ function hashSlug(slug: string): number {
   return Math.abs(h)
 }
 
+/**
+ * The deterministic brand→violet cover gradient for a slug, as a CSS
+ * `background` string. Single source of truth shared by <ArticleCover>
+ * (the 21:9 article strip) and the homepage "Latest deep reviews" card
+ * thumbnails — so a review's cover colour is identical on the card, the
+ * /reviews index and the article page (matches design-v.026 homepage.html
+ * `.review-cover`, which is the same recipe at 16:9).
+ */
+export function coverGradient(slug: string): string {
+  const v = VARIANTS[hashSlug(slug) % VARIANTS.length]
+  return `linear-gradient(135deg, color-mix(in oklch, ${v.from} ${v.fromPct}%, var(--bg-muted)), color-mix(in oklch, ${v.to} ${v.toPct}%, var(--bg-muted)))`
+}
+
+/** Diagonal 12px stripe overlay — the texture both cover surfaces share. */
+export const COVER_STRIPE =
+  "repeating-linear-gradient(45deg, transparent 0 12px, rgba(255,255,255,0.04) 12px 13px)"
+
 export function ArticleCover({
   slug,
   coverImage,
   ogCoverHref,
   className,
 }: ArticleCoverProps) {
-  const v = VARIANTS[hashSlug(slug) % VARIANTS.length]
-
   // Tier 1 wins over tier 2; tier 3 (gradient) only when both are absent.
   const imageSrc = coverImage ?? ogCoverHref ?? null
   const isOg = !coverImage && !!ogCoverHref
@@ -123,19 +138,14 @@ export function ArticleCover({
       <div
         aria-hidden="true"
         className={boxClass}
-        style={{
-          background: `linear-gradient(135deg, color-mix(in oklch, ${v.from} ${v.fromPct}%, var(--bg-muted)), color-mix(in oklch, ${v.to} ${v.toPct}%, var(--bg-muted)))`,
-        }}
+        style={{ background: coverGradient(slug) }}
       >
         {/* Diagonal stripe overlay — 12px transparent, 1px white-04. Same
             repeating-linear-gradient recipe as the home-page review-card
             covers so the two surfaces feel related. */}
         <div
           className="absolute inset-0"
-          style={{
-            background:
-              "repeating-linear-gradient(45deg, transparent 0 12px, rgba(255,255,255,0.04) 12px 13px)",
-          }}
+          style={{ background: COVER_STRIPE }}
         />
       </div>
     </div>

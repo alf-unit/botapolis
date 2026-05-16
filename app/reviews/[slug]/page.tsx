@@ -6,7 +6,7 @@ import type { Metadata } from "next"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { ArticleHero } from "@/components/content/ArticleHero"
-import { ArticleCover } from "@/components/content/ArticleCover"
+import { ArticleCover, reviewOgCoverHref } from "@/components/content/ArticleCover"
 import { TableOfContents } from "@/components/content/TableOfContents"
 import { ProsConsList } from "@/components/content/ProsConsList"
 import { AffiliateButton } from "@/components/content/AffiliateButton"
@@ -203,13 +203,12 @@ export default async function ReviewPage({ params }: PageProps) {
   // Programmatic brand cover: the tool's official logo on the mint→violet
   // OG atmosphere. `coverImage` in frontmatter overrides it with a real
   // photo; ArticleCover falls back to its gradient if neither resolves.
-  const coverRating = frontmatter.rating ?? tool?.rating ?? null
-  const ogCoverHref = `/api/og?${new URLSearchParams({
-    variant: "cover",
-    eyebrow: tool?.name ? `${tool.name} ${t.eyebrow.toLowerCase()}` : t.eyebrow,
-    ...(tool?.logo_url ? { logo: tool.logo_url } : {}),
-    ...(coverRating != null ? { rating: String(coverRating) } : {}),
-  }).toString()}`
+  const ogCoverHref = reviewOgCoverHref({
+    toolName: tool?.name,
+    logoUrl: tool?.logo_url,
+    rating: frontmatter.rating ?? tool?.rating ?? null,
+    eyebrowWord: t.eyebrow,
+  })
 
   return (
     <>

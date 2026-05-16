@@ -2,13 +2,17 @@ import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 /* ----------------------------------------------------------------------------
-   <ArticleCover>
+   Article cover system
    ----------------------------------------------------------------------------
-   Decorative 21:9 gradient strip rendered between ArticleHero and the
-   article body on /reviews/[slug] and /guides/[slug]. Mirrors the
-   `.cover-img` block from the New_Design mockups (review-klaviyo.html,
-   guide.html) — same aspect, same gradient-into-bg-muted tint, plus a
-   diagonal stripe overlay for visual texture.
+   One tiered cover (real photo → programmatic next/og → deterministic
+   gradient) rendered at two aspect ratios from one shared <CoverFill>:
+     • <ArticleCover>    — 21:9 strip on /reviews/[slug], /guides/[slug]
+     • <ReviewCardCover> — 16:9 full-bleed on the homepage review cards
+   plus helpers `coverGradient` / `COVER_STRIPE` / `reviewOgCoverHref`.
+
+   Mirrors the `.cover-img` / `.review-cover` blocks from the New_Design
+   mockups (review-klaviyo.html, guide.html, homepage.html) — same
+   gradient-into-bg-muted tint + diagonal stripe texture.
 
    The gradient variant is picked deterministically by hashing the article
    slug, so every article keeps its OWN colour identity across deploys
@@ -88,66 +92,146 @@ export function coverGradient(slug: string): string {
 export const COVER_STRIPE =
   "repeating-linear-gradient(45deg, transparent 0 12px, rgba(255,255,255,0.04) 12px 13px)"
 
+/**
+ * Builds the /api/og?variant=cover URL for a review. SINGLE source of
+ * truth: the article page (the 21:9 strip) and the homepage "Latest
+ * deep reviews" card both call this, so a review's cover is byte-for-byte
+ * the same image in both places (same params → same OG cache key).
+ *
+ * `eyebrowWord` is the localised section label ("Review" / "Обзор"); the
+ * cover shows "<Tool> review" when the tool is known, else just the word.
+ */
+export function reviewOgCoverHref(opts: {
+  toolName?: string | null
+  logoUrl?: string | null
+  rating?: number | null
+  eyebrowWord: string
+}): string {
+  const { toolName, logoUrl, rating, eyebrowWord } = opts
+  return `/api/og?${new URLSearchParams({
+    variant: "cover",
+    eyebrow: toolName ? `${toolName} ${eyebrowWord.toLowerCase()}` : eyebrowWord,
+    ...(logoUrl ? { logo: logoUrl } : {}),
+    ...(rating != null ? { rating: String(rating) } : {}),
+  }).toString()}`
+}
+
+/**
+ * The tiered cover content, absolutely filling its (relative) parent.
+ * Shared by <ArticleCover> and <ReviewCardCover> so the 3-tier priority
+ * — real photo → programmatic OG → gradient — lives in exactly one place
+ * and never drifts between the article page and the homepage card.
+ */
+function CoverFill({
+  slug,
+  coverImage,
+  ogCoverHref,
+  sizes,
+}: {
+  slug: string
+  coverImage?: string
+  ogCoverHref?: string
+  sizes: string
+}) {
+  // Tier 1 wins over tier 2; tier 3 (gradient) only when both are absent.
+  const imageSrc = coverImage ?? ogCoverHref ?? null
+  const isOg = !coverImage && !!ogCoverHref
+
+  if (imageSrc) {
+    return (
+      <Image
+        // Decorative: the article <h1> / card title already carry the
+        // name, so an empty alt avoids a duplicate SR announcement.
+        src={imageSrc}
+        alt=""
+        fill
+        sizes={sizes}
+        className="object-cover"
+        // The OG cover is an already-generated, edge-cached raster from
+        // our own route; re-running the optimiser on it is pure waste.
+        // Real photos still get the AVIF/WebP pipeline.
+        unoptimized={isOg}
+      />
+    )
+  }
+
+  return (
+    <>
+      <div
+        className="absolute inset-0"
+        style={{ background: coverGradient(slug) }}
+      />
+      {/* Diagonal stripe — 12px transparent, 1px white-04. */}
+      <div className="absolute inset-0" style={{ background: COVER_STRIPE }} />
+    </>
+  )
+}
+
+/**
+ * The 21:9 cover strip between the hero and the article body on
+ * /reviews/[slug] and /guides/[slug]. 21:9 on phones (~375px) is
+ * ~160px tall — compact enough not to push the body off the first screen.
+ */
 export function ArticleCover({
   slug,
   coverImage,
   ogCoverHref,
   className,
 }: ArticleCoverProps) {
-  // Tier 1 wins over tier 2; tier 3 (gradient) only when both are absent.
-  const imageSrc = coverImage ?? ogCoverHref ?? null
-  const isOg = !coverImage && !!ogCoverHref
-
-  // Shared box — same 21:9, radius and border across all three tiers so
-  // the page rhythm never shifts based on which cover is available.
-  // 21:9 on phones (~375px) is ~160px tall: compact enough not to push
-  // the article body off the first screenful.
-  const boxClass = cn(
-    "relative w-full overflow-hidden",
-    "aspect-[21/9] rounded-2xl border border-[var(--border-base)]",
-    className,
-  )
-
-  if (imageSrc) {
-    return (
-      <div className="container-default mt-2 lg:mt-4">
-        <div className={boxClass}>
-          <Image
-            // Decorative: the article <h1> already carries the title, so
-            // an empty alt keeps screen readers from announcing it twice.
-            src={imageSrc}
-            alt=""
-            fill
-            // The cover never exceeds the article container (~960px) and
-            // is one-per-page below the hero — not LCP-critical, lazy is
-            // correct and keeps it off the initial paint budget.
-            sizes="(min-width: 1024px) 960px, 100vw"
-            className="object-cover"
-            // The OG cover is an already-generated, edge-cached raster
-            // from our own route; re-running the image optimiser on it is
-            // pure waste. Real photos still get the AVIF/WebP pipeline.
-            unoptimized={isOg}
-          />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="container-default mt-2 lg:mt-4">
       <div
         aria-hidden="true"
-        className={boxClass}
-        style={{ background: coverGradient(slug) }}
+        className={cn(
+          "relative w-full overflow-hidden",
+          "aspect-[21/9] rounded-2xl border border-[var(--border-base)]",
+          className,
+        )}
       >
-        {/* Diagonal stripe overlay — 12px transparent, 1px white-04. Same
-            repeating-linear-gradient recipe as the home-page review-card
-            covers so the two surfaces feel related. */}
-        <div
-          className="absolute inset-0"
-          style={{ background: COVER_STRIPE }}
+        <CoverFill
+          slug={slug}
+          coverImage={coverImage}
+          ogCoverHref={ogCoverHref}
+          // The strip never exceeds the article container (~960px) and
+          // sits below the hero — not LCP-critical, lazy is correct.
+          sizes="(min-width: 1024px) 960px, 100vw"
         />
       </div>
+    </div>
+  )
+}
+
+/**
+ * Full-bleed 16:9 cover for the homepage "Latest deep reviews" cards —
+ * design-v.026 homepage.html `.review-cover`. Same three tiers as
+ * <ArticleCover>, so a review shows the SAME cover on its card and at
+ * the top of its article. No container/rounding of its own: the card
+ * owns `overflow-hidden rounded-2xl`, this just clips to the top edge
+ * and draws the divider above the padded body.
+ */
+export function ReviewCardCover({
+  slug,
+  coverImage,
+  ogCoverHref,
+  className,
+}: ArticleCoverProps) {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        "relative overflow-hidden aspect-[16/9]",
+        "border-b border-[var(--border-base)]",
+        className,
+      )}
+    >
+      <CoverFill
+        slug={slug}
+        coverImage={coverImage}
+        ogCoverHref={ogCoverHref}
+        // ~3-up grid on md+, full width below — a rough hint is enough
+        // (the OG tier is unoptimized anyway, so no srcset is emitted).
+        sizes="(min-width: 768px) 380px, 100vw"
+      />
     </div>
   )
 }

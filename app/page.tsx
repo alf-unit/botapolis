@@ -17,7 +17,7 @@ import { LiveNumber } from "@/components/ui/LiveNumber"
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { ComparisonCard } from "@/components/tools/ComparisonCard"
-import { coverGradient, COVER_STRIPE } from "@/components/content/ArticleCover"
+import { ReviewCardCover, reviewOgCoverHref } from "@/components/content/ArticleCover"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getAllMdxFrontmatter } from "@/lib/content/mdx"
@@ -108,6 +108,32 @@ async function fetchLatestReviews(locale: "en" | "ru") {
   }
 }
 
+// Logo + name + rating for the reviews' tools, so each homepage review
+// card can build the SAME /api/og?variant=cover URL the article page
+// builds — i.e. the card shows the real article cover, not a generic
+// gradient. Keyed by tool slug. Failures degrade to the gradient tier.
+type ReviewTool = Pick<ToolRow, "slug" | "name" | "logo_url" | "rating">
+
+async function fetchReviewTools(
+  slugs: string[],
+): Promise<Map<string, ReviewTool>> {
+  const unique = Array.from(new Set(slugs.filter(Boolean)))
+  if (unique.length === 0) return new Map()
+  try {
+    const supabase = createServiceClient()
+    const { data, error } = await supabase
+      .from("tools")
+      .select("slug, name, logo_url, rating")
+      .in("slug", unique)
+      .eq("status", "published")
+    if (error || !data) return new Map()
+    return new Map(data.map((t) => [t.slug, t]))
+  } catch (err) {
+    console.error("[homepage] review tools fetch threw:", err)
+    return new Map()
+  }
+}
+
 // ISR — same window as the rest of the site. /compare and /reviews/page.tsx
 // both refresh on Supabase / MDX mutations via /api/revalidate, so the
 // homepage picks up changes within a deploy or webhook cycle.
@@ -124,6 +150,13 @@ export default async function HomePage() {
     fetchHomeComparisons(locale),
     fetchLatestReviews(locale),
   ])
+
+  // Hydrate the reviews' tools so each card's cover === the article's
+  // cover (same /api/og params → same OG cache entry, no second render).
+  const reviewToolBySlug = await fetchReviewTools(
+    latestReviews.map((r) => r.frontmatter.toolSlug),
+  )
+  const reviewEyebrow = locale === "ru" ? "Обзор" : "Review"
 
   // Featured-tool icon map. Keys MUST mirror `dict.tools.items` and the
   // slug map below — three calculators we actually ship today (Email ROI,
@@ -440,7 +473,15 @@ export default async function HomePage() {
               </div>
 
               <ul role="list" className="grid gap-4 md:grid-cols-3">
-                {latestReviews.map(({ slug, frontmatter }) => (
+                {latestReviews.map(({ slug, frontmatter }) => {
+                  const tool = reviewToolBySlug.get(frontmatter.toolSlug)
+                  const ogCoverHref = reviewOgCoverHref({
+                    toolName: tool?.name,
+                    logoUrl: tool?.logo_url,
+                    rating: frontmatter.rating ?? tool?.rating ?? null,
+                    eyebrowWord: reviewEyebrow,
+                  })
+                  return (
                   <li key={slug}>
                     <Link
                       href={`${localePrefix}/reviews/${slug}`}
@@ -451,21 +492,16 @@ export default async function HomePage() {
                         "hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] hover:border-[var(--border-strong)]",
                       )}
                     >
-                      {/* Cover — matches design-v.026 homepage.html
-                          `.review-cover`: full-bleed 16:9 deterministic
-                          brand→violet gradient + diagonal stripe, shared
-                          recipe with <ArticleCover> so the card and the
-                          article page show the same colour per review. */}
-                      <div
-                        aria-hidden="true"
-                        className="relative aspect-[16/9] border-b border-[var(--border-base)]"
-                        style={{ background: coverGradient(slug) }}
-                      >
-                        <div
-                          className="absolute inset-0"
-                          style={{ background: COVER_STRIPE }}
-                        />
-                      </div>
+                      {/* Cover — design-v.026 homepage.html `.review-cover`
+                          at 16:9. Same <CoverFill> tiers as the article
+                          page: real photo → programmatic OG (tool logo on
+                          the brand atmosphere) → deterministic gradient.
+                          Same OG params as /reviews/[slug] → same image. */}
+                      <ReviewCardCover
+                        slug={slug}
+                        coverImage={frontmatter.coverImage}
+                        ogCoverHref={ogCoverHref}
+                      />
 
                       <div className="flex flex-1 flex-col gap-4 p-6">
                       <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
@@ -495,7 +531,8 @@ export default async function HomePage() {
                       </div>
                     </Link>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             </div>
           </section>

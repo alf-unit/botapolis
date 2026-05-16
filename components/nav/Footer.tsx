@@ -186,7 +186,16 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
       {/* Newsletter — design-v.026 ships this as its OWN <section> on the
           page surface ABOVE <footer>, not inside it. #newsletter stays
           the scroll-to anchor the mobile NewsletterDialog falls back to. */}
-      <section id="newsletter" className="container-default my-20 lg:my-24">
+      {/* `scroll-reveal` joins this CTA to the same fade-in rhythm as the
+          page's content sections. The footer chrome below stays static —
+          a site-chrome footer shouldn't animate in. Spacing: only a
+          bottom gap before the footer — the preceding section already
+          carries `pb-16 lg:pb-20`, so a top margin here would DOUBLE the
+          gap above the card vs every other section boundary. */}
+      <section
+        id="newsletter"
+        className="scroll-reveal container-default mb-20 lg:mb-24"
+      >
         {/* design-v.026 `.nl`: a centred card (max 720px) with everything
             stacked and centre-aligned — eyebrow → title → subtitle →
             form → footnote. Only the visual layout changed here; the

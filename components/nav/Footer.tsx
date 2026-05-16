@@ -187,7 +187,13 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
           page surface ABOVE <footer>, not inside it. #newsletter stays
           the scroll-to anchor the mobile NewsletterDialog falls back to. */}
       <section id="newsletter" className="container-default my-20 lg:my-24">
-        <div className="relative overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)] px-6 py-10 md:px-10 md:py-12 shadow-[var(--shadow-md)]">
+        {/* design-v.026 `.nl`: a centred card (max 720px) with everything
+            stacked and centre-aligned — eyebrow → title → subtitle →
+            form → footnote. Only the visual layout changed here; the
+            <NewsletterForm> component (Safari-tuned focus / Turnstile
+            token / dialog behaviour) is untouched — we just hand it a
+            centred, width-capped wrapper class. */}
+        <div className="relative mx-auto max-w-[720px] overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)] px-6 py-12 md:px-10 md:py-14 text-center shadow-[var(--shadow-md)]">
           <div
             aria-hidden="true"
             className="absolute inset-x-1/4 -top-1/3 h-[150%] pointer-events-none opacity-60"
@@ -196,30 +202,28 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
                 "radial-gradient(ellipse, rgba(16,185,129,0.14), transparent 60%)",
             }}
           />
-          <div className="relative grid md:grid-cols-[1fr_auto] gap-6 md:gap-10 items-end">
-            <div className="max-w-md">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--brand)] font-mono">
-                {strings.newsletter.eyebrow}
-              </span>
-              <h3 className="mt-2 text-h3 lg:text-h2 font-semibold text-[var(--text-primary)] tracking-[-0.02em]">
-                {strings.newsletter.title}
-              </h3>
-              <p className="mt-2 text-[15px] leading-[1.6] text-[var(--text-secondary)]">
-                {strings.newsletter.subtitle}
-              </p>
-            </div>
+          <div className="relative flex flex-col items-center">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--brand)] font-mono">
+              {strings.newsletter.eyebrow}
+            </span>
+            <h3 className="mt-2 text-h3 lg:text-h2 font-semibold text-[var(--text-primary)] tracking-[-0.02em]">
+              {strings.newsletter.title}
+            </h3>
+            <p className="mt-2 max-w-xl text-[15px] leading-[1.6] text-[var(--text-secondary)]">
+              {strings.newsletter.subtitle}
+            </p>
             <NewsletterForm
               strings={strings.newsletter}
               source="footer"
               // Footer doesn't know the locale directly; we infer it
               // from the locale prefix the page passed in.
               language={localePrefix === "/ru" ? "ru" : "en"}
-              className="w-full md:w-auto md:min-w-[420px]"
+              className="mt-6 w-full max-w-[480px]"
             />
+            <p className="mt-3 text-[12px] text-[var(--text-tertiary)]">
+              {strings.newsletter.footnote}
+            </p>
           </div>
-          <p className="relative mt-4 text-[12px] text-[var(--text-tertiary)]">
-            {strings.newsletter.footnote}
-          </p>
         </div>
       </section>
 

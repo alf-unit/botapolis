@@ -182,13 +182,54 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
   ]
 
   return (
-    <footer
-      className={cn(
-        "mt-20 lg:mt-24 bg-[var(--bg-base)] border-t border-[var(--border-base)]",
-        className,
-      )}
-    >
-      <div className="container-default py-14 lg:py-16">
+    <>
+      {/* Newsletter — design-v.026 ships this as its OWN <section> on the
+          page surface ABOVE <footer>, not inside it. #newsletter stays
+          the scroll-to anchor the mobile NewsletterDialog falls back to. */}
+      <section id="newsletter" className="container-default my-20 lg:my-24">
+        <div className="relative overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)] px-6 py-10 md:px-10 md:py-12 shadow-[var(--shadow-md)]">
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-1/4 -top-1/3 h-[150%] pointer-events-none opacity-60"
+            style={{
+              background:
+                "radial-gradient(ellipse, rgba(16,185,129,0.14), transparent 60%)",
+            }}
+          />
+          <div className="relative grid md:grid-cols-[1fr_auto] gap-6 md:gap-10 items-end">
+            <div className="max-w-md">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--brand)] font-mono">
+                {strings.newsletter.eyebrow}
+              </span>
+              <h3 className="mt-2 text-h3 lg:text-h2 font-semibold text-[var(--text-primary)] tracking-[-0.02em]">
+                {strings.newsletter.title}
+              </h3>
+              <p className="mt-2 text-[15px] leading-[1.6] text-[var(--text-secondary)]">
+                {strings.newsletter.subtitle}
+              </p>
+            </div>
+            <NewsletterForm
+              strings={strings.newsletter}
+              source="footer"
+              // Footer doesn't know the locale directly; we infer it
+              // from the locale prefix the page passed in.
+              language={localePrefix === "/ru" ? "ru" : "en"}
+              className="w-full md:w-auto md:min-w-[420px]"
+            />
+          </div>
+          <p className="relative mt-4 text-[12px] text-[var(--text-tertiary)]">
+            {strings.newsletter.footnote}
+          </p>
+        </div>
+      </section>
+
+      <footer
+        className={cn(
+          "bg-[var(--bg-base)] border-t border-[var(--border-base)]",
+          className,
+        )}
+      >
+        <div className="container-default py-14 lg:py-16">
         {/* Top: brand + link columns. Five link columns since Sprint 2 added
             a Library column for /reviews + /guides — keep the brand cell
             slightly wider so the link grid breathes on desktop. */}
@@ -219,47 +260,6 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
               </ul>
             </div>
           ))}
-        </div>
-
-        {/* Newsletter strip */}
-        <div
-          id="newsletter"
-          className="mt-12 pt-10 border-t border-[var(--border-base)]"
-        >
-          <div className="relative overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)] px-6 py-10 md:px-10 md:py-12 shadow-[var(--shadow-md)]">
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-1/4 -top-1/3 h-[150%] pointer-events-none opacity-60"
-              style={{
-                background:
-                  "radial-gradient(ellipse, rgba(16,185,129,0.14), transparent 60%)",
-              }}
-            />
-            <div className="relative grid md:grid-cols-[1fr_auto] gap-6 md:gap-10 items-end">
-              <div className="max-w-md">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--brand)] font-mono">
-                  {strings.newsletter.eyebrow}
-                </span>
-                <h3 className="mt-2 text-h3 lg:text-h2 font-semibold text-[var(--text-primary)] tracking-[-0.02em]">
-                  {strings.newsletter.title}
-                </h3>
-                <p className="mt-2 text-[15px] leading-[1.6] text-[var(--text-secondary)]">
-                  {strings.newsletter.subtitle}
-                </p>
-              </div>
-              <NewsletterForm
-                strings={strings.newsletter}
-                source="footer"
-                // Footer doesn't know the locale directly; we infer it
-                // from the locale prefix the page passed in.
-                language={localePrefix === "/ru" ? "ru" : "en"}
-                className="w-full md:w-auto md:min-w-[420px]"
-              />
-            </div>
-            <p className="relative mt-4 text-[12px] text-[var(--text-tertiary)]">
-              {strings.newsletter.footnote}
-            </p>
-          </div>
         </div>
 
         {/* Bottom legal strip */}
@@ -299,5 +299,6 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
         </div>
       </div>
     </footer>
+    </>
   )
 }

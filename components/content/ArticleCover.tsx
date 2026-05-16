@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 /* ----------------------------------------------------------------------------
@@ -16,16 +17,16 @@ import { cn } from "@/lib/utils"
    enough to stay on-brand (every variant pulls from --accent-* or
    --violet-* with --warning as the single warm accent).
 
-   Why a gradient strip and not a real image:
-     - The design mockup is purely gradient-driven. Real cover photos
-       would require: a frontmatter field, an image pipeline (next/image,
-       AVIF/WebP, blurhash placeholders), and someone to generate or
-       license them. Big lift for ornamental chrome.
-     - Frontmatter already supports `ogImage` for the social-share card
-       (which is the high-value image — appears in X / LinkedIn previews).
-       The in-page cover is decorative; the gradient handles it cleanly.
-     - When/if real cover images become content priority, this component
-       can grow an optional `imageUrl` prop that overrides the gradient.
+   Three render tiers, highest priority first:
+     1. `coverImage` — a real, produced/licensed photo set in frontmatter.
+        Rendered through next/image (AVIF/WebP, lazy) at object-cover.
+     2. `ogCoverHref` — a programmatic next/og brand cover (/api/og?
+        variant=cover): the tool's official logo on the mint→violet
+        atmosphere. On-brand, zero asset pipeline, generated + edge-cached
+        by the OG route itself. This is the default for tool reviews.
+     3. The deterministic gradient strip (original behaviour) — the pure
+        fallback when neither image source is available, so removing a
+        cover never regresses to a broken box.
 
    Pure server component — no client interactivity, no JS payload.
 ---------------------------------------------------------------------------- */
@@ -33,6 +34,14 @@ import { cn } from "@/lib/utils"
 interface ArticleCoverProps {
   /** Article slug — drives the gradient variant via a deterministic hash. */
   slug: string
+  /** Real produced/licensed photo (frontmatter `coverImage`). Tier 1. */
+  coverImage?: string
+  /**
+   * Programmatic /api/og?variant=cover URL built by the page. Tier 2.
+   * Same-origin dynamic route — rendered unoptimized (it's already a
+   * generated, edge-cached raster; re-optimising it is wasted work).
+   */
+  ogCoverHref?: string
   className?: string
 }
 
@@ -62,21 +71,58 @@ function hashSlug(slug: string): number {
   return Math.abs(h)
 }
 
-export function ArticleCover({ slug, className }: ArticleCoverProps) {
+export function ArticleCover({
+  slug,
+  coverImage,
+  ogCoverHref,
+  className,
+}: ArticleCoverProps) {
   const v = VARIANTS[hashSlug(slug) % VARIANTS.length]
+
+  // Tier 1 wins over tier 2; tier 3 (gradient) only when both are absent.
+  const imageSrc = coverImage ?? ogCoverHref ?? null
+  const isOg = !coverImage && !!ogCoverHref
+
+  // Shared box — same 21:9, radius and border across all three tiers so
+  // the page rhythm never shifts based on which cover is available.
+  // 21:9 on phones (~375px) is ~160px tall: compact enough not to push
+  // the article body off the first screenful.
+  const boxClass = cn(
+    "relative w-full overflow-hidden",
+    "aspect-[21/9] rounded-2xl border border-[var(--border-base)]",
+    className,
+  )
+
+  if (imageSrc) {
+    return (
+      <div className="container-default mt-2 lg:mt-4">
+        <div className={boxClass}>
+          <Image
+            // Decorative: the article <h1> already carries the title, so
+            // an empty alt keeps screen readers from announcing it twice.
+            src={imageSrc}
+            alt=""
+            fill
+            // The cover never exceeds the article container (~960px) and
+            // is one-per-page below the hero — not LCP-critical, lazy is
+            // correct and keeps it off the initial paint budget.
+            sizes="(min-width: 1024px) 960px, 100vw"
+            className="object-cover"
+            // The OG cover is an already-generated, edge-cached raster
+            // from our own route; re-running the image optimiser on it is
+            // pure waste. Real photos still get the AVIF/WebP pipeline.
+            unoptimized={isOg}
+          />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container-default mt-2 lg:mt-4">
       <div
         aria-hidden="true"
-        className={cn(
-          "relative w-full overflow-hidden",
-          // 21:9 matches the design mockup. On phones (~375px) this comes
-          // out to ~160px tall — compact enough not to push the article
-          // body off the first screenful.
-          "aspect-[21/9] rounded-2xl border border-[var(--border-base)]",
-          className,
-        )}
+        className={boxClass}
         style={{
           background: `linear-gradient(135deg, color-mix(in oklch, ${v.from} ${v.fromPct}%, var(--bg-muted)), color-mix(in oklch, ${v.to} ${v.toPct}%, var(--bg-muted)))`,
         }}

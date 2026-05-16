@@ -57,6 +57,11 @@ const baseFrontmatterSchema = z.object({
   author:       z.string().default("Botapolis editorial"),
   tags:         z.array(z.string()).default([]),
   ogImage:      z.string().optional(),
+  // Optional real cover photo (absolute or app-relative). When unset the
+  // page renders a programmatic next/og brand cover, and if that's also
+  // unavailable, ArticleCover's deterministic gradient strip. Lets a
+  // single article opt into a licensed/produced image without a pipeline.
+  coverImage:   z.string().optional(),
   draft:        z.boolean().default(false),
 })
 

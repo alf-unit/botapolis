@@ -7,10 +7,16 @@
  *
  *   ?title=Klaviyo+review+2026
  *   &description=The+90-day+field+report+from+a+real+%242M+store
- *   &logo=/tools/klaviyo.svg          (optional, absolute or app-relative)
+ *   &logo=/tools/klaviyo.png          (optional, absolute or app-relative)
  *
  * Falls back to a hero card if no params are supplied — useful as a default
  * site OG and as a smoke-test from /api/og itself.
+ *
+ * `?variant=cover` switches to a logo-forward in-page cover composition
+ * (used by <ArticleCover>): big brand plate + eyebrow + optional rating,
+ * deliberately NO title/description so it never duplicates the H1 that
+ * sits right next to it on the article page. Extra params:
+ *   &eyebrow=Klaviyo+review   &rating=8.7
  */
 import { ImageResponse } from "next/og"
 import type { NextRequest } from "next/server"
@@ -36,6 +42,8 @@ export async function GET(req: NextRequest) {
   )
   const logo = searchParams.get("logo")
   const eyebrow = searchParams.get("eyebrow") ?? "botapolis"
+  const variant = searchParams.get("variant")
+  const rating = searchParams.get("rating")
 
   // satori-friendly absolute URL — bare paths fail when fetched server-side.
   const logoSrc = logo
@@ -43,6 +51,130 @@ export async function GET(req: NextRequest) {
       ? logo
       : absoluteUrl(logo)
     : null
+
+  // --------------------------------------------------------------------------
+  // variant=cover — the in-page article cover. Logo-forward, no headline
+  // (the page's <h1> is right next to it). Composition is vertically
+  // centred so the 21:9 crop <ArticleCover> applies never clips it.
+  // --------------------------------------------------------------------------
+  if (variant === "cover") {
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width:          "100%",
+            height:         "100%",
+            display:        "flex",
+            flexDirection:  "column",
+            alignItems:     "center",
+            justifyContent: "center",
+            gap:            36,
+            background:     "#0A0A0B",
+            color:          "#FAFAFA",
+            fontFamily:     "Geist, system-ui, sans-serif",
+            position:       "relative",
+          }}
+        >
+          {/* Same atmospheric mint + violet glows as the OG card so the
+              cover and the social-share image feel like one system. */}
+          <div
+            style={{
+              position: "absolute", top: -260, right: -180,
+              width: 760, height: 760, borderRadius: "9999px",
+              background: "radial-gradient(circle, rgba(16,185,129,0.34), rgba(16,185,129,0) 64%)",
+              filter: "blur(46px)",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute", bottom: -280, left: -160,
+              width: 720, height: 720, borderRadius: "9999px",
+              background: "radial-gradient(circle, rgba(139,92,246,0.26), rgba(139,92,246,0) 60%)",
+              filter: "blur(54px)",
+            }}
+          />
+
+          {/* Brand plate — mirrors <ToolLogo>'s constant white plate so a
+              mono-dark vendor mark stays legible on the dark canvas. */}
+          {logoSrc && (
+            <div
+              style={{
+                display:        "flex",
+                alignItems:     "center",
+                justifyContent: "center",
+                width:          176,
+                height:         176,
+                borderRadius:   32,
+                background:     "#FFFFFF",
+                border:         "1px solid #27272A",
+                position:       "relative",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoSrc}
+                alt=""
+                width={138}
+                height={138}
+                style={{ objectFit: "contain" }}
+              />
+            </div>
+          )}
+
+          <div
+            style={{
+              display:        "flex",
+              alignItems:     "center",
+              gap:            18,
+              position:       "relative",
+            }}
+          >
+            <span
+              style={{
+                textTransform:  "uppercase",
+                letterSpacing:  "0.14em",
+                fontSize:       24,
+                fontWeight:     600,
+                color:          "#A1A1AA",
+              }}
+            >
+              {eyebrow}
+            </span>
+            {rating && (
+              <>
+                <span style={{ color: "#3F3F46", fontSize: 24 }}>·</span>
+                {/* Mint rating pill — the one warm signal on the cover. */}
+                <span
+                  style={{
+                    display:       "flex",
+                    alignItems:    "center",
+                    gap:           8,
+                    padding:       "8px 18px",
+                    borderRadius:  "9999px",
+                    fontSize:      24,
+                    fontWeight:    600,
+                    color:         "#10B981",
+                    border:        "1px solid rgba(16,185,129,0.35)",
+                    background:    "rgba(16,185,129,0.10)",
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>●</span>
+                  {rating}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      ),
+      {
+        ...SIZE,
+        headers: {
+          "cache-control":
+            "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      },
+    )
+  }
 
   return new ImageResponse(
     (
@@ -211,7 +343,7 @@ export async function GET(req: NextRequest) {
             }}
           >
             <span style={{ color: "#10B981" }}>●</span>
-            <span>operator's manual</span>
+            <span>operator&apos;s manual</span>
           </div>
         </div>
       </div>

@@ -200,6 +200,17 @@ export default async function ReviewPage({ params }: PageProps) {
         : "This article hasn't been translated yet — you're reading the English original.",
   }
 
+  // Programmatic brand cover: the tool's official logo on the mint→violet
+  // OG atmosphere. `coverImage` in frontmatter overrides it with a real
+  // photo; ArticleCover falls back to its gradient if neither resolves.
+  const coverRating = frontmatter.rating ?? tool?.rating ?? null
+  const ogCoverHref = `/api/og?${new URLSearchParams({
+    variant: "cover",
+    eyebrow: tool?.name ? `${tool.name} ${t.eyebrow.toLowerCase()}` : t.eyebrow,
+    ...(tool?.logo_url ? { logo: tool.logo_url } : {}),
+    ...(coverRating != null ? { rating: String(coverRating) } : {}),
+  }).toString()}`
+
   return (
     <>
       <Navbar strings={dict.nav} localePrefix={localePrefix} />
@@ -236,7 +247,11 @@ export default async function ReviewPage({ params }: PageProps) {
             gradient cover sits between the hero text and the article
             body. Variant is picked deterministically from the slug, so
             every review has a stable colour identity across deploys. */}
-        <ArticleCover slug={slug} />
+        <ArticleCover
+          slug={slug}
+          coverImage={frontmatter.coverImage}
+          ogCoverHref={ogCoverHref}
+        />
 
         {/* Body grid: TOC sidebar (desktop) + article column */}
         <section className="container-default py-12 lg:py-16">

@@ -121,6 +121,14 @@ export default async function GuidePage({ params }: PageProps) {
         : "This article hasn't been translated yet — you're reading the English original.",
   }
 
+  // Guides have no tool logo, so the programmatic cover is the mint→violet
+  // brand atmosphere + the localised eyebrow. `coverImage` frontmatter
+  // overrides with a real photo; gradient remains the final fallback.
+  const ogCoverHref = `/api/og?${new URLSearchParams({
+    variant: "cover",
+    eyebrow: t.eyebrow,
+  }).toString()}`
+
   return (
     <>
       <Navbar strings={dict.nav} localePrefix={localePrefix} />
@@ -165,7 +173,11 @@ export default async function GuidePage({ params }: PageProps) {
         {/* Wave 5 audit alignment (design v.026) — see /reviews/[slug]
             for the same component's role. Deterministic per-slug
             gradient strip; no per-guide config needed. */}
-        <ArticleCover slug={slug} />
+        <ArticleCover
+          slug={slug}
+          coverImage={frontmatter.coverImage}
+          ogCoverHref={ogCoverHref}
+        />
 
         <section className="container-default py-12 lg:py-16">
           {/* Post-Wave-3 audit follow-up: `max-w-[68ch]` was constraining the

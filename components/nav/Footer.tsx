@@ -241,8 +241,8 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
               // `sm:flex-1` in the row. Font kept at 16px (text-base) —
               // mockup ships 14px but <16px triggers iOS Safari auto-zoom
               // (HANDOFF hard rule); 16px fits a 40px field fine.
-              inputClassName="block w-full h-10 flex-none sm:flex-1 px-3 text-base"
-              buttonClassName="h-10 px-4 text-base"
+              inputClassName="block w-full h-12 flex-none sm:flex-1 px-3 text-base"
+              buttonClassName="h-12 px-4 text-base"
             />
             <p className="mt-3 text-[12px] text-[var(--text-tertiary)]">
               {strings.newsletter.footnote}

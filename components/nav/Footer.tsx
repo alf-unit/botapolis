@@ -228,6 +228,12 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
               // from the locale prefix the page passed in.
               language={localePrefix === "/ru" ? "ru" : "en"}
               className="mt-6 w-full max-w-[480px]"
+              // Mobile: the form stacks (flex-col), where a bare <input>
+              // (a replaced element) won't stretch under align-stretch and
+              // collapses to its intrinsic ~20ch width while the button
+              // fills. `w-full` forces full width. Harmless on desktop —
+              // there the row layout's `flex-1` already drives the width.
+              inputClassName="w-full"
             />
             <p className="mt-3 text-[12px] text-[var(--text-tertiary)]">
               {strings.newsletter.footnote}

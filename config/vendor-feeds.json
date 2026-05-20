@@ -1,16 +1,32 @@
 {
   "$schema": "./vendor-feeds.schema.json",
-  "version": 1,
+  "version": 2,
   "updated_at": "2026-05-20",
-  "description": "RSS / Atom / Substack feeds SCOUT polls every 4 hours. Each entry: vendor slug (matches Supabase tools.slug if applicable), feed URL, type, and the categorization hints SCOUT uses when deciding opportunity_score.",
+  "description": "RSS / Atom feeds SCOUT polls every 4 hours. Each entry: vendor slug (matches Supabase tools.slug where applicable), feed URL, type, categorization hints, and a tracked flag SCOUT uses to decide whether to poll. URLs marked tracked=false MUST be verified by operator (load in browser, confirm RSS parses) before flipping tracked=true — vendor feeds frequently move or 404, and a bad URL just creates SCOUT noise.",
+  "verification_protocol": [
+    "1. Curl the url with -I and check 200 + content-type contains 'xml' or 'rss'.",
+    "2. Open in a feed reader (e.g. feedly) and confirm recent items render.",
+    "3. Flip tracked=true and let SCOUT pick it up on next 4-hour cycle.",
+    "4. If 404 or empty: search '<vendor> blog rss' / '<vendor> feed' — many vendors hide the URL one click deeper than the blog index."
+  ],
   "feeds": [
+    {
+      "vendor": "shopify",
+      "url": "https://www.shopify.com/blog.atom",
+      "type": "atom",
+      "categories": ["platform", "core"],
+      "tracked": true,
+      "priority": "high",
+      "notes": "Official Shopify blog — captures Editions, Sidekick releases, Magic updates"
+    },
     {
       "vendor": "klaviyo",
       "url": "https://www.klaviyo.com/blog/feed",
       "type": "rss",
       "categories": ["email", "marketing-automation"],
       "tracked": true,
-      "priority": "high"
+      "priority": "high",
+      "notes": "Critical — pricing announcements + Customer Agent / Marketing Agent feature drops land here first"
     },
     {
       "vendor": "gorgias",
@@ -18,15 +34,8 @@
       "type": "rss",
       "categories": ["customer-support", "helpdesk"],
       "tracked": true,
-      "priority": "high"
-    },
-    {
-      "vendor": "shopify",
-      "url": "https://www.shopify.com/blog.atom",
-      "type": "atom",
-      "categories": ["platform", "core"],
-      "tracked": true,
-      "priority": "high"
+      "priority": "high",
+      "notes": "Critical — AI Agent + Auto-Respond billing model changes announced here"
     },
     {
       "vendor": "recharge",
@@ -34,12 +43,329 @@
       "type": "rss",
       "categories": ["subscriptions"],
       "tracked": true,
-      "priority": "medium"
+      "priority": "high",
+      "notes": "Post-Skio-acquisition consolidation news will originate here"
+    },
+    {
+      "vendor": "postscript",
+      "url": "https://www.postscript.io/blog/rss",
+      "type": "rss",
+      "categories": ["sms"],
+      "tracked": false,
+      "priority": "high",
+      "notes": "VERIFY URL — Postscript Shopper feature roadmap announcements land here. May actually be at /resources/blog/rss."
+    },
+    {
+      "vendor": "loop",
+      "url": "https://www.loopreturns.com/blog/rss",
+      "type": "rss",
+      "categories": ["returns", "subscriptions"],
+      "tracked": false,
+      "priority": "high",
+      "notes": "VERIFY URL — Loop tripled ARR + acquired Skio; central to subscription cluster. Tool not yet in Supabase tools table."
+    },
+    {
+      "vendor": "stay-ai",
+      "url": "https://stay.ai/blog/rss",
+      "type": "rss",
+      "categories": ["subscriptions", "ai"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — Stay AI WinbackEngine releases. Tool not yet in Supabase tools table."
+    },
+    {
+      "vendor": "omnisend",
+      "url": "https://www.omnisend.com/blog/feed/",
+      "type": "rss",
+      "categories": ["email", "sms"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — MCP/ChatGPT integration announcements relevant for klaviyo-vs-omnisend cluster"
+    },
+    {
+      "vendor": "mailchimp",
+      "url": "https://mailchimp.com/feed/",
+      "type": "rss",
+      "categories": ["email"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL — broad marketing blog, low relevance for Shopify operators"
+    },
+    {
+      "vendor": "tidio",
+      "url": "https://www.tidio.com/blog/feed/",
+      "type": "rss",
+      "categories": ["chat", "support", "ai"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — Lyro AI feature drops"
+    },
+    {
+      "vendor": "manychat",
+      "url": "https://manychat.com/blog/feed",
+      "type": "rss",
+      "categories": ["chat", "automation"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — IG/FB/WhatsApp automation, partnerstack affiliate"
+    },
+    {
+      "vendor": "attentive",
+      "url": "https://www.attentive.com/blog/rss.xml",
+      "type": "rss",
+      "categories": ["sms"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — enterprise SMS competitor to Postscript. Pricing changes important for cluster comparisons."
+    },
+    {
+      "vendor": "yotpo",
+      "url": "https://www.yotpo.com/blog/feed/",
+      "type": "rss",
+      "categories": ["reviews", "loyalty", "sms"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — multi-product vendor, AI Campaigns / Loyalty Tier announcements"
+    },
+    {
+      "vendor": "loox",
+      "url": "https://loox.app/blog/feed",
+      "type": "rss",
+      "categories": ["reviews", "ugc"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — partnerstack affiliate; submission-rate claim debates"
+    },
+    {
+      "vendor": "judge-me",
+      "url": "https://judge.me/blog/feed/",
+      "type": "rss",
+      "categories": ["reviews", "ugc"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — direct competitor to Loox; 'free forever' positioning shifts matter"
+    },
+    {
+      "vendor": "smile-io",
+      "url": "https://blog.smile.io/rss",
+      "type": "rss",
+      "categories": ["loyalty"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — direct affiliate"
+    },
+    {
+      "vendor": "loyaltylion",
+      "url": "https://loyaltylion.com/blog/feed",
+      "type": "rss",
+      "categories": ["loyalty", "ai"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — AI Campaigns launch covered in semantic core"
+    },
+    {
+      "vendor": "rebuy",
+      "url": "https://www.rebuyengine.com/blog/feed",
+      "type": "rss",
+      "categories": ["personalization", "upsell"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — modular pricing changes important for the rebuy-vs-limespot cluster"
+    },
+    {
+      "vendor": "limespot",
+      "url": "https://www.limespot.com/blog/rss",
+      "type": "rss",
+      "categories": ["personalization"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL — hybrid manual/AI competitor to Rebuy"
+    },
+    {
+      "vendor": "nosto",
+      "url": "https://www.nosto.com/blog/feed",
+      "type": "rss",
+      "categories": ["personalization", "enterprise"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL — enterprise tier, lower operator-relevance"
+    },
+    {
+      "vendor": "triple-whale",
+      "url": "https://www.triplewhale.com/blog/rss.xml",
+      "type": "rss",
+      "categories": ["attribution", "analytics"],
+      "tracked": false,
+      "priority": "high",
+      "notes": "VERIFY URL — Moby AI updates; cluster head for attribution"
+    },
+    {
+      "vendor": "northbeam",
+      "url": "https://www.northbeam.io/blog/feed",
+      "type": "rss",
+      "categories": ["attribution"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — $1,500/mo minimum announcements"
+    },
+    {
+      "vendor": "polar-analytics",
+      "url": "https://www.polaranalytics.com/blog/rss",
+      "type": "rss",
+      "categories": ["attribution", "analytics"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — Snowflake-backed attribution"
+    },
+    {
+      "vendor": "adcreative-ai",
+      "url": "https://www.adcreative.ai/blog/rss",
+      "type": "rss",
+      "categories": ["ad-creative", "ai"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — direct affiliate (30% recurring)"
+    },
+    {
+      "vendor": "pencil",
+      "url": "https://www.pencil.com/blog/rss",
+      "type": "rss",
+      "categories": ["ad-creative", "ai", "video"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL"
+    },
+    {
+      "vendor": "signifyd",
+      "url": "https://www.signifyd.com/blog/feed",
+      "type": "rss",
+      "categories": ["fraud-detection"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — chargeback-guarantee announcements; relevant for fraud-detection cluster"
+    },
+    {
+      "vendor": "nofraud",
+      "url": "https://www.nofraud.com/blog/feed",
+      "type": "rss",
+      "categories": ["fraud-detection"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL — human-analyst hybrid competitor to Signifyd"
+    },
+    {
+      "vendor": "aftership",
+      "url": "https://www.aftership.com/blog/feed",
+      "type": "rss",
+      "categories": ["shipping", "returns", "tiktok"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — TikTok Shop Feed integration relevant for tiktok-shop-ops cluster"
+    },
+    {
+      "vendor": "redo",
+      "url": "https://www.redo.com/blog/feed",
+      "type": "rss",
+      "categories": ["returns"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL"
+    },
+    {
+      "vendor": "inventory-planner",
+      "url": "https://www.inventory-planner.com/blog/feed",
+      "type": "rss",
+      "categories": ["inventory-forecasting"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — post-Sage-acquisition feature changes critical"
+    },
+    {
+      "vendor": "prediko",
+      "url": "https://www.prediko.io/blog/feed",
+      "type": "rss",
+      "categories": ["inventory-forecasting", "cash-flow"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL"
+    },
+    {
+      "vendor": "cogsy",
+      "url": "https://cogsy.com/blog/rss",
+      "type": "rss",
+      "categories": ["inventory-forecasting"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL"
+    },
+    {
+      "vendor": "hypotenuse-ai",
+      "url": "https://hypotenuse.ai/blog/rss",
+      "type": "rss",
+      "categories": ["ai", "product-descriptions"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "VERIFY URL — direct affiliate (20%)"
+    },
+    {
+      "vendor": "pebblely",
+      "url": "https://www.pebblely.com/blog/rss",
+      "type": "rss",
+      "categories": ["ai", "product-photography"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL"
+    },
+    {
+      "vendor": "photoroom",
+      "url": "https://www.photoroom.com/blog/rss",
+      "type": "rss",
+      "categories": ["ai", "product-photography"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL"
+    },
+    {
+      "vendor": "techcrunch-ecommerce",
+      "url": "https://techcrunch.com/category/ecommerce/feed/",
+      "type": "rss",
+      "categories": ["news", "industry"],
+      "tracked": false,
+      "priority": "medium",
+      "notes": "Vendor news/funding/acquisitions (Skio acquisition broke here). Lower relevance per-item but high-signal events"
+    },
+    {
+      "vendor": "modern-retail",
+      "url": "https://www.modernretail.co/feed/",
+      "type": "rss",
+      "categories": ["news", "industry"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL — D2C industry analysis"
+    },
+    {
+      "vendor": "retail-dive",
+      "url": "https://www.retaildive.com/feeds/news/",
+      "type": "rss",
+      "categories": ["news", "industry"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL — broader retail news, returns/fraud regulation"
+    },
+    {
+      "vendor": "emarketer",
+      "url": "https://www.emarketer.com/rss",
+      "type": "rss",
+      "categories": ["news", "research"],
+      "tracked": false,
+      "priority": "low",
+      "notes": "VERIFY URL — TikTok Shop forecasts originate here"
     }
   ],
   "_notes": [
-    "Populate the rest of the 50+ vendors before flipping SCOUT to production.",
-    "If a vendor only offers email digest (no RSS), set type='email' and route through a Beehiiv-ingestion alias.",
-    "tracked=false rows are kept for reference but SCOUT skips polling."
+    "Total entries: 39. Active tracked: 4 (Shopify, Klaviyo, Gorgias, Recharge). Pending verification: 35.",
+    "Operator action before SCOUT launch: walk through verification_protocol for each tracked=false entry, flip flag, commit.",
+    "If a vendor has no RSS but offers email digest: route through Beehiiv ingestion (set type='email'). Not implemented in MVP.",
+    "Re-tested URLs are still subject to vendor-side changes — SCOUT logs every fetch result to agent_logs; weekly audit catches drift."
   ]
 }

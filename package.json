@@ -17,6 +17,7 @@
     "validate:content": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/content-validator.ts",
     "import:semantic-core": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/import-semantic-core.ts",
     "import:semantic-core:dry": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/import-semantic-core.ts --dry-run",
+    "validate:infra": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/validate-infra.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

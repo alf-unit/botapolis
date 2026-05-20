@@ -1,0 +1,182 @@
+---
+title: "How to migrate from Skio to Loop Subscriptions in 2026"
+description: "Step-by-step migration from Skio to Loop after Recharge's 2026 acquisition. Subscriber export, payment-token transfer, and what breaks during cutover."
+publishedAt: "2026-05-20"
+updatedAt: "2026-05-20"
+author: "Botapolis editorial"
+tags: ["subscriptions", "skio", "loop", "recharge", "migration", "shopify"]
+category: "subscriptions"
+cluster: "recharge-skio-acquisition"
+steps:
+  - name: "Export your Skio subscriber list and audit it"
+    text: "Pull a full CSV of active subscribers from Skio's admin. Verify counts against your Shopify customer list, check for stuck or failed billing rows, and flag any non-standard subscription rules (custom intervals, bundle SKUs, prepaid plans)."
+  - name: "Map your subscription products and pricing rules"
+    text: "Document every active subscription product: SKU, billing interval, discount logic, and any custom-pricing rules tied to subscriber tenure. Loop imports the catalog cleanly when the schema is documented up front."
+  - name: "Pause new Skio sign-ups during the cutover"
+    text: "Disable subscribe-on-PDP buttons (or redirect to a 'we're moving' page) during the migration window. New sign-ups on Skio mid-migration get orphaned — they land in Skio's system after the import snapshot."
+  - name: "Set up Loop and recreate the catalog"
+    text: "Create your Loop account, install the Shopify app, and recreate the subscription catalog. Loop's setup uses the audit document from step 2 — every SKU, interval, and rule maps from Skio's schema to Loop's."
+  - name: "Import subscribers and migrate payment tokens"
+    text: "Loop's migration team coordinates payment-token transfer through the gateway (Stripe, Authorize.net, Shopify Payments). Tokens move between platforms via vendor-to-vendor APIs — subscribers do not re-enter cards."
+  - name: "Configure the Loop subscriber portal"
+    text: "Set up the customer-facing portal: branding, allowed actions (pause, skip, swap, cancel), and cancellation flow rules. Test the portal as a real customer before going live."
+  - name: "Reconnect Klaviyo and any retention flows"
+    text: "Re-wire event streams to your email and SMS tools. The 'subscription started', 'subscription paused', and 'subscription cancelled' events have different names between Skio and Loop — Klaviyo flows referencing the old event names will silently stop firing."
+  - name: "Run a verification cycle on a real renewal"
+    text: "Wait until at least one real renewal cycle has run on Loop, then verify: payment captured, fulfilment created, customer email sent, retention flows triggered. This is the only test that catches issues a staging environment can't surface."
+---
+
+Recharge acquired Skio for $105 million on April 30, 2026, per TechCrunch coverage of the announcement. Skio's roadmap, pricing, and feature parity will eventually fold into Recharge's, but Recharge has not published a public sunset date for the standalone Skio platform. The consolidation timeline is the unknown — and subscription billing is the one place where a vendor transition can break recurring revenue without you noticing for 30 days, until the next renewal cycle.
+
+Migrating to Loop is not the only defensible choice; the section near the end on staying with Recharge covers when that's the better call. This guide is the playbook for everyone whose answer is "we're moving."
+
+A clean Skio→Loop migration runs 10-14 days. Loop's four-phase migration program (verified 2026-05-20 from loopwork.co, free migration bundled with paid plans):
+
+| Phase | Timing | Focus |
+|-------|--------|-------|
+| 1. Kickoff | Week 1 | Audit current Skio setup, map data, write the migration plan |
+| 2. Build | Weeks 2-3 | Rebuild portal, retention flows, and integrations on Loop |
+| 3. Test | Weeks 3-4 | Validate every subscription, flow, and edge case before any subscriber is touched |
+| 4. Go-live | End of window | Cut over; subscribers see the new portal at next login |
+
+## Before you start
+
+- **Loop Subscriptions account** — sign up at [loopwork.co](https://www.loopwork.co); no upfront cost for the trial
+- **Shopify admin access** with permission to install apps and edit checkout settings
+- **Payment gateway credentials** — know which provider you use (Stripe, Authorize.net, Shopify Payments). Loop's migration team needs this to coordinate token transfer.
+- **A two-week window** where new Skio sign-ups can be paused without losing meaningful acquisition volume
+- **A list of every retention integration** — Klaviyo, Postscript, Gorgias, and any custom webhook that fires on subscription events
+
+## Step 1: Export your Skio subscriber list and audit it
+
+Pull a full CSV from Skio Admin → Subscribers → Export. You want every active subscription, every paused subscription, and every recently-cancelled one (the last 90 days of cancellations matter for win-back flows on the new platform).
+
+The audit is the part most operators skip. Compare the Skio export against your Shopify customer list — every active Skio subscription should map to a Shopify customer ID. Mismatches happen when subscriptions were created against deleted customer records, or when manual ops created subscriptions outside the standard flow. Flag those rows; they won't import cleanly without intervention.
+
+Also check for:
+
+- Stuck billing rows (subscriptions in "failed payment" state for 30+ days — these are effectively dead, exclude them from the import)
+- Custom intervals (every 6 weeks, every 90 days — non-standard intervals need Loop verification)
+- Bundle SKUs that span multiple products
+- Prepaid plans (annual subs paid upfront — these import differently than recurring)
+
+## Step 2: Map your subscription products and pricing rules
+
+Document every active subscription SKU in a spreadsheet:
+
+- Product ID and variant
+- Billing interval (every 30 days, every 60 days, every 90 days, etc.)
+- Discount logic (10% off subscribe-and-save, tier discount at third order, etc.)
+- Any custom rules tied to subscriber tenure (loyalty pricing, lock-ins, grandfathered rates)
+
+Loop imports the catalog cleanly when the schema is documented up front. Without it, the migration team rebuilds rules from inference, and some — especially loyalty pricing — will be wrong. A common failure mode: a $39/mo grandfathered tier from 2024 gets silently reset to the current $49/mo, and the operator only catches it three renewal cycles later when a customer complains.
+
+## Step 3: Pause new Skio sign-ups during the cutover
+
+Disable the subscribe-on-PDP button or redirect it to a "we're moving — back in two weeks" page. New sign-ups created on Skio between the export snapshot and the Loop go-live get orphaned: they land in Skio after your import, miss the migration, and become a manual cleanup problem.
+
+If your acquisition flow can't tolerate a two-week pause, run the cutover in cohorts: migrate active subscribers first, keep new sign-ups on Skio for one cohort cycle, then migrate them in a second sweep. Adds complexity, removes the acquisition-pause cost.
+
+<Callout variant="warning" title="Maintenance-window trap">
+The "we're moving" page is not optional. Operators who skip it and let Skio keep accepting sign-ups during the cutover end up with two systems of record for 7-10 days, and the reconciliation work afterward eats more time than the pause would have cost.
+</Callout>
+
+## Step 4: Set up Loop and recreate the catalog
+
+Create the Loop account, install the Shopify app, and recreate the subscription catalog using the audit document from step 2. Loop's onboarding team handles the catalog-recreation work; your job is to verify the result against your spreadsheet line by line.
+
+Common SKU mapping issues:
+
+- Variant IDs change if you rebuilt the product in Shopify since launch (rare but happens — Loop's import matches on variant ID, not product handle)
+- Discount logic on Loop uses different rule names than Skio — confirm each rule renders the same final price on a test order
+- Bundle SKUs map cleanly if both platforms use the same "subscription box" pattern; if your bundle was a Skio-specific build, Loop's team needs to know to rebuild it differently
+
+## Step 5: Import subscribers and migrate payment tokens
+
+This is the step most operators worry about. Payment tokens — the encrypted references to a customer's card that let you bill without re-collecting card data — must move from Skio's vault to Loop's. Customers do not re-enter card information; that would tank conversion and break recurring revenue immediately.
+
+Token transfer happens through the payment gateway, not between Skio and Loop directly. Loop's migration team coordinates with Stripe (or Authorize.net, or Shopify Payments) to move the token references on the gateway side. You provide gateway credentials and the subscriber CSV; the gateway team executes the transfer. Plan a 48-72 hour window — token transfers don't fail loudly. A failed token sits there looking valid until the next renewal tries to charge it and gets declined; the verification cycle in step 8 is what catches this.
+
+## Step 6: Configure the Loop subscriber portal
+
+Set up the customer-facing portal: branding, allowed actions (pause, skip, swap, cancel), and the cancellation flow with retention offers. Loop's portal philosophy emphasises retention — the swap-instead-of-cancel and pause-instead-of-cancel flows are the platform's marquee feature, and they meaningfully reduce involuntary churn when configured well.
+
+Test the portal as a real customer, from a real subscriber account, before going live. Configurations to verify:
+
+- The cancel button is not buried — FTC compliance requires equal prominence with the sign-up flow
+- Pause and swap options are functional, not just visible (Loop's defaults are usually right; double-check after any branding edit)
+- Branding renders correctly on mobile — subscribers manage subscriptions on phones in the majority of sessions
+
+## Step 7: Reconnect Klaviyo and any retention flows
+
+Every retention tool you have wired into Skio events needs to re-wire to Loop events. The event names differ — Skio's `subscription/created` is Loop's `subscription.started`, and so on through the catalogue. Klaviyo, Postscript, Gorgias, and any custom webhook integrations will silently stop firing if the event names aren't remapped.
+
+The two flows that hurt most when they break:
+
+- **Subscription cancelled → win-back email.** Broken means cancelled subscribers don't get the retention nudge, and you lose the second-chance conversion.
+- **Payment failed → recovery email.** Broken means failed-payment subscribers churn instead of recovering, and the involuntary-churn line in your dashboard quietly worsens.
+
+Test each retention flow with a real event after the cutover. If your [Shopify email setup](/guides/how-to-set-up-shopify-email-automation) runs through Klaviyo, the subscription-event triggers are where most retention revenue lives.
+
+## Step 8: Run a verification cycle on a real renewal
+
+Wait until at least one real renewal cycle has run on Loop, then verify end-to-end:
+
+- Payment captured against the migrated token — check the gateway dashboard, not just Loop's UI
+- Order created in Shopify with the correct line items
+- Fulfilment triggered through your 3PL or in-house ops
+- Customer renewal email sent (subject line and content match expectations)
+- Klaviyo (or your ESP) logged the renewal event and triggered downstream flows
+
+The verification cycle is the only test that catches issues a staging environment can't surface. Token transfer issues, event-name mismatches, and timing bugs all reveal themselves on a real renewal. A known failure mode: everything passes UAT but the first batch of renewals fails because the gateway moved tokens to a sandbox vault that production billing can't read.
+
+If anything fails, Loop's migration team stays engaged through the first renewal cycle — surface issues immediately rather than waiting for the next one.
+
+## Troubleshooting: what actually breaks
+
+Failure modes that show up across Shopify subscription migrations, drawn from platform documentation and the standard patterns these systems share. Treat this as the checklist for the first month post-cutover.
+
+- **Payment token transfer failures.** Tokens that look transferred but don't authorise on the first charge. Symptom: failed-payment notifications spike 24-48 hours after go-live. Fix: Loop's migration team re-coordinates with the gateway; the operator should not retry charges manually (that multiplies the failed-attempt count on the customer's record and accelerates them toward churn).
+
+- **Subscriber portal login confusion.** Skio used email + order number; Loop uses email + magic link. Customers used to the old flow type their old password and bounce. Fix: send a portal-introduction email two days before go-live explaining the new login flow; include a direct portal link with magic-link auth pre-attached, so the customer's first interaction is a successful login, not a failed one.
+
+- **Custom pricing rules not migrating cleanly.** Tenure-based loyalty pricing, grandfathered tiers, and per-subscriber overrides are the rules most likely to import wrong. Fix: spot-check the first 20-30 renewals against your audit spreadsheet from step 2. A pricing-rule mismatch caught at renewal #1 is a refund and an apology; caught at renewal #6, it's a chargeback risk.
+
+- **Klaviyo / Postscript event silence.** Events fire on Loop, but Klaviyo flows referencing Skio event names don't pick them up. Symptom: zero subscription-related events in Klaviyo from go-live forward. Fix: remap event names in each affected flow, then run a manual test event through each one to confirm.
+
+- **Subscription cancellation in-flight at cutover.** A subscriber who hit "cancel" in Skio the day before migration but whose cancellation hadn't processed yet — their record imports as active, and they get billed on Loop. Fix: include "pending cancellations" in the audit (step 1), and force-cancel them in Skio before export.
+
+- **Bundle SKUs that span multiple Shopify products.** Loop handles bundles, but the schema differs from Skio's. If your bundles were custom-built in Skio, they may need a manual rebuild in Loop. Loop's migration team flags these during step 2 — do not skip the audit step.
+
+## Should you stay on Recharge instead?
+
+For some stores, the better call is to stay through Recharge's consolidation rather than migrating to Loop. The fee math, as of 2026-05-20:
+
+| Platform | Base | Per-tx fee | Notes |
+|----------|------|------------|-------|
+| Recharge Standard | $99/mo | 1.25% | Flow engine on Pro tier only |
+| Recharge Pro | $499/mo | 1.00% | Flow engine, advanced automation |
+| Loop Starter | $99/mo | 1.00% | Retention portal included |
+| Loop Pro | $399/mo | 0.75% | Adds advanced retention flows, lower fee |
+
+For stores under ~200 active subscribers, the per-transaction fee delta is small enough that the migration overhead doesn't pay back inside a year. For stores past 500 active subscribers, the 0.25-percentage-point gap between Loop Pro (0.75%) and Recharge Pro (1.00%) compounds — at $200k subscription GMV/month, that's about $500/mo back in margin, which clears typical migration costs in 1-2 quarters.
+
+Stay on Recharge (or migrate from Skio into Recharge) if:
+
+- You're under 200 active subscribers and the migration risk outweighs the fee savings
+- You already use Recharge for non-Skio products — consolidating onto one platform is cheaper than running two billing systems in parallel
+- Your retention flows are deeply tied to Recharge's Flow engine, and rebuilding them on Loop is more work than the fee delta justifies
+
+For the fee structure and Flow-engine breakdown, see the [Recharge tool profile](/tools/recharge).
+
+<AffiliateButton tool="loop-subscriptions" cta="See Loop Subscriptions" />
+
+## What to do next
+
+Migration is the start, not the end. The retention flows that turn subscribers into long-term revenue need to be set up on the new platform, and the support load typically spikes for 4-6 weeks post-cutover as subscribers adjust to the new portal.
+
+- [How to set up Shopify email automation](/guides/how-to-set-up-shopify-email-automation) — the welcome, abandoned-cart, and post-purchase flows that feed your subscription portal
+- [Support automation for Shopify stores](/guides/support-automation-for-shopify-stores) — subscriber tickets spike after any migration; macros and AI deflection earn their keep here
+- [Recharge tool profile](/tools/recharge) — fee structure and Flow-engine breakdown if you're still choosing between platforms
+
+Last verified 2026-05-20. Loop and Recharge pricing checked against vendor docs the same day; Skio acquisition figure confirmed against TechCrunch's coverage of the April 30, 2026 announcement.

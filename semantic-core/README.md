@@ -21,7 +21,7 @@ and write status there, not in the CSV.
 | `search_intent` | enum | yes | `transactional` \| `commercial-investigation` \| `informational`. |
 | `volume_estimate` | integer | no | Monthly search volume estimate (any source). |
 | `difficulty` | integer | no | 0–100 (Ahrefs KD-style). |
-| `priority_score` | integer | no | 0–100 internal score. Computed by CHIEF; importer accepts whatever's in CSV. |
+| `priority_score` | integer | no | Internal score — relative ranking, not a strict 0–100 scale. The May 2026 seed core uses a `volume × intent × cluster-strategic-weight` formula that goes up to ~600 for the highest-leverage entries (e.g. `klaviyo review` = 583). CHIEF normalizes / rescales as it sees fit; importer accepts whatever's in CSV. |
 | `content_angle` | string | no | The unique angle this article should take. |
 | `content_gap` | string | no | What the top-10 SERP results miss. |
 | `competitors_top3` | JSON | no | `[{"url":"...","dr":78,"angle":"listicle"}, ...]`. The importer parses JSON; broken JSON skips the row. |

@@ -31,6 +31,7 @@ _None._
 
 ## Recently done (last 10)
 
+- 001-skio-to-loop-migration.md — 2026-05-20
 <!-- OPS appends here when moving a packet to done/. Most recent first. -->
 
 _Nothing published yet._

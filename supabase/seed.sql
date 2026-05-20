@@ -419,6 +419,74 @@ insert into public.tools (
   'Recharge tested on a real Shopify subscription store. Honest take on per-transaction fees, the Flow engine, and when Smartrr or Skio start making sense.'
 ),
 -- ---------------------------------------------------------------------------
+-- 8a. Loop Subscriptions — Skio-migration destination, retention-focused
+--     status=published with affiliate_url=NULL so /go/loop-subscriptions
+--     falls back to website_url until the Loop Partner Program approves.
+--     Mirrors migration 009_add_loop_and_skio_tools.sql.
+-- ---------------------------------------------------------------------------
+(
+  'loop-subscriptions',
+  'Loop Subscriptions',
+  'Subscriptions for Shopify with a retention-first focus.',
+  'Loop Subscriptions is a Shopify-native subscription platform that grew rapidly during 2025-2026 (reported ARR tripled to $33M+ over twelve months, per ARR Club). Loop differentiates on retention tooling — cancellation flows, swap-instead-of-cancel offers, and a subscriber portal designed to reduce involuntary churn. Following Recharge''s acquisition of Skio (April 30, 2026), Loop became the most common destination for merchants migrating off Skio.',
+  null,
+  'https://www.loopwork.co',
+  null,
+  null,
+  'upsell',
+  array['subscriptions','recurring','retention','shopify','skio-alternative'],
+  'subscription',
+  null,
+  null,
+  null,
+  '[]'::jsonb,
+  array['shopify','shopify-plus','klaviyo'],
+  null,
+  null,
+  '{}'::text[],
+  '{}'::text[],
+  null,
+  null,
+  0,
+  'published',
+  'Loop Subscriptions · Shopify subscription platform 2026',
+  'Loop Subscriptions for Shopify operators migrating from Skio after the Recharge acquisition. Retention-focused subscriber portal, cancellation flows, swap offers.'
+),
+-- ---------------------------------------------------------------------------
+-- 8b. Skio — acquired by Recharge 2026-04-30, entity reference only
+--     status=archived; /go/skio intentionally routes to /tools per the
+--     redirector (we don't send traffic to a sunsetting platform).
+--     Mirrors migration 009_add_loop_and_skio_tools.sql.
+-- ---------------------------------------------------------------------------
+(
+  'skio',
+  'Skio',
+  'Shopify subscriptions platform acquired by Recharge (April 30, 2026).',
+  'Skio was a Shopify-native subscription platform that competed with Recharge and Loop Subscriptions through 2025. On April 30, 2026, Recharge announced the acquisition of Skio for $105 million. As of mid-2026 Skio remains operational, but new sign-ups and the long-term product roadmap are being consolidated into the Recharge ecosystem. Existing Skio merchants face a platform decision: stay through the Recharge consolidation, or migrate to an independent competitor such as Loop Subscriptions or Stay AI.',
+  null,
+  'https://www.skio.com',
+  null,
+  null,
+  'upsell',
+  array['subscriptions','acquired','shopify','recharge-acquisition'],
+  'subscription',
+  null,
+  null,
+  null,
+  '[]'::jsonb,
+  array['shopify','shopify-plus'],
+  null,
+  null,
+  '{}'::text[],
+  '{}'::text[],
+  null,
+  null,
+  0,
+  'archived',
+  'Skio · acquired by Recharge in 2026',
+  'Skio overview and acquisition context for Shopify operators evaluating subscription platform migrations to Loop or Recharge.'
+),
+-- ---------------------------------------------------------------------------
 -- 9. Loox — photo reviews + UGC
 -- ---------------------------------------------------------------------------
 (

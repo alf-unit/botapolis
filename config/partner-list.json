@@ -1,0 +1,41 @@
+{
+  "$schema": "./partner-list.schema.json",
+  "version": 1,
+  "updated_at": "2026-05-20",
+  "description": "Affiliate / partner relationships. The Supabase tools table is source-of-truth for runtime URLs (so /go/[slug] resolves quickly); this JSON is the auditable source-of-truth for terms, contacts, and contractual notes that don't belong in a DB row.",
+  "partners": [
+    {
+      "slug": "klaviyo",
+      "program_name": "Klaviyo Partner Program",
+      "commission_model": "recurring",
+      "commission_rate_pct": 25,
+      "cookie_window_days": 60,
+      "minimum_payout_usd": 100,
+      "tracking_provider": "impact",
+      "signup_url": "https://www.klaviyo.com/partners",
+      "go_slug": "klaviyo",
+      "status": "active",
+      "contract_signed_at": null,
+      "notes": "Placeholder — replace with real terms after signing."
+    },
+    {
+      "slug": "gorgias",
+      "program_name": "Gorgias Affiliate Program",
+      "commission_model": "one-time",
+      "commission_rate_pct": 20,
+      "cookie_window_days": 30,
+      "minimum_payout_usd": 50,
+      "tracking_provider": "partnerstack",
+      "signup_url": "https://www.gorgias.com/partners",
+      "go_slug": "gorgias",
+      "status": "active",
+      "contract_signed_at": null,
+      "notes": "Placeholder."
+    }
+  ],
+  "_notes": [
+    "When a partner is added: insert/update the matching Supabase tools row first; this JSON is updated last.",
+    "Status enum: active | paused | declined | pending.",
+    "commission_rate_pct is informational — actual payout depends on the network ledger."
+  ]
+}

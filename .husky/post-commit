@@ -1,0 +1,104 @@
+#!/usr/bin/env sh
+# ============================================================================
+# Botapolis · post-commit hook
+# ----------------------------------------------------------------------------
+# Notifies /api/agents/article-published when a commit adds or modifies MDX
+# under content/<type>/{en,ru}/. The endpoint updates
+# semantic_core_entries.status='published', revalidates the page, and logs
+# to agent_logs.
+#
+# Design choices:
+#   - Hook never fails the commit. Network errors → warn and continue.
+#   - Reads SITE_URL from .env.local; defaults to production if unset.
+#   - Reads REVALIDATE_SECRET from .env.local; if missing, hook is a no-op
+#     (same pattern as pre-commit handles OPENROUTER_API_KEY).
+#   - Only fires when the committed change is on `main` (the deployed
+#     branch). Feature-branch commits don't update agent state.
+#
+# Mirror script: scripts/git-hooks/post-commit.sh — same logic, intended for
+# environments that don't use husky (e.g. a bare clone on the Mac Mini).
+# ============================================================================
+set -e
+
+# Only run on main — feature branches shouldn't poke the prod webhook.
+branch=$(git rev-parse --abbrev-ref HEAD)
+if [ "$branch" != "main" ]; then
+  exit 0
+fi
+
+# Find content MDX added/modified in the just-committed commit.
+sha=$(git rev-parse HEAD)
+changed=$(git diff-tree --no-commit-id --name-only --diff-filter=AM -r "$sha" \
+  | grep -E '^content/(reviews|comparisons|alternatives|guides|best|news)/(en|ru)/.*\.mdx$' \
+  || true)
+
+if [ -z "$changed" ]; then
+  exit 0
+fi
+
+# Load env from .env.local without sourcing it (avoids accidental eval).
+load_env() {
+  if [ -f .env.local ]; then
+    grep -E "^$1=" .env.local | head -n1 | sed -E "s/^$1=//" | sed -E 's/^"//; s/"$//'
+  fi
+}
+
+SECRET=$(load_env REVALIDATE_SECRET)
+SITE_URL=$(load_env NEXT_PUBLIC_SITE_URL)
+SITE_URL="${SITE_URL:-https://botapolis.com}"
+
+if [ -z "$SECRET" ]; then
+  echo "[post-commit] REVALIDATE_SECRET not set in .env.local — skipping webhook"
+  exit 0
+fi
+
+# Build a JSON payload. We extract primary_keyword from MDX frontmatter
+# with a tiny awk script — no Node startup cost on every commit.
+mdx_primary_keyword() {
+  awk '
+    BEGIN { inFm=0 }
+    /^---[[:space:]]*$/ { inFm = !inFm; next }
+    inFm && /^primaryKeyword:/ {
+      sub(/^primaryKeyword:[[:space:]]*/, "")
+      gsub(/^"|"$/, "")
+      print
+      exit
+    }
+  ' "$1"
+}
+
+slug_from_path() {
+  echo "$1" | sed -E 's|^content/[^/]+/(en\|ru)/(.+)\.mdx$|\2|'
+}
+
+files_json=""
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  kw=$(mdx_primary_keyword "$f" 2>/dev/null | sed 's/"/\\"/g')
+  slug=$(slug_from_path "$f")
+  entry="{\"path\":\"$f\",\"primary_keyword\":\"$kw\",\"slug\":\"$slug\"}"
+  if [ -z "$files_json" ]; then files_json="$entry"
+  else files_json="$files_json,$entry"
+  fi
+done <<EOF
+$changed
+EOF
+
+payload="{\"files\":[$files_json],\"commit_sha\":\"$sha\"}"
+
+# Fire and forget. Use a generous-ish timeout so a cold function start
+# doesn't drop the signal, but cap it so the hook isn't blocking forever.
+echo "[post-commit] notifying $SITE_URL/api/agents/article-published"
+http_code=$(curl -s -o /tmp/botapolis-post-commit.log -w "%{http_code}" \
+  --max-time 20 \
+  -X POST "$SITE_URL/api/agents/article-published?secret=$SECRET" \
+  -H "Content-Type: application/json" \
+  -d "$payload" || echo "000")
+
+if [ "$http_code" = "200" ]; then
+  echo "[post-commit] webhook OK"
+else
+  echo "[post-commit] webhook returned $http_code — see /tmp/botapolis-post-commit.log"
+fi
+
+exit 0

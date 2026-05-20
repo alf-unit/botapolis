@@ -1,0 +1,57 @@
+{
+  "$schema": "./banned-phrases.schema.json",
+  "version": 1,
+  "updated_at": "2026-05-20",
+  "description": "Phrases Claude Code must never emit in published MDX. Enforced by scripts/content-validator.ts (and surfaced as warnings in the pre-commit hook). Add per-packet bans in writer-queue/<packet>.md → 'Banned phrases for this packet' section.",
+  "categories": {
+    "ai_tells": [
+      "delve into",
+      "in today's digital landscape",
+      "in the ever-evolving world of",
+      "tapestry",
+      "embark on",
+      "navigate the complexities",
+      "revolutionize",
+      "unlock the power of",
+      "harness the power of",
+      "game-changer",
+      "game-changing",
+      "cutting-edge solution",
+      "seamless integration",
+      "robust solution",
+      "comprehensive suite",
+      "leverage the power",
+      "at the end of the day"
+    ],
+    "marketing_fluff": [
+      "industry-leading",
+      "best-in-class",
+      "world-class",
+      "next-generation",
+      "state-of-the-art",
+      "one-stop shop",
+      "supercharge",
+      "skyrocket",
+      "10x your"
+    ],
+    "uncertain_hedging": [
+      "may or may not",
+      "in some cases",
+      "various factors",
+      "depending on your needs",
+      "results may vary"
+    ],
+    "honesty_killers": [
+      "perfect for everyone",
+      "no downsides",
+      "no learning curve",
+      "completely free",
+      "zero setup"
+    ]
+  },
+  "_notes": [
+    "Matching is case-insensitive substring by default in content-validator.ts.",
+    "If a banned phrase is technically required (e.g., direct quote from vendor copy), wrap it in <!-- vendor-quote --> ... <!-- /vendor-quote --> and the validator will skip the block.",
+    "Adding entries: PRs welcome; one bullet per addition with the source incident in the commit message."
+  ]
+}

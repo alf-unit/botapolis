@@ -15,6 +15,8 @@
     "sync:ratings": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/sync-ratings.ts",
     "sync:ratings:apply": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/sync-ratings.ts --apply",
     "validate:content": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/content-validator.ts",
+    "import:semantic-core": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/import-semantic-core.ts",
+    "import:semantic-core:dry": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/import-semantic-core.ts --dry-run",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

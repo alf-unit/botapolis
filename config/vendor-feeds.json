@@ -1,0 +1,45 @@
+{
+  "$schema": "./vendor-feeds.schema.json",
+  "version": 1,
+  "updated_at": "2026-05-20",
+  "description": "RSS / Atom / Substack feeds SCOUT polls every 4 hours. Each entry: vendor slug (matches Supabase tools.slug if applicable), feed URL, type, and the categorization hints SCOUT uses when deciding opportunity_score.",
+  "feeds": [
+    {
+      "vendor": "klaviyo",
+      "url": "https://www.klaviyo.com/blog/feed",
+      "type": "rss",
+      "categories": ["email", "marketing-automation"],
+      "tracked": true,
+      "priority": "high"
+    },
+    {
+      "vendor": "gorgias",
+      "url": "https://www.gorgias.com/blog/rss.xml",
+      "type": "rss",
+      "categories": ["customer-support", "helpdesk"],
+      "tracked": true,
+      "priority": "high"
+    },
+    {
+      "vendor": "shopify",
+      "url": "https://www.shopify.com/blog.atom",
+      "type": "atom",
+      "categories": ["platform", "core"],
+      "tracked": true,
+      "priority": "high"
+    },
+    {
+      "vendor": "recharge",
+      "url": "https://rechargepayments.com/blog/feed",
+      "type": "rss",
+      "categories": ["subscriptions"],
+      "tracked": true,
+      "priority": "medium"
+    }
+  ],
+  "_notes": [
+    "Populate the rest of the 50+ vendors before flipping SCOUT to production.",
+    "If a vendor only offers email digest (no RSS), set type='email' and route through a Beehiiv-ingestion alias.",
+    "tracked=false rows are kept for reference but SCOUT skips polling."
+  ]
+}

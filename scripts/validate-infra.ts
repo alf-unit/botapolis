@@ -204,9 +204,14 @@ async function checkSupabase() {
   if (!url || !key) { record("supabase: env vars present", "FAIL", "cannot connect"); return }
   const supabase = createClient(url, key, { auth: { persistSession: false } })
 
-  const tables = ["semantic_core_entries", "content_opportunities", "agent_logs", "performance_snapshots", "system_config"]
+  const tables = [
+    "semantic_core_entries",
+    "content_opportunities",
+    "agent_logs",
+    "performance_snapshots",
+    "system_config",
+  ] as const
   for (const t of tables) {
-    // @ts-expect-error — `t` is a runtime string; the typed Database accepts a literal union here.
     const { count, error } = await supabase.from(t).select("*", { count: "exact", head: true })
     if (error) record(`supabase: ${t} reachable`, "FAIL", error.message)
     else record(`supabase: ${t} reachable`, "PASS", `count=${count}`)

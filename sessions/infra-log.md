@@ -83,3 +83,60 @@ Stand up the repo-side scaffolding for the FINAL-ARCHITECTURE-V4 multi-agent sys
 - **Vercel deploy status not visible in validate:infra** — only the endpoint reach test runs against prod. Add a `last_deployed_sha` query (Vercel API) to catch silent build failures earlier.
 
 - **Semantic core expansion 101 → ~427** — programmatic pSEO long-tail per the source report's pattern note. Best done after 30-60 days of GSC data and SCOUT opportunity detection, not preemptively (avoids placeholder rot).
+
+---
+
+## 2026-05-22 — SCOUT unblocked: migration 010 + AGENTS.md write contract
+
+### Commits
+
+- [`8ee09b1`](https://github.com/alf-unit/botapolis/commit/8ee09b1) — feat(supabase): migration 010 — content_opportunities columns for SCOUT
+
+### Task
+
+OpenClaw agents went live 2026-05-21. CHIEF's first morning briefing on 2026-05-22 flagged that SCOUT lost 4 valid opportunities (Gorgias AI pricing, Gorgias guardrails, Recharge-Skio acquisition, Recharge AI agents) because the INSERTs into `public.content_opportunities` referenced columns (`tool_slug`, `category`) the schema didn't define. Unblock SCOUT and lock down the write contract so it doesn't recur.
+
+### Done
+
+- **Migration 010** (commit `8ee09b1`) — added nullable `tool_slug` (text) and `category` (text) columns to `public.content_opportunities` + partial index `idx_opp_tool_slug` on `tool_slug WHERE NOT NULL`. Category left un-CHECKed for v1. Applied via Supabase Studio (same flow as 009).
+
+- **`lib/supabase/types.ts`** (same commit) — `ContentOpportunityRow` extended with the new columns; new `ContentOpportunityCategory` union uses `(string & {})` escape hatch since the DB column is intentionally open.
+
+- **SCOUT `AGENTS.md` rewrite** — handed off to operator as `agent-workspaces/scout/AGENTS.md` (since cleaned), then copied to `~/.openclaw/agents/scout/workspace/AGENTS.md` on Mac Mini. Preserved the architecture's structure verbatim except for an inserted `## content_opportunities — schema for INSERT (READ BEFORE EVERY WRITE)` section near the top: explicit column-by-column write contract, category→urgency mapping, opportunity_score ladder, worked example for the Recharge-Skio acquisition, failure-mode handling (`event_type='schema_mismatch'`, no retry). RSS/Reddit/PH monitoring sections updated to reference the schema section instead of inventing fields ad-hoc.
+
+### Discovered (quirks / gotchas)
+
+- **Architecture spec is silent on where SCOUT writes its classifier category.** `FINAL-ARCHITECTURE-V4.md` SCOUT block says "Categorize: pricing-change | feature-launch | acquisition | news | unrelated" but doesn't say to which column. At runtime Haiku invented `tool_slug` and `category` columns. CHIEF's briefing proposed adding the columns rather than redirecting SCOUT to existing `evidence` JSONB + `related_tools` UUID[]. Gap is in the spec, not the agents.
+
+- **Token-cost comparison favours flat columns over JSONB for SCOUT writes.** Quick estimate: ~30 extra output-tokens per INSERT if category lives in `evidence` JSONB (LLM has to serialize), plus an extra ~50-80 output-tokens per slug→UUID lookup against `tools`. At 60+ INSERTs/day on Haiku that's ~$1/mo. Plus CHIEF (Sonnet, 5-7x dearer) reading the JSONB blob on every morning briefing adds another ~$0.20-0.50/mo. β path (flat columns) is the cheaper + lower-hallucination route.
+
+- **OpenClaw workspace files reload on session start, NOT on every HEARTBEAT tick.** Confirmed against official docs (docs.openclaw.ai/concepts/agent-workspace and docs.openclaw.ai/gateway/heartbeat). HEARTBEAT runs *inside* the agent's main session by default (`isolatedSession: true` is opt-in). Practical consequence: after replacing `AGENTS.md` on disk, you must restart the agent's session for the new instructions to take effect — a running agent keeps the old file's content cached in its prompt context. I'd earlier conflated "RSS task fires every 4h" with "files reload every 4h"; they are unrelated mechanisms.
+
+- **`SUPABASE_SERVICE_ROLE_KEY` in `.env.local` is a pre-existing exfil vector.** It's been there since project init and gives PostgREST read/write on every table — bypassing RLS. Today's exploration of CLI-driven self-apply migrations would have added DB-password (DDL access) and PAT (Management API across the whole Supabase account); we deliberately did not do this, keeping migrations on the manual "paste-to-Studio" path so the new attack surface stays unopened. Worth flagging that the *baseline* risk was already present, not "introduced today".
+
+- **"Private repo per agent workspace" is operator-doc lore, not OpenClaw.** Official docs don't recommend it; the pattern lives only in `FINAL-ARCHITECTURE-V4.md` part 1. Operator already does periodic full-folder backups of `~/.openclaw/` — that subsumes the per-agent-repo pattern. We can stop citing it as a requirement.
+
+### Fixes (what + why)
+
+- **Schema gap closed** — `add column if not exists tool_slug text` / `category text` rather than re-routing SCOUT to JSONB. Chose this over `evidence`-based encoding for the token-economics + hallucination-robustness reasons above. Cost: two denormalised columns + small partial index. Not free, but cheap.
+
+- **SCOUT `AGENTS.md` now self-documents the schema.** The architecture's "Categorize: ... write to content_opportunities" was too thin — Haiku had to invent the wiring. New section spells out every required/recommended/optional/never-set column + a real INSERT example. Same pattern should be applied to any other agent write contract that the architecture spec leaves implicit.
+
+- **Cleanup of mid-session false starts** — wrote and then reverted a `scripts/db-push.ts` + `npm run db:push` + `CLAUDE.md` "self-apply" protocol section + `agent-workspaces/scout/` handoff dir, all uncommitted. Kept only the migration + types + this log. The CLI path is feasible (Supabase CLI v2.101.0 installed and pulls; project-ref `vdzslhzyezngdbnrnomc` extractable from `NEXT_PUBLIC_SUPABASE_URL`) but operator chose not to extend the secret footprint right now.
+
+### Open follow-ups
+
+- **4 lost opportunities** (Gorgias AI pricing, Gorgias guardrails, Recharge-Skio acquisition, Recharge AI agents) — SCOUT will re-encounter them on the next RSS cycle once the agent session is restarted with the new `AGENTS.md`. No manual rescue needed.
+
+- **Same write-contract gap may bite again** when SCOUT/OPS/CHIEF do writes the architecture spec describes only at "what to write" level, not "which columns". Pre-emptively spell out schema references in each agent's `AGENTS.md` before going live — same pattern as today's `content_opportunities` block.
+
+- **Tighten `content_opportunities.category` to CHECK constraint** after ~30 days of SCOUT runs reveal the stable vocab. Until then a stray value silently lands rather than failing the INSERT.
+
+- **`SCOUT-specific MEMORY.md / TOOLS.md` not in architecture spec** — `FINAL-ARCHITECTURE-V4.md` only shows CHIEF's TOOLS.md. SCOUT's runtime TOOLS access (Playwright, Supabase, GitHub, Reddit, RSS) isn't documented. Worth a pass before SCOUT scales to full vendor list.
+
+- **Self-apply migration path stays on the shelf.** If operator later wants the Claude-Code-runs-`db:push` workflow, the components needed are: (1) re-add `scripts/db-push.ts` (uses `SUPABASE_ACCESS_TOKEN` + `SUPABASE_DB_PASSWORD` env), (2) add `db:push` to `package.json`, (3) add `supabase/.temp/` to `.gitignore`, (4) document safety protocol in `CLAUDE.md`. Project-ref is `vdzslhzyezngdbnrnomc`. Trade-off discussed: DB password on disk expands prompt-injection surface to DDL.
+
+- **Prior-session follow-ups still open and now more relevant** with agents live:
+  - 35 RSS feeds in `vendor-feeds.json` are still `tracked: false` — SCOUT will spend cycles on 404s until verified.
+  - 15 partners `pending_approval` — at minimum Shopify/Klaviyo/Gorgias/Recharge need signed before traffic ramp.
+  - `last_deployed_sha` check in `validate:infra` — silent Vercel build failures still invisible.

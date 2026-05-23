@@ -90,7 +90,7 @@ Stand up the repo-side scaffolding for the FINAL-ARCHITECTURE-V4 multi-agent sys
 
 ### Commits
 
-- [`8ee09b1`](https://github.com/alf-unit/botapolis/commit/8ee09b1) — feat(supabase): migration 010 — content_opportunities columns for SCOUT
+- [`0c9eee5`](https://github.com/alf-unit/botapolis/commit/0c9eee5) — feat(supabase): migration 010 — content_opportunities columns for SCOUT
 
 ### Task
 
@@ -98,7 +98,7 @@ OpenClaw agents went live 2026-05-21. CHIEF's first morning briefing on 2026-05-
 
 ### Done
 
-- **Migration 010** (commit `8ee09b1`) — added nullable `tool_slug` (text) and `category` (text) columns to `public.content_opportunities` + partial index `idx_opp_tool_slug` on `tool_slug WHERE NOT NULL`. Category left un-CHECKed for v1. Applied via Supabase Studio (same flow as 009).
+- **Migration 010** (commit `0c9eee5`) — added nullable `tool_slug` (text) and `category` (text) columns to `public.content_opportunities` + partial index `idx_opp_tool_slug` on `tool_slug WHERE NOT NULL`. Category left un-CHECKed for v1. Applied via Supabase Studio (same flow as 009).
 
 - **`lib/supabase/types.ts`** (same commit) — `ContentOpportunityRow` extended with the new columns; new `ContentOpportunityCategory` union uses `(string & {})` escape hatch since the DB column is intentionally open.
 

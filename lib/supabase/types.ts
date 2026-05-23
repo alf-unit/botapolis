@@ -321,6 +321,12 @@ export type ContentOpportunityStatus =
   | "pending" | "reviewed_by_chief" | "accepted" | "rejected" | "expired"
 export type ContentOpportunityUrgency = "hot" | "warm" | "evergreen"
 
+// Category vocabulary per SCOUT's AGENTS.md classifier. Kept open with the
+// `(string & {})` escape hatch since the DB column is intentionally un-CHECKed
+// — SCOUT's vocab may add new buckets before we tighten the constraint.
+export type ContentOpportunityCategory =
+  | "pricing-change" | "feature-launch" | "acquisition" | "news" | "unrelated"
+
 export type ContentOpportunityRow = {
   id: string
   source: ContentOpportunitySource
@@ -328,6 +334,9 @@ export type ContentOpportunityRow = {
   topic: string
   related_keywords: string[] | null
   related_tools: string[] | null
+  // Migration 010 — denormalised slug + classifier (both nullable).
+  tool_slug: string | null
+  category: ContentOpportunityCategory | (string & {}) | null
   opportunity_score: number | null
   urgency: ContentOpportunityUrgency | null
   estimated_window_days: number | null

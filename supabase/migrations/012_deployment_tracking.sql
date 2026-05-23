@@ -25,8 +25,8 @@
 insert into public.system_config (key, value, description) values
   ('last_deployed_sha',
    '""'::jsonb,
-   'Short SHA of the commit currently live on production Vercel. Populated by OPS via Vercel API poll (hourly). Compare against ` HEAD` to detect silent deploy failures.'),
+   'Short SHA of the commit currently live on production Vercel. Populated by OPS via GitHub HEAD comparison every 2 days (no Vercel API token used). Compared against `git rev-parse --short HEAD` to detect silent deploy failures.'),
   ('last_deployed_at',
    '""'::jsonb,
-   'ISO timestamp when last_deployed_sha was observed live by OPS. Stale value (>2h old without a HEAD match) implies deploy hung or failed.')
+   'ISO timestamp when last_deployed_sha was last observed by OPS. Stale value (>4 days old without a HEAD match) implies a deploy hung or failed.')
 on conflict (key) do nothing;

@@ -55,8 +55,10 @@ comment on column public.tools.sitemap_url is
   'Verified sitemap URL for SCOUT sitemap-diff monitoring. Filled in by SCOUT on first cycle via path-probe (/sitemap.xml, /sitemap_index.xml, /sitemap.xml.gz); NULL means SCOUT either has not crawled yet or vendor has no discoverable sitemap.';
 
 -- ── 2. scout_sitemap_snapshots ──────────────────────────────────────────────
--- One row per (vendor, week) capturing the URL-set DIFF since the prior
--- snapshot. SCOUT writes; CHIEF reads when classifying opportunities.
+-- One row per (vendor, snapshot_date) capturing the URL-set DIFF since the
+-- prior snapshot. SCOUT writes daily (12:30 UTC per AGENTS.md cadence);
+-- CHIEF reads when classifying opportunities. UNIQUE constraint permits any
+-- cadence — schema does not bake in daily-vs-weekly.
 -- ----------------------------------------------------------------------------
 create table if not exists public.scout_sitemap_snapshots (
   id                  uuid primary key default gen_random_uuid(),
@@ -67,7 +69,7 @@ create table if not exists public.scout_sitemap_snapshots (
   -- in vendor-feeds.json but not in tools.
   vendor_slug         text not null,
 
-  -- Date of the snapshot run (typically the SCOUT weekly cycle day).
+  -- Date of the snapshot run. SCOUT writes daily at 12:30 UTC per AGENTS.md;
   -- UNIQUE(vendor_slug, snapshot_date) below ensures one row per vendor/day.
   snapshot_date       date not null,
 

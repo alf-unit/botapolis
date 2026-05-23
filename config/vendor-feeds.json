@@ -1,32 +1,47 @@
 {
   "$schema": "./vendor-feeds.schema.json",
-  "version": 2,
-  "updated_at": "2026-05-20",
-  "description": "RSS / Atom feeds SCOUT polls every 4 hours. Each entry: vendor slug (matches Supabase tools.slug where applicable), feed URL, type, categorization hints, and a tracked flag SCOUT uses to decide whether to poll. URLs marked tracked=false MUST be verified by operator (load in browser, confirm RSS parses) before flipping tracked=true — vendor feeds frequently move or 404, and a bad URL just creates SCOUT noise.",
+  "version": 3,
+  "updated_at": "2026-05-22",
+  "description": "RSS / Atom feeds SCOUT polls every 4 hours. Each entry: vendor slug (matches Supabase tools.slug where applicable), feed URL, type, categorization hints, and a tracked flag SCOUT uses to decide whether to poll. URLs marked tracked=false either failed verification or never had RSS to begin with (see dead_as_of / dead_reason). RSS is a SUPPLEMENTARY signal in the 2026 stack — see _notes for the primary/supplementary/roadmap split established after the 2026-05-22 audit.",
   "verification_protocol": [
-    "1. Curl the url with -I and check 200 + content-type contains 'xml' or 'rss'.",
-    "2. Open in a feed reader (e.g. feedly) and confirm recent items render.",
-    "3. Flip tracked=true and let SCOUT pick it up on next 4-hour cycle.",
-    "4. If 404 or empty: search '<vendor> blog rss' / '<vendor> feed' — many vendors hide the URL one click deeper than the blog index."
+    "1. curl -IL (follow redirects) and check final 200 + content-type contains 'xml' or 'rss' — catches dead-on-arrival URLs but misses content-type lies.",
+    "2. curl -L to fetch the body — confirm it starts with '<?xml' and contains <item> or <entry> elements. Yotpo-style content-type lies (header says rss+xml, body is HTML homepage) only get caught here.",
+    "3. Count <item>/<entry> > 0 AND most-recent <pubDate>/<updated> within last 90 days — catches valid-skeleton-but-empty feeds (nofraud-style) and abandoned blogs (cogsy, last post June 2023).",
+    "4. Only if all three pass: flip tracked=true.",
+    "5. If 404 or empty body: probe common alternative paths via curl loop with a real browser User-Agent: /feed/, /feed, /rss, /rss/, /blog/feed/, /blog/rss.xml, /blog/atom.xml, /blog/feed.xml, /feed.xml, /atom.xml, /news/feed, /resources/feed, /changelog/feed.xml. Many vendors hide the URL one click deeper than the blog index.",
+    "6. If absolutely no working RSS path exists after path-probing: mark tracked=false + dead_as_of=YYYY-MM-DD + dead_reason='<specific reason>'. Add vendor to the newsletter-ingestion roadmap (see _notes) — for most 2026 marketing sites that have no public RSS, email is the working substitute."
   ],
   "feeds": [
     {
       "vendor": "shopify",
-      "url": "https://www.shopify.com/blog.atom",
-      "type": "atom",
+      "url": "https://shopify.dev/changelog/feed.xml",
+      "type": "rss",
       "categories": ["platform", "core"],
       "tracked": true,
       "priority": "high",
-      "notes": "Official Shopify blog — captures Editions, Sidekick releases, Magic updates"
+      "notes": "Shopify developer changelog (1852 items as of audit) — captures platform changes, Editions, Sidekick/Magic releases directly at the source. Swapped 2026-05-22 from dead https://www.shopify.com/blog.atom (returned HTML, not Atom). This feed is a stricter upgrade for SCOUT's purpose: less marketing noise, more product-truth."
+    },
+    {
+      "vendor": "shopify-news",
+      "url": "https://www.shopify.com/news/feed",
+      "type": "rss",
+      "categories": ["platform", "press"],
+      "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "Feed parses, but last post is 2023-12-07 — Shopify abandoned this press-release feed. Considered as fallback for shopify-changelog but rejected as stale. Kept as audit tombstone.",
+      "priority": "low",
+      "notes": "Press-release feed — historically used for corporate announcements but unmaintained since end-2023. Re-check in 6 months."
     },
     {
       "vendor": "klaviyo",
       "url": "https://www.klaviyo.com/blog/feed",
       "type": "rss",
       "categories": ["email", "marketing-automation"],
-      "tracked": true,
+      "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns explicit 404 page (React-Router fallback served with status 200, but body is Klaviyo's 'Page not found' template). No working RSS path discovered after probing /feed, /rss, /blog/feed, /blog/rss, /blog/rss.xml, /blog/atom.xml, /news.atom, help.klaviyo.com/hc/en-us/articles.rss. Klaviyo's blog runs on a marketing-site stack without RSS exposure.",
       "priority": "high",
-      "notes": "Critical — pricing announcements + Customer Agent / Marketing Agent feature drops land here first"
+      "notes": "CRITICAL coverage gap — pricing announcements + Customer Agent / Marketing Agent feature drops land here first. Must be covered via newsletter ingestion (roadmap) + pricing-page scrape (primary)."
     },
     {
       "vendor": "gorgias",
@@ -35,7 +50,7 @@
       "categories": ["customer-support", "helpdesk"],
       "tracked": true,
       "priority": "high",
-      "notes": "Critical — AI Agent + Auto-Respond billing model changes announced here"
+      "notes": "Critical — AI Agent + Auto-Respond billing model changes announced here. Verified 2026-05-22: items active (latest 22 May 2026)."
     },
     {
       "vendor": "recharge",
@@ -44,7 +59,7 @@
       "categories": ["subscriptions"],
       "tracked": true,
       "priority": "high",
-      "notes": "Post-Skio-acquisition consolidation news will originate here"
+      "notes": "Post-Skio-acquisition consolidation news will originate here. Verified 2026-05-22: redirects to getrecharge.com/blog/feed/, returns 10 items, latest 11 May 2026."
     },
     {
       "vendor": "postscript",
@@ -52,8 +67,10 @@
       "type": "rss",
       "categories": ["sms"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path discovered after probing /feed, /rss, /blog/feed, /resources/blog/feed, /learning-center/feed. postscript.substack.com exists but last updated October 2020 (abandoned).",
       "priority": "high",
-      "notes": "VERIFY URL — Postscript Shopper feature roadmap announcements land here. May actually be at /resources/blog/rss."
+      "notes": "Postscript Shopper feature roadmap announcements were the target. Cover via newsletter ingestion (roadmap) + pricing-page scrape."
     },
     {
       "vendor": "loop",
@@ -61,26 +78,28 @@
       "type": "rss",
       "categories": ["returns", "subscriptions"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. Blog page (/blog/) renders but emits no <link rel='alternate' type='application/rss+xml'> in head. Loop offers email newsletter ('biweekly newsletter') as the official subscribe channel — covered by newsletter ingestion roadmap.",
       "priority": "high",
-      "notes": "VERIFY URL — Loop tripled ARR + acquired Skio; central to subscription cluster. Tool not yet in Supabase tools table."
+      "notes": "Loop tripled ARR + acquired Skio; central to subscription cluster. Tool not yet in Supabase tools table. High-value vendor — prioritize for newsletter ingestion setup."
     },
     {
       "vendor": "stay-ai",
       "url": "https://stay.ai/blog/rss",
       "type": "rss",
       "categories": ["subscriptions", "ai"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — Stay AI WinbackEngine releases. Tool not yet in Supabase tools table."
+      "notes": "Stay AI WinbackEngine releases. Tool not yet in Supabase tools table. Verified 2026-05-22: RSS 0.92 (minimalist format), 10 items, latest 20 Apr 2026."
     },
     {
       "vendor": "omnisend",
       "url": "https://www.omnisend.com/blog/feed/",
       "type": "rss",
       "categories": ["email", "sms"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — MCP/ChatGPT integration announcements relevant for klaviyo-vs-omnisend cluster"
+      "notes": "MCP/ChatGPT integration announcements relevant for klaviyo-vs-omnisend cluster. Verified 2026-05-22: 10 items, latest 22 May 2026."
     },
     {
       "vendor": "mailchimp",
@@ -88,17 +107,19 @@
       "type": "rss",
       "categories": ["email"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path on mailchimp.com (probed full common-path set). Mailchimp is now Intuit-owned and content moved behind a marketing-site stack with no RSS.",
       "priority": "low",
-      "notes": "VERIFY URL — broad marketing blog, low relevance for Shopify operators"
+      "notes": "Broad marketing blog, originally low relevance for Shopify operators. Newsletter ingestion not critical here — Reddit/community coverage suffices."
     },
     {
       "vendor": "tidio",
-      "url": "https://www.tidio.com/blog/feed/",
+      "url": "https://www.tidio.com/feed/",
       "type": "rss",
       "categories": ["chat", "support", "ai"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — Lyro AI feature drops"
+      "notes": "Lyro AI feature drops. URL updated 2026-05-22 from /blog/feed/ (returned HTML) to /feed/ (real RSS at root). Verified: 10 items, latest 31 Mar 2026 — slower cadence but functional."
     },
     {
       "vendor": "manychat",
@@ -106,8 +127,10 @@
       "type": "rss",
       "categories": ["chat", "automation"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 403 (Cloudflare bot block). No working RSS path discovered after probing with realistic browser User-Agent. Site is behind aggressive bot protection — even browser-UA probes fail.",
       "priority": "medium",
-      "notes": "VERIFY URL — IG/FB/WhatsApp automation, partnerstack affiliate"
+      "notes": "IG/FB/WhatsApp automation, partnerstack affiliate. Cover via newsletter ingestion (roadmap) + Reddit r/automation."
     },
     {
       "vendor": "attentive",
@@ -115,8 +138,10 @@
       "type": "rss",
       "categories": ["sms"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path on attentive.com. attentive.substack.com is a different unrelated project ('Attention to Detail — Practical advice for the modern MBA').",
       "priority": "medium",
-      "notes": "VERIFY URL — enterprise SMS competitor to Postscript. Pricing changes important for cluster comparisons."
+      "notes": "Enterprise SMS competitor to Postscript. Pricing changes important for cluster comparisons. Cover via newsletter ingestion + pricing-page scrape."
     },
     {
       "vendor": "yotpo",
@@ -124,17 +149,19 @@
       "type": "rss",
       "categories": ["reviews", "loyalty", "sms"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "Returns 200 with content-type application/rss+xml, but body is the HTML homepage (content-type header lies — 420KB of HTML masquerading as RSS). /blog/feed/ returns empty body. No working RSS path on yotpo.com.",
       "priority": "medium",
-      "notes": "VERIFY URL — multi-product vendor, AI Campaigns / Loyalty Tier announcements"
+      "notes": "Multi-product vendor, AI Campaigns / Loyalty Tier announcements. Cover via newsletter ingestion + pricing-page scrape."
     },
     {
       "vendor": "loox",
-      "url": "https://loox.app/blog/feed",
+      "url": "https://loox.app/blog/rss.xml",
       "type": "rss",
       "categories": ["reviews", "ugc"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — partnerstack affiliate; submission-rate claim debates"
+      "notes": "Partnerstack affiliate; submission-rate claim debates. URL updated 2026-05-22 from /blog/feed (404) to /blog/rss.xml. Verified: latest 20 May 2026."
     },
     {
       "vendor": "judge-me",
@@ -142,35 +169,37 @@
       "type": "rss",
       "categories": ["reviews", "ugc"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "Connection times out (code 000) on multiple attempts. Likely Cloudflare anti-bot blocking even browser-UA probes. No working RSS path discoverable from outside.",
       "priority": "medium",
-      "notes": "VERIFY URL — direct competitor to Loox; 'free forever' positioning shifts matter"
+      "notes": "Direct competitor to Loox; 'free forever' positioning shifts matter. Cover via Reddit + pricing-page scrape."
     },
     {
       "vendor": "smile-io",
       "url": "https://blog.smile.io/rss",
       "type": "rss",
       "categories": ["loyalty"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — direct affiliate"
+      "notes": "Direct affiliate. Verified 2026-05-22: 2 items in latest, latest 11 May 2026. Slower cadence but functional."
     },
     {
       "vendor": "loyaltylion",
       "url": "https://loyaltylion.com/blog/feed",
       "type": "rss",
       "categories": ["loyalty", "ai"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — AI Campaigns launch covered in semantic core"
+      "notes": "AI Campaigns launch covered in semantic core. Verified 2026-05-22: 15 items, latest 20 May 2026."
     },
     {
       "vendor": "rebuy",
-      "url": "https://www.rebuyengine.com/blog/feed",
+      "url": "https://www.rebuyengine.com/blog/rss.xml",
       "type": "rss",
       "categories": ["personalization", "upsell"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — modular pricing changes important for the rebuy-vs-limespot cluster"
+      "notes": "Modular pricing changes important for the rebuy-vs-limespot cluster. URL updated 2026-05-22 from /blog/feed (404) to /blog/rss.xml. Verified: 10 items, latest 30 Apr 2026."
     },
     {
       "vendor": "limespot",
@@ -178,8 +207,10 @@
       "type": "rss",
       "categories": ["personalization"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL redirects to limespot.com/articles/rss which is an HTML page titled 'Rss - LimeSpot Blog' (it's a blog post about RSS, not an actual feed). No working RSS path on limespot.com.",
       "priority": "low",
-      "notes": "VERIFY URL — hybrid manual/AI competitor to Rebuy"
+      "notes": "Hybrid manual/AI competitor to Rebuy. Low priority — Reddit coverage sufficient."
     },
     {
       "vendor": "nosto",
@@ -187,8 +218,10 @@
       "type": "rss",
       "categories": ["personalization", "enterprise"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. /resources/rss exists but is a WordPress comments feed ('Comments on: Resources') with 0 items — not a content feed. No working content RSS on nosto.com.",
       "priority": "low",
-      "notes": "VERIFY URL — enterprise tier, lower operator-relevance"
+      "notes": "Enterprise tier, lower operator-relevance. Cover via Reddit if needed."
     },
     {
       "vendor": "triple-whale",
@@ -196,8 +229,10 @@
       "type": "rss",
       "categories": ["attribution", "analytics"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path on triplewhale.com after full probe. triplewhale.substack.com returns 404.",
       "priority": "high",
-      "notes": "VERIFY URL — Moby AI updates; cluster head for attribution"
+      "notes": "Moby AI updates; cluster head for attribution. HIGH-VALUE coverage gap — prioritize for newsletter ingestion."
     },
     {
       "vendor": "northbeam",
@@ -205,8 +240,10 @@
       "type": "rss",
       "categories": ["attribution"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path on northbeam.io. northbeam.substack.com returns text/html, not a feed.",
       "priority": "medium",
-      "notes": "VERIFY URL — $1,500/mo minimum announcements"
+      "notes": "$1,500/mo minimum announcements. Cover via newsletter ingestion + pricing-page scrape."
     },
     {
       "vendor": "polar-analytics",
@@ -214,8 +251,10 @@
       "type": "rss",
       "categories": ["attribution", "analytics"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path on polaranalytics.com.",
       "priority": "medium",
-      "notes": "VERIFY URL — Snowflake-backed attribution"
+      "notes": "Snowflake-backed attribution. Cover via newsletter ingestion."
     },
     {
       "vendor": "adcreative-ai",
@@ -223,8 +262,10 @@
       "type": "rss",
       "categories": ["ad-creative", "ai"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path on adcreative.ai.",
       "priority": "medium",
-      "notes": "VERIFY URL — direct affiliate (30% recurring)"
+      "notes": "Direct affiliate (30% recurring). Cover via newsletter ingestion."
     },
     {
       "vendor": "pencil",
@@ -232,35 +273,39 @@
       "type": "rss",
       "categories": ["ad-creative", "ai", "video"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "Connection times out (code 000). No working RSS path discoverable.",
       "priority": "low",
-      "notes": "VERIFY URL"
+      "notes": "Low priority overall."
     },
     {
       "vendor": "signifyd",
       "url": "https://www.signifyd.com/blog/feed",
       "type": "rss",
       "categories": ["fraud-detection"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — chargeback-guarantee announcements; relevant for fraud-detection cluster"
+      "notes": "Chargeback-guarantee announcements; relevant for fraud-detection cluster. Verified 2026-05-22: 10 items, latest 19 May 2026."
     },
     {
       "vendor": "nofraud",
-      "url": "https://www.nofraud.com/blog/feed",
+      "url": "https://www.nofraud.com/feed/",
       "type": "rss",
       "categories": ["fraud-detection"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns valid RSS 2.0 skeleton but 0 items. Feed exists at /feed/, /feed, /rss, /rss/ but channel has no <item> elements. Vendor has either no blog or stopped publishing.",
       "priority": "low",
-      "notes": "VERIFY URL — human-analyst hybrid competitor to Signifyd"
+      "notes": "Human-analyst hybrid competitor to Signifyd. Re-check in 6 months — if items appear, flip tracked=true."
     },
     {
       "vendor": "aftership",
-      "url": "https://www.aftership.com/blog/feed",
-      "type": "rss",
+      "url": "https://www.aftership.com/blog/rss",
+      "type": "atom",
       "categories": ["shipping", "returns", "tiktok"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — TikTok Shop Feed integration relevant for tiktok-shop-ops cluster"
+      "notes": "TikTok Shop Feed integration relevant for tiktok-shop-ops cluster. URL updated 2026-05-22 from /blog/feed (Cloudflare blocked) to /blog/rss (Atom format, 214 items, latest 4 May 2026)."
     },
     {
       "vendor": "redo",
@@ -268,35 +313,39 @@
       "type": "rss",
       "categories": ["returns"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path on redo.com.",
       "priority": "low",
-      "notes": "VERIFY URL"
+      "notes": "Low priority."
     },
     {
       "vendor": "inventory-planner",
-      "url": "https://www.inventory-planner.com/blog/feed",
+      "url": "https://www.inventory-planner.com/feed/",
       "type": "rss",
       "categories": ["inventory-forecasting"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "VERIFY URL — post-Sage-acquisition feature changes critical"
+      "notes": "Post-Sage-acquisition feature changes critical. URL updated 2026-05-22 from /blog/feed (403) to /feed/ (200 with real RSS). Verified: 12 items, latest 19 May 2026."
     },
     {
       "vendor": "prediko",
-      "url": "https://www.prediko.io/blog/feed",
+      "url": "https://www.prediko.io/blog/rss.xml",
       "type": "rss",
       "categories": ["inventory-forecasting", "cash-flow"],
-      "tracked": false,
+      "tracked": true,
       "priority": "low",
-      "notes": "VERIFY URL"
+      "notes": "URL updated 2026-05-22 from /blog/feed (404) to /blog/rss.xml. Verified: 1 item visible at audit time, latest 22 May 2026 — low cadence."
     },
     {
       "vendor": "cogsy",
-      "url": "https://cogsy.com/blog/rss",
+      "url": "https://cogsy.com/blog/feed/",
       "type": "rss",
       "categories": ["inventory-forecasting"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "Feed parses with 10 items but most recent <pubDate> is 2023-06-09 — vendor abandoned blogging ~3 years ago. Fails the 90-day freshness check in the new verification protocol.",
       "priority": "low",
-      "notes": "VERIFY URL"
+      "notes": "Re-check in 6 months — if vendor resumes blogging, flip tracked=true."
     },
     {
       "vendor": "hypotenuse-ai",
@@ -304,8 +353,10 @@
       "type": "rss",
       "categories": ["ai", "product-descriptions"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404 (canonical hostname is www.hypotenuse.ai). No working RSS path discovered.",
       "priority": "medium",
-      "notes": "VERIFY URL — direct affiliate (20%)"
+      "notes": "Direct affiliate (20%). Cover via newsletter ingestion."
     },
     {
       "vendor": "pebblely",
@@ -313,8 +364,10 @@
       "type": "rss",
       "categories": ["ai", "product-photography"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "Connection times out (code 000). No working RSS path discoverable.",
       "priority": "low",
-      "notes": "VERIFY URL"
+      "notes": "Low priority."
     },
     {
       "vendor": "photoroom",
@@ -322,35 +375,37 @@
       "type": "rss",
       "categories": ["ai", "product-photography"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path on photoroom.com.",
       "priority": "low",
-      "notes": "VERIFY URL"
+      "notes": "Low priority."
     },
     {
       "vendor": "techcrunch-ecommerce",
-      "url": "https://techcrunch.com/category/ecommerce/feed/",
+      "url": "https://techcrunch.com/feed/",
       "type": "rss",
       "categories": ["news", "industry"],
-      "tracked": false,
+      "tracked": true,
       "priority": "medium",
-      "notes": "Vendor news/funding/acquisitions (Skio acquisition broke here). Lower relevance per-item but high-signal events"
+      "notes": "Vendor news/funding/acquisitions (Skio acquisition broke here). URL updated 2026-05-22 from /category/ecommerce/feed/ (Cloudflare-blocked) to /feed/ (full TechCrunch — broader noise, SCOUT classifier must filter for ecommerce relevance). Verified: 20 items, latest 22 May 2026."
     },
     {
       "vendor": "modern-retail",
       "url": "https://www.modernretail.co/feed/",
       "type": "rss",
       "categories": ["news", "industry"],
-      "tracked": false,
+      "tracked": true,
       "priority": "low",
-      "notes": "VERIFY URL — D2C industry analysis"
+      "notes": "D2C industry analysis. Verified 2026-05-22: 10 items, latest 23 May 2026."
     },
     {
       "vendor": "retail-dive",
       "url": "https://www.retaildive.com/feeds/news/",
       "type": "rss",
       "categories": ["news", "industry"],
-      "tracked": false,
+      "tracked": true,
       "priority": "low",
-      "notes": "VERIFY URL — broader retail news, returns/fraud regulation"
+      "notes": "Broader retail news, returns/fraud regulation. Verified 2026-05-22: 1 item visible at audit, latest 22 May 2026."
     },
     {
       "vendor": "emarketer",
@@ -358,14 +413,20 @@
       "type": "rss",
       "categories": ["news", "research"],
       "tracked": false,
+      "dead_as_of": "2026-05-22",
+      "dead_reason": "URL returns 404. No working RSS path on emarketer.com.",
       "priority": "low",
-      "notes": "VERIFY URL — TikTok Shop forecasts originate here"
+      "notes": "TikTok Shop forecasts originate here. Low priority — alternative coverage via direct site monitoring if needed."
     }
   ],
   "_notes": [
-    "Total entries: 39. Active tracked: 4 (Shopify, Klaviyo, Gorgias, Recharge). Pending verification: 35.",
-    "Operator action before SCOUT launch: walk through verification_protocol for each tracked=false entry, flip flag, commit.",
-    "If a vendor has no RSS but offers email digest: route through Beehiiv ingestion (set type='email'). Not implemented in MVP.",
-    "Re-tested URLs are still subject to vendor-side changes — SCOUT logs every fetch result to agent_logs; weekly audit catches drift."
+    "Total entries: 40 (39 original + shopify-news tombstone added 2026-05-22). Active tracked: 17. Verified dead (no usable RSS): 20. Stale (RSS exists but abandoned or empty): 3.",
+    "Full verification performed 2026-05-22 — see /sessions/infra-log.md '2026-05-22 (session 2) — RSS pivot' block for findings, methodology, and architectural implications.",
+    "SIGNAL PRIORITY (post-2026-05-22 pivot):",
+    "  PRIMARY: pricing-page scrape (Playwright, weekly Sunday 04:00 UTC) + Reddit/community monitoring (daily 10:00 UTC). These catch changes at the source — pricing-page diffs see vendor changes the day they ship; Reddit catches operator chatter within hours of any vendor move. RSS lags both.",
+    "  SUPPLEMENTARY: RSS feeds (17 working entries above). Free signal where available, but do not over-weight in CHIEF briefings — empirical coverage is only ~45% of target vendors, and even working feeds often run on marketing-blog cadence (latency vs the real change).",
+    "  ROADMAP: newsletter ingestion via a dedicated Beehiiv inbox covers the 20 verified-dead vendors (klaviyo, postscript, loop, triple-whale, attentive, mailchimp, manychat, yotpo, judge-me, limespot, nosto, northbeam, polar-analytics, adcreative-ai, redo, hypotenuse-ai, pebblely, photoroom, pencil, emarketer). Email is where modern SaaS marketing actually publishes — high deliverability, vendor-maintained. Setup estimate: 1-2 days (dedicated mailbox e.g. news@botapolis.com → Beehiiv inbox API hookup → SCOUT email parser writing to content_opportunities). HIGH-PRIORITY follow-up — single biggest signal-coverage gain available.",
+    "Why so many dead RSS: 2026 marketing-site stack (Webflow / Framer / Next.js / HubSpot CMS / custom React) does not expose RSS by default. This is a structural shift, not a config bug. Periodic re-check (~6 months) for vendors that might add RSS later — particularly nofraud (empty skeleton today) and cogsy (abandoned 2023).",
+    "Re-tested URLs are still subject to vendor-side changes — SCOUT logs every fetch result to agent_logs; weekly audit catches drift. The verification_protocol above is intended for re-runs."
   ]
 }

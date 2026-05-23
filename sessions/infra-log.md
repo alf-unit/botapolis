@@ -140,3 +140,76 @@ OpenClaw agents went live 2026-05-21. CHIEF's first morning briefing on 2026-05-
   - 35 RSS feeds in `vendor-feeds.json` are still `tracked: false` — SCOUT will spend cycles on 404s until verified.
   - 15 partners `pending_approval` — at minimum Shopify/Klaviyo/Gorgias/Recharge need signed before traffic ramp.
   - `last_deployed_sha` check in `validate:infra` — silent Vercel build failures still invisible.
+
+---
+
+## 2026-05-22 (session 2) — RSS pivot: 39-feed verification + reweight to pricing-scrape/Reddit primary
+
+### Commits
+
+- config(scout): RSS feed verification + deprecate dead feeds + reweight priorities
+
+### Task
+
+Close the "35 RSS feeds untrusted" follow-up from session 1 — verify each URL in `config/vendor-feeds.json`, find replacements for moved feeds, mark dead ones, and flip `tracked` flags so SCOUT stops spending cycles on 404s. Triggered a deeper architectural question (raised by operator mid-session): "why RSS at all in 2026?" Outcome: reweight signal taxonomy — RSS demoted to supplementary, pricing-scrape + Reddit confirmed as primary, newsletter ingestion added to roadmap.
+
+### Done
+
+- **Full audit of all 39 feeds** — methodology: `curl -IL` (HEAD with redirect) → `curl -L` (body fetch) → count `<item>`/`<entry>` → check most-recent `<pubDate>/<updated>`. Result classification:
+  - **17 feeds work + active:** shopify (URL changed), gorgias, recharge, stay-ai, omnisend, tidio (URL changed), loox (URL changed), smile-io, loyaltylion, rebuy (URL changed), signifyd, aftership (URL + type changed), inventory-planner (URL changed), prediko (URL changed), techcrunch-ecommerce (URL changed), modern-retail, retail-dive
+  - **3 feeds stale/empty:** cogsy (last post 2023-06), nofraud (0 items in valid skeleton), shopify-news (last post 2023-12, added as tombstone)
+  - **20 vendors have no working RSS at all:** klaviyo, postscript, loop, mailchimp, attentive, yotpo, judge-me, limespot, nosto, triple-whale, northbeam, polar-analytics, adcreative-ai, pencil, redo, hypotenuse-ai, pebblely, photoroom, emarketer, manychat
+
+- **`config/vendor-feeds.json` rewritten:**
+  - Bumped version 2 → 3, `updated_at` → 2026-05-22
+  - 17 entries flipped `tracked: true` (8 of them with corrected URLs)
+  - 23 entries `tracked: false` + new fields `dead_as_of: "2026-05-22"` + `dead_reason: "<specific>"`
+  - 1 new tombstone entry for `shopify-news` (audit trail — checked, found stale, not the answer)
+  - Per-entry `notes` updated with verification timestamp + item count for working feeds
+  - **`verification_protocol`** upgraded 4 → 6 steps: HEAD-status check kept as step 1; added body-fetch + `<?xml` check (step 2), item count + 90-day freshness check (step 3), path-probe fallback list (step 5), tombstone protocol (step 6). Old protocol would have falsely-greenlit yotpo (content-type lies), nofraud (empty skeleton), cogsy (stale).
+  - **`_notes`** restructured around signal-priority taxonomy: PRIMARY = pricing-scrape + Reddit, SUPPLEMENTARY = RSS, ROADMAP = newsletter ingestion
+
+### Discovered (quirks / gotchas)
+
+- **2 of 4 originally `tracked: true` feeds were silently dead all week** — shopify (`/blog.atom` returns HTML, not Atom) and klaviyo (`/blog/feed` → React-Router 404 served with 200 status). SCOUT effectively ran on 2 feeds (gorgias, recharge), not 4. No `agent_logs` alerts because the original verification only inspected HEAD response. **Lesson:** HEAD-status-only verification is structurally insufficient for SPA / React-Router sites that 200-everything and serve the 404 in the body.
+
+- **Yotpo lies in content-type header.** `GET /feed` returns `200 OK` + `content-type: application/rss+xml`, but the body is the HTML homepage (420KB of HTML masquerading as RSS). Only body inspection catches it. Worth assuming other vendors may do the same — body check is non-optional going forward.
+
+- **Nofraud `/feed/` returns valid RSS 2.0 skeleton with 0 items.** Technically "works" (passes header check, passes XML-prefix check) but offers zero signal. The new protocol's item-count gate catches it.
+
+- **Cogsy's blog last post is June 2023** — vendor stopped publishing. RSS still parses cleanly but is 3 years stale. The 90-day freshness gate catches it.
+
+- **Modern marketing-site stacks frequently don't expose RSS at all.** 19 of 39 target vendors — including Klaviyo, Postscript, Loop, Triple Whale, Attentive, ManyChat — have no `/feed` at any common path. Verified via path-probe against /feed, /rss, /blog/feed, /blog/rss, /blog/rss.xml, /blog/atom.xml, /feed.xml, /news/feed, /resources/feed, /changelog/feed.xml. This is a 2026 platform reality (Webflow / Framer / Next.js / HubSpot CMS / custom React), not a config bug.
+
+- **`shopify.dev/changelog/feed.xml` is a stricter upgrade than the dead `/blog.atom`** — 1852 items, directly carries platform/Sidekick/Magic releases the architecture wanted to capture. Less marketing noise, more product-truth. Type changes atom→rss (changelog feed is RSS 2.0, not Atom).
+
+- **Substack-hosted vendor blogs in this niche are mostly dead or unrelated.** `attentive.substack.com` is a different unrelated project ("Attention to Detail — Practical advice for the modern MBA"). `postscript.substack.com` last updated October 2020. Not a viable substitute for RSS-less vendors.
+
+- **Cloudflare bot blocks affect bot-UA + browser-UA equally** for some sites — judge-me, manychat, original techcrunch /category/ecommerce path. SCOUT will hit these if attempted; safer to mark dead than to burn cycles.
+
+### Fixes (what + why)
+
+- **`config/vendor-feeds.json` full rewrite (v2 → v3)** — single source of truth for SCOUT's RSS task surface. The flip from 4 active to 17 active is a 4x increase in coverage at zero LLM-cost change (RSS parse is non-LLM; categorization is per-item not per-feed; ~10-20 extra items/week across 13 new feeds = ~$0.05/mo extra Haiku spend).
+
+- **`verification_protocol` 4 → 6 steps** — body inspection (catches yotpo), item count (catches nofraud), freshness window (catches cogsy), path-probe fallback (recovers loox/rebuy/prediko/etc), tombstone protocol (cogsy/nofraud kept as audit records). Documented inline so re-verification 6 months from now uses the same gates.
+
+- **Signal taxonomy reweight in `_notes`** — RSS confirmed supplementary, not primary. Architecture's existing primary signals (pricing-scrape + Reddit) preserved as-is; this is a CHIEF/operator mental-model fix, not a code change. CHIEF briefings should weight pricing-page-diffs and Reddit chatter above RSS-driven `content_opportunities`.
+
+### Open follow-ups
+
+- **Newsletter ingestion via Beehiiv inbox — HIGH PRIORITY.** Closes the 20-vendor RSS gap. Setup: (1) dedicated mailbox (e.g., `news@botapolis.com`), (2) Beehiiv inbox API hookup, (3) SCOUT email parser writing structured items to `content_opportunities` with `source='vendor_newsletter'`. Estimated 1-2 days. Single biggest signal-coverage gain available — until done, SCOUT only sees Klaviyo/Postscript/Loop/Triple-Whale/Attentive changes via Reddit chatter and weekly pricing scrape (both lag direct vendor announcements). Already mentioned as "not implemented in MVP" in original `_notes` — this audit promotes it to active roadmap item.
+
+- **Re-check RSS-less vendors every ~6 months.** Webflow/Framer/Next.js sites occasionally add RSS endpoints post-launch. Stale feeds (cogsy, nofraud) may resume publishing. Calendar reminder: 2026-11-22.
+
+- **Consider HTML-changelog diff scraping for tech-savvy vendors** (Stripe, Klaviyo developers portal, Recharge developer docs). Some publish structured changelogs without RSS — weekly diff catches changes without needing an RSS endpoint. Not blocking; useful Beehiiv-newsletter-can't-cover-this expansion.
+
+- **TechCrunch coverage broadened, classifier must filter.** Swapped `/category/ecommerce/feed/` (Cloudflare-blocked) → `/feed/` (full TechCrunch). More items per fetch (20/feed vs ~5/feed previously). SCOUT classification step must filter for ecommerce relevance more aggressively. Slight LLM-cost bump from extra items, still well within SCOUT's $0.40/day target.
+
+- **Update `FINAL-ARCHITECTURE-V4.md` Part 3 SCOUT section** — current spec describes "Monitor RSS feeds 50+ vendors every 4 hours" as if it's the bulk of SCOUT's vendor-news signal. Reality post-2026-05-22 is 17 RSS feeds + pricing-scrape + Reddit as primary, newsletter ingestion as roadmap. Spec rewrite blocked on completing newsletter ingestion (otherwise the new spec describes vapor).
+
+- **Prior-session follow-ups still open:**
+  - 15 partners `pending_approval` — operator action, blocking revenue.
+  - `last_deployed_sha` check in `validate:infra`.
+  - Pre-emptive write-contract sections for OPS/CHIEF `AGENTS.md` (apply SCOUT pattern to other agents).
+  - `content_opportunities.category` → CHECK constraint after 30 days of SCOUT data (~2026-06-22).
+  - General architecture spec drift (`FINAL-ARCHITECTURE-V4.md`) — schema for `content_opportunities`, dropped analytics tools (Plausible/PostHog), per-agent-repos pattern abandoned.

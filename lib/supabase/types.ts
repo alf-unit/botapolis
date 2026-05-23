@@ -111,6 +111,10 @@ export type ToolRow = {
   status: ToolStatus
   meta_title: string | null
   meta_description: string | null
+  // Migration 011 — sitemap URL discovered by SCOUT via path-probe on first
+  // sitemap-diff cycle. NULL until SCOUT has crawled, or for vendors whose
+  // sitemap is not discoverable. Used only by SCOUT; not surfaced on the site.
+  sitemap_url: string | null
   created_at: string
   updated_at: string
 }
@@ -317,6 +321,10 @@ export type SemanticCoreEntryInsert = Omit<
 
 export type ContentOpportunitySource =
   | "reddit" | "vendor_blog" | "producthunt" | "serp_change" | "rss" | "manual"
+  // Migration 011 — sitemap-diff is a supplementary signal channel covering
+  // RSS-less vendors (Klaviyo, Postscript, Loop, et al). SCOUT writes one
+  // opportunity per diff-classified URL bucket.
+  | "sitemap_diff"
 export type ContentOpportunityStatus =
   | "pending" | "reviewed_by_chief" | "accepted" | "rejected" | "expired"
 export type ContentOpportunityUrgency = "hot" | "warm" | "evergreen"
@@ -429,6 +437,31 @@ export type SystemConfigInsert = Omit<SystemConfigRow, "modified_at"> & {
   modified_at?: string
 }
 
+// Migration 011 — SCOUT sitemap-diff monitoring. One row per (vendor,
+// snapshot_date). `urls` and `changes_detected` are JSONB — typed as
+// `unknown` here following the existing JSONB-column convention; SCOUT
+// enforces shape at write time. See migration 011 SQL for expected shapes.
+export type ScoutSitemapSnapshotRow = {
+  id: string
+  vendor_slug: string
+  snapshot_date: string
+  // Expected: { added: string[], removed: string[] }
+  urls: unknown
+  url_count: number | null
+  // Expected: { "pricing-change": string[], "feature-launch": string[], ... }
+  changes_detected: unknown | null
+  created_at: string
+}
+export type ScoutSitemapSnapshotInsert = Omit<
+  ScoutSitemapSnapshotRow,
+  "id" | "created_at" | "url_count" | "changes_detected"
+> & {
+  id?: string
+  created_at?: string
+  url_count?: number | null
+  changes_detected?: unknown | null
+}
+
 // ----------------------------------------------------------------------------
 // Database — the shape consumed by `createBrowserClient<Database>()` etc.
 // ----------------------------------------------------------------------------
@@ -451,6 +484,8 @@ export type Database = {
       agent_logs:            { Row: AgentLogRow;          Insert: AgentLogInsert;          Update: Partial<AgentLogInsert>;          Relationships: NoRels }
       performance_snapshots: { Row: PerformanceSnapshotRow; Insert: PerformanceSnapshotInsert; Update: Partial<PerformanceSnapshotInsert>; Relationships: NoRels }
       system_config:         { Row: SystemConfigRow;     Insert: SystemConfigInsert;       Update: Partial<SystemConfigInsert>;      Relationships: NoRels }
+      // SCOUT sitemap-diff monitoring — migration 011
+      scout_sitemap_snapshots: { Row: ScoutSitemapSnapshotRow; Insert: ScoutSitemapSnapshotInsert; Update: Partial<ScoutSitemapSnapshotInsert>; Relationships: NoRels }
     }
     Views: {
       content_like_counts: { Row: ContentLikeCountRow; Relationships: NoRels }

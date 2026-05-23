@@ -23,11 +23,67 @@
 
 В начале каждой сессии перечисли доступные mode, и спроси оператора в каком режиме будем работать? . Не пытайся одновременно "и контент и код".
 
+## Session continuity
+
+В проекте ведётся **shared memory между сессиями** через append-only логи:
+
+- `/sessions/writer-log.md` — для **Content writing** сессий
+- `/sessions/infra-log.md` — для **Code/feature** и **Infrastructure** сессий
+
+### В начале сессии
+
+После того как оператор подтвердил mode — **прочитай последние 2-3 блока** соответствующего лога:
+
+| Mode | Какой лог читать |
+|------|------------------|
+| Content writing | `/sessions/writer-log.md` |
+| Code/feature | `/sessions/infra-log.md` |
+| Infrastructure | `/sessions/infra-log.md` |
+
+Это даст контекст последних работ: что было сделано, какие quirks обнаружены, какие fixes применены, open follow-ups которые могут быть релевантны текущей задаче.
+
+### В конце сессии (когда оператор просит сохраниться)
+
+Когда оператор говорит "сохрани сессию", "закроемся", "запиши лог" или аналогичное — **append новый блок** в конец соответствующего лога. Формат блока:
+
+```markdown
+---
+
+## YYYY-MM-DD — краткое описание сессии
+
+### Commits
+- <commit subject 1>
+- <commit subject 2>
+
+(Идентификация коммитов по subject, не по hash — hash внутри коммитимого файла математически невозможен: hash = sha(содержимое), файл = часть содержимого. Поиск через `git log --grep "<subject>"` или GitHub-search.)
+
+### Задача
+[что было задачей сессии]
+
+### Сделано
+- [пункт 1 со ссылкой на commit subject если применимо]
+- [пункт 2]
+
+### Обнаружено
+- [quirks, gotchas, undocumented behavior, важные nuances]
+
+### Fixes
+- [что и почему было исправлено]
+
+### Open follow-ups
+- [что осталось на потом]
+```
+
+Если в один день несколько сессий — заголовок `## YYYY-MM-DD (session 2) — ...`.
+
+После append'а — commit + push. Это последнее действие сессии.
+
 ## Key documents (read on demand)
 
 - `BOTAPOLIS-PLAYBOOK-V2.md` — стратегия, монетизация, позиционирование, бизнес-логика. Читай когда нужно понять why behind decisions.
 - `FINAL-ARCHITECTURE-V4.md` — техническая архитектура multi-agent системы (3 OpenClaw агента + Web Chat + Claude Code). Читай когда нужно понять как агенты взаимодействуют или работаешь с инфраструктурой.
 - `CONTENT-WRITING.md` — детальные операционные инструкции для написания контента. Читай когда оператор переключает на content mode.
+- `HANDOFF.md` — операционный контекст для Code/feature сессий. Читай при переключении в этот mode.
 - `/semantic-core/full-core.csv` — 427 keywords ядро. Не читай целиком, обращайся к нужным entries через Supabase когда требуется.
 
 ## Repo structure (top-level)
@@ -53,6 +109,9 @@ botapolis/
 │   ├── chief/
 │   ├── scout/
 │   └── ops/
+├── sessions/                   — shared memory логи между Claude Code сессиями
+│   ├── writer-log.md           — content writing сессии
+│   └── infra-log.md            — code/feature + infrastructure сессии
 ├── config/                     — конфиги (vendor feeds, banned phrases, etc.)
 ├── scripts/                    — helper скрипты
 ├── supabase/                   — миграции БД

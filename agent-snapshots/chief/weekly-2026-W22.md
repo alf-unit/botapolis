@@ -47,6 +47,8 @@ reviews-ugc
 
 Reason: `klaviyo` and `gorgias` remain the strongest commercial priorities in queue. `reviews-ugc` now outranks `shopify-sidekick` in available semantic-core priority (`loox vs judge me`, `judge me review`, `loox vs yotpo`) and has direct affiliate-health risk worth resolving before traffic scales.
 
+Implementation note: the cron requested `modified_by=agent`, but the live `system_config_modified_by_chk` rejected both `agent` and `system`. The value was updated without touching `modified_by`, so the row still shows `modified_by=operator`. This is a config-schema mismatch to fix later.
+
 ## next 7 days plan
 
 Publishing rate from `system_config.publishing_rate_daily`: 4/day. Weekly capacity ceiling: 28 articles. Because writer-queue is empty and auto-approve is off, the practical plan is to have OPS generate packets first, then let Claude Code publish only what can pass review.

@@ -344,3 +344,50 @@ CHIEF's OpenClaw session crashed with "Missing API key for OpenAI" gateway error
 - **Single-pass spec rewrite** of `FINAL-ARCHITECTURE-V4.md` after #1-9 settle (carryover from session 3, more drift accumulated today).
 - **Capture SCOUT AGENTS.md to `/agent-snapshots/scout/`** (carryover from session 3, same pattern as CHIEF capture).
 - **`system_config.modified_by` CHECK constraint** rejects values agents try to write (2 warning logs by CHIEF). Side-finding from Phase 3 preflight, not Phase 3 specific. Add 'agent' / 'CHIEF' / 'SCOUT' / 'OPS' / 'CLAUDE_CODE' to constraint or drop it.
+
+### Extended work in same session (after log first saved, before final commit)
+
+After the first session-log save, owner pushed back on deferring follow-ups ("ты че хочешь все выявленные косяки и баги оставить как есть что ли??") and we kept chasing fixes in the same session. Additional commits:
+
+- **`docs(architecture): track FINAL-ARCHITECTURE-V4.md + 2026-05-26 updates`** — spec file (1771 lines) brought under git tracking for the first time (session 3 carryover follow-up #5). Initial-tracking commit also bundles five edits from today: Часть 6 Block A+B requirement, Часть 3 OPS HEARTBEAT 15-min poll, Часть 3 OPS model drift to openai/gpt-5.5, CLAUDE_CODE formalized as Agent #4 in Часть 3, cost reconciliation note in Часть 9, CLAUDE_CODE row added to "Кто пишет куда в Supabase" section in Часть 10.
+
+- **Comparison page architectural finding (post-publish):** owner tested `botapolis.com/comparisons/klaviyo-vs-mailchimp` (wrong path — actual URL prefix is `/compare/`, not `/comparisons/`) and got 404. Investigation revealed deeper issue: `app/compare/[slug]/page.tsx` reads from `public.comparisons` table (DB-driven), not from `/content/comparisons/{lang}/*.mdx` (which is what reviews do). The MDX file I committed at Step 7 was never read by the runtime — `klaviyo-vs-mailchimp.mdx` was dead weight on disk. **Architecture inconsistency**: reviews are MDX-driven, comparisons are DB-driven, and the spec implies both go through `/content/`. Bigger picture: post-commit webhook also did not bridge the MDX commit into the DB table — `task_completed` got logged but no row appeared in `public.comparisons`.
+
+- **Three-part fix shipped same session** for the comparison gap:
+  1. **`public.comparisons` EN row UPDATE** (existed since 2026-05-15 with thin stub) — replaced verdict + custom_intro + comparison_data JSONB with Phase 3 rich content (3 useCases segmented by subscriber range, 3 quickStats, pricing details, full segmented verdict). Direct SQL via `.update()`. Triggered `/api/revalidate` for `/compare/klaviyo-vs-mailchimp` so ISR cache refreshed in seconds, not 24h.
+  2. **`feat(api): article-published bridges comparison MDX to public.comparisons table`** — `/api/agents/article-published` webhook now detects `content/comparisons/{lang}/<slug>.mdx` paths, fetches raw file from `raw.githubusercontent.com/.../main/<path>`, parses frontmatter with `gray-matter`, resolves `tools[]` slugs to UUIDs via `public.tools`, and **INSERT-only-if-absent** into `public.comparisons`. If a row exists for `(slug, language)`, only touches `updated_at` — never overwrites editorial verdict/intro/comparison_data. Each bridge action logs to `agent_logs` as `event_type='comparison_bridge'` with explicit result (created/touched/skipped) and reason for audit.
+  3. **`repoPathToPublicUrl` bug fix in same webhook commit** — was returning `/comparisons/<slug>` (404s) for comparison MDX; now correctly maps `comparisons` repo segment → `/compare/` URL segment.
+
+- **`fix(hooks+helper): pre-commit regex covers all 6 content types + after-publish updates Counts`** (Tier 1 batch, already captured above but worth re-stating since it shipped same session)
+
+- **`docs(chief): capture runtime CHIEF AGENTS.md from Mac Mini for audit trail`** — first capture of CHIEF's runtime AGENTS.md from `~/.openclaw/agents/chief/workspace/` into `/agent-snapshots/chief/AGENTS.md`. Closes session 3 carryover follow-up #6 (same pattern was used for SCOUT AGENTS.md but never made it to repo). Drift from spec captured: morning-briefing quality gate (5 forbidden patterns: .gitkeep, raw UUIDs, unexplained nulls, raw error counts, incomplete data), Delegation → Alf (main agent) via `sessions_send agentId='main'`, "Site protection (CRITICAL)" rule limiting CHIEF writes to `/agent-snapshots/chief/`, session-log + commit-subject reference rules, timezone shift 06:00 UTC → 07:00 America/Los_Angeles, Russian for Telegram, monthly cost target $20-30. To refresh later: ask CHIEF to print current AGENTS.md and overwrite.
+
+- **OPS auto-trigger polling cron registered** — CHIEF used OpenClaw cron API (mechanism confirmed in Step 6a diagnostic) to register `cron_id=cb5abd3e-1f7c-4357-a130-6b48dd4a38c7` with `schedule.kind=every`, `everyMs=900000` (15 min), `payload.kind=agentTurn`, targeting `agentId='ops'`. First wake at 2026-05-26T07:47:22Z (00:47 PDT). OPS workspace files (HEARTBEAT.md + AGENTS.md) updated on Mac Mini with paste-ready blocks so the new poll task has instructions when it fires. Closes the most impactful Phase 3 gap (OPS auto-trigger). `cron_registered` log id=9af44c6e-e33a-40a1-bee3-613484e8a0ba.
+
+- **Telegram split artifact (worth remembering):** CHIEF's AGENTS.md dump was split mid-word across two Telegram messages by the ~4096 char limit ("## Delegati" / "on patterns"). Operator relayed verbatim; reassembly done in Claude Code before commit. Cost: 0 information lost. Future dumps of similar-size files will need same handling.
+
+### Updated Open follow-ups (after extended fixes — supersedes earlier list)
+
+- **OpenClaw `sessions_send` delivery modes** — investigate docs for a mode that wakes target agent vs only-announces. Cron polling is now reliable fallback so this is no longer urgent, but a wake-mode would close the dispatch latency gap (15-min worst case → seconds).
+- **OPS GPT-5.5 cost reconciliation** — спека Часть 9 updated with note + range. Real numbers need first month of OPS runtime metrics via `agent_logs.cost_usd`.
+- **`system_config.modified_by` CHECK constraint** — rejects agent-written values (warning logs from CHIEF). Add 'CHIEF' / 'SCOUT' / 'OPS' / 'CLAUDE_CODE' or drop constraint.
+- **`tools` table missing columns** — `pricing_url`, `pricing_css_selectors`, `pricing_data`, `affiliate_health_checked_at`. Blocks SCOUT pricing scrape persistence + affiliate health timestamp updates (~9 logs from CHIEF preflight diagnostic). Separate migration.
+- **Option B refactor `/compare/[slug]` to MDX-driven** — current state has webhook bridge (Option C) papering over the architecture inconsistency. Long-term cleaner path: refactor route to read MDX like `/reviews/[slug]`. ~1-2h of code + DB migration to move 5+ existing comparison rows back to MDX.
+- **Research handoff workflow** — Option A (Claude Code commits) is the current pattern, works. Option C (`/api/research/upload` endpoint) deferred per owner explicit deferral.
+- **Capture SCOUT AGENTS.md to `/agent-snapshots/scout/`** — same pattern as today's CHIEF capture (session 3 carryover, still open).
+- **Single-pass spec rewrite of FINAL-ARCHITECTURE-V4.md** — many incremental edits accumulated; future session can do clean rewrite once schema/agents settle. File is now tracked so changes show in git diff.
+
+### Final commit summary (10 commits from this session)
+
+1. `research: klaviyo vs mailchimp for sub-2k Shopify stores` (Phase 3 Step 3)
+2. `chief(ops-request): task packet — klaviyo vs mailchimp (Phase 3 test)` (CHIEF Step 5)
+3. `chief-as-ops(packet): klaviyo vs mailchimp (Phase 3 fallback — OPS dispatch blocked)` (CHIEF Step 6c)
+4. `chief-as-ops: index update for 003` (CHIEF Step 6c continued)
+5. `content(comparisons): add Klaviyo vs Mailchimp for sub-2k Shopify stores` (Claude Code Step 7)
+6. `content(packet): move 003-klaviyo-vs-mailchimp pending→done` (Claude Code Step 9)
+7. `fix(hooks+helper): pre-commit regex covers all 6 content types + after-publish updates Counts` (Tier 1 fixes)
+8. `docs(sessions): 2026-05-26 Phase 3 E2E test + Tier 1 fixes from findings` (initial session log save)
+9. `docs(architecture): track FINAL-ARCHITECTURE-V4.md + 2026-05-26 updates` (spec tracked first time)
+10. `feat(api): article-published bridges comparison MDX to public.comparisons table` (webhook bridge fix)
+11. `docs(chief): capture runtime CHIEF AGENTS.md from Mac Mini for audit trail` (Tier 2 capture)
+12. `docs(sessions): 2026-05-26 Phase 3 extended fixes` (this update — final session log)

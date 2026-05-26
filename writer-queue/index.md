@@ -20,8 +20,7 @@ If the queue is empty, ping CHIEF in Telegram: "queue empty — assign next prio
 1. `priority/NNN-slug.md` — primary keyword — cluster — target YYYY-MM-DD
 -->
 
-_Queue not yet populated. OPS will write the first batch once
-`/agent-snapshots/chief/priorities-YYYY-WNN.md` is published._
+1. `pending/003-klaviyo-vs-mailchimp.md` — klaviyo vs mailchimp — klaviyo — target 2026-05-26
 
 ## In progress
 
@@ -40,7 +39,7 @@ _Nothing published yet._
 
 ## Counts
 
-- pending: 0
+- pending: 1
 - done: 0
 - archive: 0
 

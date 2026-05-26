@@ -51,24 +51,46 @@ echo "[after-publish] moved $packet → done/"
 
 # Append to "Recently done (last 10)" section in writer-queue/index.md.
 # We do this with awk to keep it idempotent on missing-section.
+# Also recompute pending/done/archive counts since OPS auto-trigger isn't
+# wired (Phase 3 finding 2026-05-26).
 idx="writer-queue/index.md"
 if [ -f "$idx" ]; then
   ts=$(date -u '+%Y-%m-%d')
+
+  # Count actual files excluding .gitkeep and the optional _template.md
+  count_files() {
+    find "writer-queue/$1" -maxdepth 1 -type f -name '*.md' \
+      ! -name '.gitkeep' ! -name '_template.md' 2>/dev/null | wc -l | tr -d ' '
+  }
+  pending_count=$(count_files pending)
+  done_count=$(count_files done)
+  archive_count=$(count_files archive)
+
   tmpfile=$(mktemp)
-  awk -v entry="- $packet — $ts" '
-    BEGIN { injected = 0 }
+  awk -v entry="- $packet — $ts" \
+      -v pending_n="$pending_count" \
+      -v done_n="$done_count" \
+      -v archive_n="$archive_count" '
+    BEGIN { injected = 0; in_counts = 0 }
     {
-      print
+      # Inject the new "Recently done" entry as the first list item.
       if (!injected && /^## Recently done/) {
-        # Skip the blank line and the optional placeholder paragraph, then
-        # inject our entry as the new first list item.
+        print
         getline blank; print blank
         injected = 1
         print entry
+        next
       }
+      # Rewrite the Counts block by replacing the three count lines.
+      if (/^## Counts/) { in_counts = 1; print; next }
+      if (in_counts && /^- pending:/)  { print "- pending: "  pending_n;  next }
+      if (in_counts && /^- done:/)     { print "- done: "     done_n;     next }
+      if (in_counts && /^- archive:/)  { print "- archive: "  archive_n;  next }
+      if (in_counts && /^## /)         { in_counts = 0 }
+      print
     }
   ' "$idx" > "$tmpfile" && mv "$tmpfile" "$idx"
-  echo "[after-publish] updated $idx"
+  echo "[after-publish] updated $idx (counts: pending=$pending_count done=$done_count archive=$archive_count)"
 fi
 
 echo "[after-publish] done"

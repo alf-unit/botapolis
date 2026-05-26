@@ -21,14 +21,16 @@
 set -e
 
 # 1. Find staged EN MDX files. --diff-filter=ACMR catches add/copy/modify/rename.
-staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^content/(reviews|guides)/en/.*\.mdx$' || true)
+# Regex covers all 6 content types per post-commit hook + content/<type>/{en,ru}/
+# tree from FINAL-ARCHITECTURE-V4.md Часть 1 (Phase 3 finding 2026-05-26).
+staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^content/(reviews|guides|comparisons|alternatives|news|best)/en/.*\.mdx$' || true)
 
 # Validate frontmatter for any staged MDX (EN or RU) — schema check is
 # cheap and runs without external creds. The rating cross-check inside
 # the validator no-ops gracefully when Supabase env is unset (same
 # pattern as OPENROUTER_API_KEY below). This catches the May 2026 audit
 # failure mode where an MDX rating drifted from the DB row.
-staged_any_mdx=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^content/(reviews|guides)/(en|ru)/.*\.mdx$' || true)
+staged_any_mdx=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^content/(reviews|guides|comparisons|alternatives|news|best)/(en|ru)/.*\.mdx$' || true)
 if [ -n "$staged_any_mdx" ]; then
   echo ""
   echo "[pre-commit] validating staged MDX frontmatter:"
@@ -66,8 +68,8 @@ fi
 #    opt-out is enforced inside the translator and not here.
 echo "$staged" | while IFS= read -r f; do
   [ -z "$f" ] && continue
-  type=$(echo "$f" | sed -E 's|^content/(reviews\|guides)/en/.*|\1|')
-  slug=$(echo "$f" | sed -E 's|^content/(reviews\|guides)/en/(.*)\.mdx$|\2|')
+  type=$(echo "$f" | sed -E 's|^content/(reviews\|guides\|comparisons\|alternatives\|news\|best)/en/.*|\1|')
+  slug=$(echo "$f" | sed -E 's|^content/(reviews\|guides\|comparisons\|alternatives\|news\|best)/en/(.*)\.mdx$|\2|')
 
   if ! npm run --silent translate -- --type "$type" --slug "$slug" --force; then
     echo "  [pre-commit] translation failed for $type/$slug — continuing"

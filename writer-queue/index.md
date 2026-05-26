@@ -20,7 +20,7 @@ If the queue is empty, ping CHIEF in Telegram: "queue empty — assign next prio
 1. `priority/NNN-slug.md` — primary keyword — cluster — target YYYY-MM-DD
 -->
 
-1. `pending/003-klaviyo-vs-mailchimp.md` — klaviyo vs mailchimp — klaviyo — target 2026-05-26
+1. `pending/002-klaviyo-review-refresh.md` — klaviyo review refresh — klaviyo — target TBD
 
 ## In progress
 
@@ -34,14 +34,12 @@ _None._
 - 001-skio-to-loop-migration.md — 2026-05-20
 <!-- OPS appends here when moving a packet to done/. Most recent first. -->
 
-_Nothing published yet._
-
 ---
 
 ## Counts
 
 - pending: 1
-- done: 0
+- done: 2
 - archive: 0
 
-_Updated by OPS on each queue refresh._
+_Updated by after-publish.sh on each packet move (formerly OPS-managed; see Phase 3 finding 2026-05-26)._

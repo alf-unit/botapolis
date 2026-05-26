@@ -1,10 +1,5 @@
 # Schedule — CHIEF
 
-## Every 30 minutes (HEARTBEAT default)
-- Check `agent_logs` for critical errors (severity in ('error','critical') AND created_at > last_check) → respond if needed
-- Check Telegram for operator messages → process queue
-- If nothing actionable: reply HEARTBEAT_OK and exit
-
 ## Daily
 
 ### 07:00 America/Los_Angeles — Morning briefing
@@ -16,14 +11,9 @@
 6. Send to operator via Telegram (Russian, conversational)
 7. Log activity to memory/YYYY-MM-DD.md
 
-### 14:00 America/Los_Angeles — Afternoon check-in (light)
-1. Quick check: any high-priority opportunities from SCOUT since morning?
-2. Any pending decisions queued?
-3. Send brief Telegram update ONLY if action needed (otherwise silent)
-
 ## Weekly
 
-### Monday 07:00 America/Los_Angeles — Strategic planning
+### Monday 07:15 America/Los_Angeles — Strategic planning
 1. Pull last 7 days of metrics from performance_snapshots
 2. Compute trends, identify movers (top growers, top decliners)
 3. Plan next 7 days (respect system_config.publishing_rate_daily)
@@ -31,10 +21,6 @@
 5. Send weekly digest to operator
 6. Save digest to /agent-snapshots/chief/weekly-YYYY-WNN.md via GitHub API
 7. Drop priorities file for OPS: /agent-snapshots/chief/priorities-YYYY-WNN.md
-
-### Friday 14:00 America/Los_Angeles — Week wrap-up
-1. Brief retrospective: did we meet weekly targets?
-2. Flag anything for weekend review by operator (Telegram)
 
 ## Monthly
 
@@ -54,3 +40,11 @@
 
 ## Silent intervals
 - 23:00 America/Los_Angeles — 05:00 America/Los_Angeles: quiet hours, no proactive Telegram unless critical alert
+
+## Removed 2026-05-26 (per cron architecture review)
+- Every 30 minutes HEARTBEAT_OK presence check — dropped (too expensive vs value at this stage)
+- Daily 14:00 LA afternoon check-in — dropped; hot opportunities handled via critical-event criteria above
+- Friday 14:00 LA week wrap-up — dropped; Monday strategic planning includes retrospective
+
+## Sequence note
+- Monday strategic shifted to 07:15 (was 07:00) to avoid collision with Daily 07:00 morning briefing on Mondays.

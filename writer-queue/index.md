@@ -30,6 +30,7 @@ _None._
 
 ## Recently done (last 10)
 
+- 003-klaviyo-vs-mailchimp.md — 2026-05-26
 - 001-skio-to-loop-migration.md — 2026-05-20
 <!-- OPS appends here when moving a packet to done/. Most recent first. -->
 

@@ -266,3 +266,81 @@ Process the strategic migration Alf (web-strategist agent) proposed for closing 
 - **Pre-emptive write-contract sections for OPS/CHIEF `AGENTS.md`** (apply SCOUT pattern). Alf delivered SCOUT update this session; OPS/CHIEF equivalents are not yet drafted.
 - **`FINAL-ARCHITECTURE-V4.md` schema drift** continues to accumulate — migration 010 (tool_slug + category), 011 (sitemap_url + scout_sitemap_snapshots), 012 (last_deployed_sha config) all not reflected in the spec. Plus signal-taxonomy reweight from session 2. Spec diverged in 4+ places from reality. Single-pass rewrite needed.
 - **Capture Alf's updated SCOUT AGENTS.md to `/agent-snapshots/scout/` as audit trail** — owner pasted it to Mac Mini directly. Repo lacks the artifact; future sessions can't `git diff` what changed. If owner agrees, paste into the repo on next session.
+
+---
+
+## 2026-05-26 — Phase 3 E2E test (Flow A) + Tier 1 fixes from findings
+
+### Commits
+
+- research: klaviyo vs mailchimp for sub-2k Shopify stores
+- chief(ops-request): task packet — klaviyo vs mailchimp (Phase 3 test)
+- chief-as-ops(packet): klaviyo vs mailchimp (Phase 3 fallback — OPS dispatch blocked)
+- chief-as-ops: index update for 003
+- content(comparisons): add Klaviyo vs Mailchimp for sub-2k Shopify stores
+- content(packet): move 003-klaviyo-vs-mailchimp pending→done
+- fix(hooks+helper): pre-commit regex covers all 6 content types + after-publish updates Counts
+
+### Задача
+
+First end-to-end run of Flow A (FINAL-ARCHITECTURE-V4.md Часть 8 Phase 3) — drive a single keyword from `semantic_core_entries` through the full pipeline: CHIEF → research request → operator Web Chat Deep Research → CHIEF reads result → OPS task packet → Claude Code article → publish → status sync → OPS packet move. Phase 3 explicitly designed to surface spec/implementation gaps. Test keyword: `klaviyo vs mailchimp` (priority_score=420, cluster=klaviyo, template=vs-comparison, status='queued'). Claude Code (in repo) led the test step-by-step; operator relayed instructions to CHIEF via Telegram; CHIEF executed and reported back.
+
+### Сделано (Phase 3 chain — 9 steps, full audit trail in `agent_logs` related_entity_id=ef554d4a-47bc-4456-8b71-943b2659504c)
+
+- **Step 1**: CHIEF flipped `semantic_core_entries.status` queued → researching + logged `topic_selected`. Trigger `status_changed_at` fired correctly.
+- **Step 2**: CHIEF composed research_request. Initial brief was Часть-6-compliant but NOT paste-ready for Web Chat — operator would have to manually translate brief to Deep Research prompt. **Spec gap caught mid-test**, Часть 6 only spec'd operator-facing summary. **Fix applied immediately**: Часть 6 + CHIEF AGENTS.md "Delegation patterns → To operator (Telegram)" row updated to require Block A (operator-facing summary) + Block B (paste-ready fenced prompt). CHIEF re-issued under new rule; second brief paste-ready into Web Chat without modification.
+- **Step 3**: Operator did Deep Research in Web Chat using Block B; saved `/research/2026-05-26-klaviyo-vs-mailchimp.md` (28 sources, 6 article ideas, full 8-section structure). **Workflow gap**: Web Chat → repo file → commit dance was clunky; for this test Claude Code committed for operator. Future workflow Option A/B/C decision deferred.
+- **Steps 4-5**: Operator notified CHIEF research-ready; CHIEF read research via GitHub API, flipped status to research_ready, wrote ops-request file to `/agent-snapshots/chief/ops-requests/2026-05-26-packet-klaviyo-vs-mailchimp.md`, logged `research_ready` + `packet_request`.
+- **Step 6** — **two major OPS gaps discovered:**
+  - **6a** CHIEF diagnostic confirmed available CHIEF→OPS mechanisms: OpenClaw `sessions_send agentId=ops` (real-time messaging), `cron agentTurn` (force a turn), repo files (`ops-requests/` + `priorities-WNN.md`, but no OPS-side watcher), Supabase `agent_logs`. OPS-side AGENTS.md says "process ops-requests within 1 hour" but actual OPS cron registry has only 4 jobs (daily_metrics, site_health, weekly_refresh, weekly_digest) — no polling task for ops-requests/priorities.
+  - **6b** CHIEF dispatched via `sessions_send agentId=ops`: returned `runId` + `status=accepted` + `delivery.mode=announce`. OPS never woke (0 activity in agent_logs over 5min). **Confirms two-layer gap**: (1) no OPS HEARTBEAT polling, (2) `mode=announce` queues but doesn't wake target agent.
+  - **6c** CHIEF took OPS work as fallback — composed task packet to `/writer-queue/pending/003-klaviyo-vs-mailchimp.md` (209 lines, high quality: verbatim pricing claims dated 2026-05-26, 4 sourced operator quotes, 16 quality gates, banned-phrases ref), flipped `semantic_core_entries.status='in_writer_queue'`, updated `/writer-queue/index.md`, logged with `executed_by=CHIEF`/`intended_executor=OPS`/`fallback_reason=ops_dispatch_no_response`/`supersedes_dispatch_log_id` audit pointer.
+- **Step 7**: Claude Code wrote 2362-word vs-comparison MDX to `/content/comparisons/en/klaviyo-vs-mailchimp.mdx`. Followed packet's required claims verbatim + 16 quality gates. Banned-phrases manual scan = 0 hits (pre-commit hook regex was buggy — didn't validate comparisons; caught separately).
+- **Step 8**: `git push` triggered post-commit hook → `/api/agents/article-published` returned 200 → Supabase auto-updated: `status='published'`, `published_at=2026-05-26T06:56:19`, `published_article_path` set, `status_changed_at` trigger fired. Webhook emitted 9th `agent_logs` row with `agent_name='CLAUDE_CODE'`/`event_type='task_completed'` — **`CLAUDE_CODE` surfaced as implicit 4th agent**, not in architecture Часть 3.
+- **Step 9**: `scripts/claude-code-helpers/after-publish.sh` moved packet pending→done, updated index "Recently done". Did NOT update Counts section (helper bug — fixed in Tier 1).
+
+### Mid-session interruption + recovery
+
+CHIEF's OpenClaw session crashed with "Missing API key for OpenAI" gateway error after Step 6b. New CHIEF session started cold (no in-session memory). Claude Code prepared two-message resume preamble: (1) context + 7 prior agent_logs to verify + repo files to read + 2 operating rules (Block A+B + CHIEF-as-OPS fallback) to acknowledge; (2) Step 6c instruction. New CHIEF session sanity-checked + caught my off-by-one in the preamble (claimed 8 entries, actual 7) + proceeded cleanly. **Persistent storage carried full test context across session boundary** — `agent_logs` + `semantic_core_entries` state + committed research/ops-request files + spec edits were enough to resume without information loss.
+
+### Tier 1 fixes shipped same session (after Phase 3 gaps found)
+
+- **`.husky/pre-commit` regex** expanded to all 6 content types (was reviews+guides only — silently no-op'd validation + EN→RU translation for `klaviyo-vs-mailchimp.mdx` today). Same regex updated in two places (line 24 staged-EN list, line 31 validate-any-MDX list, line 69-70 sed substitution).
+- **`scripts/claude-code-helpers/after-publish.sh`** now recomputes pending/done/archive counts on every packet move via `find ... | wc -l`. Comment updated to flag "formerly OPS-managed; see Phase 3 finding 2026-05-26".
+- **`writer-queue/index.md`** Counts corrected manually to pending=1 done=2 archive=0 reflecting current state.
+- **`FINAL-ARCHITECTURE-V4.md` Часть 6** — added "Paste-ready prompt block (ОБЯЗАТЕЛЬНО)" sub-section spec'ing Block A + Block B structure for research_request messages. Also updated CHIEF AGENTS.md Delegation → To operator (Telegram) row.
+- **`FINAL-ARCHITECTURE-V4.md` OPS HEARTBEAT** — added "Every 15 minutes" poll task for ops-requests/ + priorities-*.md to replace the vapor "On demand (triggered by GitHub file watcher)" line. Spec edits ALL local-only because `FINAL-ARCHITECTURE-V4.md` itself is `?? untracked` in git (session 3 carryover).
+
+### Обнаружено (quirks / gotchas)
+
+- **Часть 6 спеки была неполной**: described only operator-facing brief, didn't require paste-ready Web Chat prompt. Operator had to manually translate brief → prompt every cycle. Fixed mid-test; new operating rule applies to all future research_requests.
+- **OPS auto-trigger doesn't exist**: spec described "On demand (triggered by GitHub file watcher)" but no watcher was built. OPS HEARTBEAT cron registry only has 4 jobs. Result: every CHIEF→OPS handoff requires manual workaround. Most impactful gap from Phase 3 test.
+- **OpenClaw `sessions_send` with `delivery.mode=announce`** queues a message but does not wake the target agent if it's not already running. Other delivery modes might wake; not investigated. `cron agentTurn` is the documented force-run alternative.
+- **Pre-commit hook regex drift**: covered only reviews+guides, but post-commit covers all 6 content types. Comparisons committed today bypassed validation + auto-translate silently.
+- **`CLAUDE_CODE` emerged as 4th agent in `agent_logs`**: webhook attribution uses this name when post-commit fires. Not in architecture Часть 3. Two options: formalize as 4th agent OR rename in webhook to match existing roster.
+- **OPS model drift**: architecture Часть 3 says OPS = Claude Haiku 4.5 via OpenRouter ($5-8/mo target). CHIEF's Step 6a diagnostic claimed OPS configured on `openai/gpt-5.5`. Cost calc in Часть 9 affected.
+- **CHIEF rigor**: caught my off-by-one in resume preamble (I said 8 events, actual 7) by querying agent_logs and flagging before proceeding. Worth reinforcing as desired behavior — strict assertion checks, no slack.
+- **Session continuity works via persistent storage**: Supabase agent_logs + semantic_core_entries state + committed repo files + paste-ready preamble = full context restore across CHIEF session crash.
+- **CHIEF-as-OPS bypass works architecturally**: CHIEF has same Supabase service_role + GitHub PAT access as OPS, so taking OPS work was a clean fallback. Audit trail kept clean via `executed_by`/`intended_executor` context fields in agent_logs.
+- **CHIEF (as OPS) produced higher-quality packet than expected**: 209-line packet with verbatim pricing claims, sourced operator quotes, explicit "do not invent Reddit URLs" guard, 16-checkbox quality gates. Writer (Claude Code) downstream could follow with minimal improvisation.
+- **`writer-queue/index.md` Counts section** is owned by OPS per the file's footer comment, but OPS auto-trigger is broken everywhere. Until OPS HEARTBEAT lands, the helper script keeps it accurate.
+
+### Fixes (what + why)
+
+- **Часть 6 Block A+B requirement** — research_request was unusable as a paste-ready prompt without manual operator translation. Block B explicit spec ensures future requests are self-contained for Claude.ai Web Chat.
+- **`.husky/pre-commit` regex extension** — silently dropping comparisons through auto-translate + validation was a real defect that would have shipped 5 of 6 content types without RU twins and without schema checks.
+- **`after-publish.sh` Counts auto-update** — OPS was supposed to refresh Counts but OPS trigger is broken; helper takes over until trigger lands.
+- **`FINAL-ARCHITECTURE-V4.md` OPS HEARTBEAT every-15min poll** — replaces vapor "On demand (triggered by GitHub file watcher)" with the actual mechanism needed.
+
+### Open follow-ups (priority order)
+
+- **#1 OPS HEARTBEAT polling — implementation side**: spec updated, but Mac Mini OPS workspace HEARTBEAT.md + AGENTS.md + OpenClaw cron registry still need actual paste/registration. CHIEF can register the new cron via `agentTurn` pattern (per Step 6a diagnostic) — paste-ready prepared in next session.
+- **#3 OpenClaw `sessions_send` delivery modes** — investigate OpenClaw docs for a mode that wakes vs only-announces. If only `cron agentTurn` wakes, formalize that as canonical CHIEF→OPS path. Until resolved, polling is the reliable mechanism.
+- **#4 Research handoff workflow** — Option A (Claude Code commits, current pattern, works) / B (GitHub Web UI, zero-infra) / C (custom `/api/research/upload` endpoint, ~1-2h dev, mobile-friendly). Owner deferred during test.
+- **#5 `FINAL-ARCHITECTURE-V4.md` tracking decision** — file is `?? untracked` (carryover from session 3). Today's edits (Часть 6 Block A+B, OPS HEARTBEAT polling, CHIEF AGENTS.md row) are all local-only. Owner decision: `git add` + track, or keep local.
+- **#6 Capture CHIEF runtime AGENTS.md** to `/agent-snapshots/chief/AGENTS.md` (carryover from session 3). Owner pastes CHIEF's current Mac Mini AGENTS.md; Claude Code commits.
+- **#8 `CLAUDE_CODE` 4th agent**: formalize in Часть 3 OR rename webhook attribution.
+- **#9 OPS model drift**: confirm runtime — Haiku 4.5 (spec) vs `openai/gpt-5.5` (CHIEF Step 6a claim). Update Часть 3 + Часть 9 cost calc.
+- **Single-pass spec rewrite** of `FINAL-ARCHITECTURE-V4.md` after #1-9 settle (carryover from session 3, more drift accumulated today).
+- **Capture SCOUT AGENTS.md to `/agent-snapshots/scout/`** (carryover from session 3, same pattern as CHIEF capture).
+- **`system_config.modified_by` CHECK constraint** rejects values agents try to write (2 warning logs by CHIEF). Side-finding from Phase 3 preflight, not Phase 3 specific. Add 'agent' / 'CHIEF' / 'SCOUT' / 'OPS' / 'CLAUDE_CODE' to constraint or drop it.

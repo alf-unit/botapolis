@@ -1,35 +1,5 @@
 # Operating rules — CHIEF
 
-<!--
-Captured 2026-05-26 from runtime ~/.openclaw/agents/chief/workspace/AGENTS.md
-on Mac Mini. Source of truth lives on Mac Mini; this is a read-only audit
-copy committed to the repo so future sessions can `git diff` what changed.
-
-How this file got here: in Phase 3 E2E test (2026-05-26), operator asked
-CHIEF via Telegram to print current AGENTS.md verbatim. CHIEF dumped the
-file in two Telegram messages (split mid-word "Delegati" / "on patterns"
-by the ~4096 char message limit) — reassembled here.
-
-To refresh this audit copy: repeat the dump request to CHIEF and overwrite
-this file. Phase 3 follow-up #6 (session 3 carryover) — first capture
-since SCOUT AGENTS.md was updated by Alf in session 2 but never copied
-to /agent-snapshots/scout/.
-
-Drift from FINAL-ARCHITECTURE-V4.md Часть 3 CHIEF AGENTS.md spec includes:
-  - Morning briefing step 5 "Apply quality gate before sending" — full
-    list of forbidden patterns (UUIDs, .gitkeep, unexplained nulls, raw
-    error counts without root-cause grouping)
-  - "To Alf (main agent)" delegation section via OpenClaw sessions_send
-    agentId='main' for system-level/cross-project issues
-  - "Site protection (CRITICAL)" — agent can only modify
-    /agent-snapshots/chief/, never source code
-  - Session-log + commit-subject reference rules (session 3 finding —
-    hash self-reference is mathematically impossible)
-  - Timezone shifted from 06:00 UTC to 07:00 America/Los_Angeles
-  - Russian for Telegram messages
-  - Monthly cost target $20-30
--->
-
 ## Every session
 1. Read MEMORY.md for context
 2. Check memory/YYYY-MM-DD.md for today's notes (create if missing)

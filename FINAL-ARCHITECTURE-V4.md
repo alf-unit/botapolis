@@ -248,6 +248,15 @@ Supabase — это **главный bridge** между OpenClaw на Mac Mini,
 
 > **Roster note:** оригинальная архитектура (v4) описывала 3 OpenClaw агентов. После Phase 3 E2E теста (2026-05-26) формализован 4-й agent — **CLAUDE_CODE** — который уже фигурирует в `agent_logs` как author публикации (post-commit webhook). См. секцию ниже после OPS.
 
+> **HEARTBEAT.md ground truth note (added 2026-05-26):** ВСЕ HEARTBEAT.md
+> subsections ниже описывают **design intent**. Runtime authoritative source
+> = OpenClaw cron registry snapshot:
+> [`/agent-snapshots/cron-registry-2026-05-26-final.md`](../agent-snapshots/cron-registry-2026-05-26-final.md).
+> Все времена в `America/Los_Angeles` (спека ранее использовала UTC — owner
+> явно указал что LA — правильная taimzone). При расхождении HEARTBEAT.md vs
+> registry — registry побеждает. Phantom tasks (описанные но не зарегистрированные)
+> были intentionally NOT added per cron architecture review 2026-05-26.
+
 ### Agent #1: CHIEF — Директор проекта
 
 **Модель:** Claude Sonnet 4.6 через OpenRouter (~$20-30/мес)
@@ -943,43 +952,39 @@ When git post-commit hook signals new MDX file:
 
 #### HEARTBEAT.md для OPS
 
+> **Ground truth note (added 2026-05-26):** runtime cron registry is the
+> source of truth — see [`/agent-snapshots/cron-registry-2026-05-26-final.md`](../agent-snapshots/cron-registry-2026-05-26-final.md).
+> All times shown below in `America/Los_Angeles` (spec previously listed
+> UTC — owner explicitly stated LA is correct). Section describes design
+> intent; if registry diverges, registry wins.
+
 ```markdown
 # Schedule
 
-## Every 15 minutes (added 2026-05-26 — Phase 3 finding)
-- Poll /agent-snapshots/chief/ops-requests/ via GitHub API for any *.md files
-  not yet processed (track processed list in MEMORY.md or via task_packet_created
-  agent_logs entries). For each new file: execute Task packet generation flow.
-- Poll /agent-snapshots/chief/priorities-YYYY-WNN.md for added/changed packet
-  request rows since last cycle. Same dispatch — generate packet per entry.
-- This task replaces the architecture's "On demand (triggered by GitHub file
-  watcher)" line — no file watcher was actually built, so the polling cycle
-  is the real auto-trigger. Phase 3 test (2026-05-26) found OPS was silently
-  idle on every CHIEF→OPS handoff because of this gap.
-
-## Every hour
-- Site health check (botapolis.com + 5 random articles)
-- Error rate check (Vercel + Supabase APIs)
-
 ## Daily
-- 06:00 UTC: Full metrics aggregation, write performance_snapshot
-- 08:00 UTC: After-publish processing (if any commits from previous evening)
-- 18:00 UTC: Daily ops log distillation
+- 06:30 LA: Full metrics aggregation, write performance_snapshot
+- 18:00 LA: Daily ops log distillation (compress today's memory/YYYY-MM-DD.md to MEMORY.md "Daily activity rollup")
+
+## Every 2 days
+- 06:15 LA: Site health check (botapolis.com + 5 random articles + Supabase response + GitHub HEAD vs last_deployed_sha for silent-Vercel-failure detection)
 
 ## Weekly
-- Friday 10:00 UTC: Refresh candidates analysis
-- Sunday 18:00 UTC: Weekly digest preparation for CHIEF
+- Friday 10:00 LA: Refresh candidates analysis → /agent-snapshots/ops/refresh-candidates-YYYY-WNN.md
+- Sunday 18:00 LA: Weekly digest preparation → /agent-snapshots/ops/weekly-YYYY-WNN.md (CHIEF reads Monday morning)
 
 ## On demand
-- When CHIEF dispatches via OpenClaw sessions_send (agentId=ops) with a
-  delivery mode that wakes the agent (NOT mode=announce — Phase 3 finding
-  2026-05-26: announce queues but does not wake): process within minutes.
-  Until the wake-vs-announce question is resolved in OpenClaw docs, treat
-  this as a best-effort path; the 15-minute polling cycle is the reliable
-  fallback.
-- When git hook signals new publication: process within 5 minutes
-- When critical alert triggers: immediate
+- CHIEF→OPS handoff: OPS does NOT have a dedicated dispatch cron. Instead,
+  on every scheduled wake (above), AGENTS.md "Every session" steps 3-4
+  read `/agent-snapshots/chief/ops-requests/` and `priorities-YYYY-WNN.md`,
+  process any unprocessed items via Task packet generation flow, log to
+  agent_logs as `task_packet_created`. This is the canonical mechanism
+  (Phase 3 follow-up 2026-05-26 — earlier 15-min dedicated poll cron was
+  redundant and removed).
+- New publication detected via git post-commit hook → /api/agents/article-published webhook: status flip + revalidate handled by route; OPS picks up packet-move (pending→done) via after-publish processing on next session wake.
+- Critical alert via agent_logs (severity='critical'): handled when OPS next wakes; if waiting is unacceptable, CHIEF escalates to operator via Telegram immediately.
 ```
+
+Worst-case CHIEF→OPS pickup latency: ~24h (Mon-Thu, where OPS only wakes for daily metrics 06:30 LA). Friday/Sunday have additional OPS wakes. Acceptable for content-production cadence; not designed for sub-hour real-time loops.
 
 #### MEMORY.md для OPS (стартовый)
 

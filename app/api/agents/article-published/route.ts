@@ -26,6 +26,8 @@ import { revalidatePath } from "next/cache"
 import { NextResponse, type NextRequest } from "next/server"
 import { timingSafeEqual } from "node:crypto"
 
+import matter from "gray-matter"
+
 import { createServiceClient } from "@/lib/supabase/service"
 
 export const runtime = "nodejs"
@@ -49,13 +51,149 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb)
 }
 
-/** content/reviews/en/klaviyo.mdx → /reviews/klaviyo (en) or /ru/reviews/klaviyo (ru) */
+/** content/reviews/en/klaviyo.mdx → /reviews/klaviyo (en) or /ru/reviews/klaviyo (ru).
+ *  Note: file path uses /content/comparisons/ but URL path is /compare/ (different
+ *  segment). Same for any future content type with non-1:1 file-to-URL mapping. */
 function repoPathToPublicUrl(p: string): string | null {
   const m = p.match(/^content\/([^/]+)\/(en|ru)\/(.+)\.mdx$/)
   if (!m) return null
   const [, type, locale, slug] = m
-  const base = `/${type}/${slug}`
+  // Map repo content type → public URL segment. Comparisons use /compare/<slug>,
+  // not /comparisons/<slug> (Phase 3 finding 2026-05-26).
+  const urlSegment = type === "comparisons" ? "compare" : type
+  const base = `/${urlSegment}/${slug}`
   return locale === "ru" ? `/ru${base}` : base
+}
+
+/* ============================================================================
+   Comparison MDX → public.comparisons bridge (Phase 3 finding 2026-05-26)
+   ----------------------------------------------------------------------------
+   Reviews/guides are served from MDX directly. Comparisons however are
+   DB-driven (`app/compare/[slug]/page.tsx` reads from public.comparisons).
+   So committing a comparison MDX alone doesn't make /compare/<slug> work —
+   you need a matching row in the table too.
+
+   This bridge auto-creates the row when an MDX is committed and a row for
+   (slug, language) doesn't exist yet. We DO NOT overwrite existing rows —
+   editorial may have hand-tuned verdict / custom_intro / comparison_data
+   beyond what frontmatter encodes, and the bridge must never clobber that.
+   For row updates: editorial UPDATEs the row directly (Supabase Studio or
+   SQL). The webhook only "touches" updated_at to nudge ISR.
+============================================================================ */
+async function fetchMdxRawFromMain(filePath: string): Promise<string | null> {
+  // Public raw URL — no auth needed since the repo is public. Cache-bust so
+  // the webhook always sees the just-committed file.
+  const url = `https://raw.githubusercontent.com/alf-unit/botapolis/main/${filePath}`
+  try {
+    const res = await fetch(url, { cache: "no-store" })
+    if (!res.ok) return null
+    return await res.text()
+  } catch {
+    return null
+  }
+}
+
+interface ComparisonFrontmatter {
+  title?:           string
+  description?:     string
+  slug?:            string
+  locale?:          string
+  tools?:           string[]
+  primaryKeyword?: string
+  verdict?:         { winner?: string; best_for_a?: string; best_for_b?: string }
+  schema?:          { type?: string }
+}
+
+interface BridgeResult {
+  bridged: "created" | "touched" | "skipped"
+  reason?: string
+  comparison_id?: string
+}
+
+async function bridgeComparison(
+  filePath: string,
+  language: "en" | "ru",
+  slug:     string,
+  supabase: ReturnType<typeof createServiceClient>,
+): Promise<BridgeResult> {
+  const raw = await fetchMdxRawFromMain(filePath)
+  if (!raw) return { bridged: "skipped", reason: "fetch_failed" }
+
+  const parsed = matter(raw)
+  const fm = parsed.data as ComparisonFrontmatter
+
+  const toolSlugs: string[] = Array.isArray(fm.tools) ? fm.tools.slice(0, 2) : []
+  if (toolSlugs.length !== 2) {
+    return { bridged: "skipped", reason: "frontmatter_missing_two_tools" }
+  }
+
+  // Check existing row first — never overwrite editorial fields.
+  const { data: existing } = await supabase
+    .from("comparisons")
+    .select("id")
+    .eq("slug", slug)
+    .eq("language", language)
+    .maybeSingle()
+
+  if (existing) {
+    // Row exists. Touch updated_at to nudge ISR; leave editorial fields alone.
+    await supabase
+      .from("comparisons")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", existing.id)
+    return { bridged: "touched", reason: "row_exists_editorial_preserved", comparison_id: existing.id }
+  }
+
+  // New row — resolve tool slugs to UUIDs, then INSERT.
+  const { data: toolRows } = await supabase
+    .from("tools")
+    .select("id, slug")
+    .in("slug", toolSlugs)
+
+  const toolA = toolRows?.find(t => t.slug === toolSlugs[0])
+  const toolB = toolRows?.find(t => t.slug === toolSlugs[1])
+  if (!toolA || !toolB) {
+    return { bridged: "skipped", reason: `tool_uuid_lookup_failed:${toolSlugs.join(",")}` }
+  }
+
+  // Derive a simple verdict text from frontmatter when present. Anything
+  // richer (custom_intro, comparison_data JSONB) is left null — editorial
+  // can fill it in later without the bridge overwriting on next commit.
+  let derivedVerdict: string | null = null
+  if (fm.verdict && (fm.verdict.best_for_a || fm.verdict.best_for_b)) {
+    const winnerName =
+      fm.verdict.winner === toolSlugs[0] ? toolA.slug :
+      fm.verdict.winner === toolSlugs[1] ? toolB.slug :
+      "no clear winner"
+    derivedVerdict =
+      `Winner: ${winnerName}. ` +
+      `Choose ${toolA.slug} when: ${fm.verdict.best_for_a ?? "—"}. ` +
+      `Choose ${toolB.slug} when: ${fm.verdict.best_for_b ?? "—"}.`
+  }
+
+  const { data: inserted, error: insErr } = await supabase
+    .from("comparisons")
+    .insert({
+      slug,
+      language,
+      status:              "published",
+      tool_a_id:           toolA.id,
+      tool_b_id:           toolB.id,
+      meta_title:          fm.title ?? null,
+      meta_description:    fm.description ?? null,
+      verdict:             derivedVerdict,
+      // Leave editorial fields null on auto-bridge — fill in via Studio
+      // or SQL after authoring. The bridge will not overwrite them later.
+      winner_for:          null,
+      comparison_data:     null,
+      custom_intro:        null,
+      custom_methodology:  null,
+    })
+    .select("id")
+    .single()
+
+  if (insErr) return { bridged: "skipped", reason: `insert_failed:${insErr.message}` }
+  return { bridged: "created", comparison_id: inserted.id }
 }
 
 export async function POST(req: NextRequest) {
@@ -82,7 +220,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
-  const results: Array<{ path: string; matched: boolean; reason?: string }> = []
+  const results: Array<{ path: string; matched: boolean; reason?: string; bridged?: string }> = []
   const revalidated: string[] = []
 
   for (const f of files) {
@@ -90,6 +228,34 @@ export async function POST(req: NextRequest) {
     if (publicUrl) {
       revalidatePath(publicUrl)
       revalidated.push(publicUrl)
+    }
+
+    // Comparison bridge: if path is content/comparisons/<lang>/<slug>.mdx, ensure
+    // a matching row exists in public.comparisons (the table /compare/[slug]
+    // actually reads from). Never overwrites existing rows.
+    let bridgeNote: string | undefined
+    const cmpMatch = f.path.match(/^content\/comparisons\/(en|ru)\/(.+)\.mdx$/)
+    if (cmpMatch) {
+      const [, language, slug] = cmpMatch
+      const br = await bridgeComparison(f.path, language as "en" | "ru", slug, supabase)
+      bridgeNote = `bridge:${br.bridged}${br.reason ? `(${br.reason})` : ""}`
+      // Log bridge action explicitly so audit trail exists alongside the
+      // standard task_completed entry that follows.
+      await supabase.from("agent_logs").insert({
+        agent_name: "CLAUDE_CODE",
+        event_type: "comparison_bridge",
+        severity: br.bridged === "skipped" ? "warning" : "info",
+        message: `comparison_bridge=${br.bridged} for ${f.path}${br.reason ? ` (${br.reason})` : ""}`,
+        context: {
+          file:           f.path,
+          slug,
+          language,
+          bridge_result:  br.bridged,
+          bridge_reason:  br.reason ?? null,
+          comparison_id:  br.comparison_id ?? null,
+          commit_sha:     body.commit_sha,
+        },
+      })
     }
 
     // Try keyword match first (most reliable), then path-suffix fallback.
@@ -113,7 +279,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!rowId) {
-      results.push({ path: f.path, matched: false, reason: "no_semantic_core_match" })
+      results.push({ path: f.path, matched: false, reason: "no_semantic_core_match", bridged: bridgeNote })
       continue
     }
 
@@ -127,7 +293,7 @@ export async function POST(req: NextRequest) {
       .eq("id", rowId)
 
     if (updErr) {
-      results.push({ path: f.path, matched: true, reason: `update_failed:${updErr.message}` })
+      results.push({ path: f.path, matched: true, reason: `update_failed:${updErr.message}`, bridged: bridgeNote })
       continue
     }
 
@@ -141,7 +307,7 @@ export async function POST(req: NextRequest) {
       related_entity_id: rowId,
     })
 
-    results.push({ path: f.path, matched: true })
+    results.push({ path: f.path, matched: true, bridged: bridgeNote })
   }
 
   return NextResponse.json({

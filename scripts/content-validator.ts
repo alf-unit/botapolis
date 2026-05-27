@@ -37,7 +37,6 @@ import fs from "node:fs/promises"
 import path from "node:path"
 
 import matter from "gray-matter"
-import { createClient } from "@supabase/supabase-js"
 import { z } from "zod"
 
 // Inline mini-schemas mirroring lib/content/mdx.ts. We re-state them here
@@ -223,25 +222,42 @@ async function main() {
     process.exit(0)
   }
 
-  const supabase = createClient(url, key, { auth: { persistSession: false } })
+  // Raw REST call instead of @supabase/supabase-js. The client library opens
+  // an undici Agent that holds TLS handles open past the success log on
+  // Node 24 + Windows, triggering a libuv assertion at process.exit.
+  // PostgREST URL: GET /rest/v1/tools?slug=in.(a,b,c)&select=slug,rating
   const slugs = [...reviewRatings.keys()]
-  const { data: rows, error } = await supabase
-    .from("tools")
-    .select("slug, rating")
-    .in("slug", slugs)
+  const slugList = slugs.map((s) => `"${s.replace(/"/g, '\\"')}"`).join(",")
+  const restUrl =
+    `${url.replace(/\/$/, "")}/rest/v1/tools` +
+    `?select=slug,rating&slug=in.(${encodeURIComponent(slugList)})`
 
-  if (error) {
-    // DB unreachable from this machine is not a commit blocker — log and
-    // continue. The deploy build runs in a hermetic env that *will* hit
-    // Supabase, and migration 003 keeps prod in sync anyway.
+  type ToolRow = { slug: string; rating: number | null }
+  let rows: ToolRow[] = []
+  try {
+    const res = await fetch(restUrl, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Accept: "application/json",
+      },
+    })
+    if (!res.ok) {
+      console.warn(
+        `[validate] DB lookup failed (HTTP ${res.status}) — schema ✓, skipping drift check.`,
+      )
+      await exitAfterDrain(0)
+    }
+    rows = (await res.json()) as ToolRow[]
+  } catch (err) {
     console.warn(
-      "[validate] DB lookup failed (" + error.message + ") — schema ✓, skipping drift check.",
+      "[validate] DB lookup failed (" + (err as Error).message + ") — schema ✓, skipping drift check.",
     )
-    process.exit(0)
+    await exitAfterDrain(0)
   }
 
   const dbBySlug = new Map<string, number | null>()
-  for (const r of rows ?? []) dbBySlug.set(r.slug, r.rating)
+  for (const r of rows) dbBySlug.set(r.slug, r.rating)
 
   const drift: string[] = []
   for (const [slug, { rating, rel }] of reviewRatings.entries()) {
@@ -265,7 +281,19 @@ async function main() {
   }
 
   console.log("[validate] schema ✓ · ratings ✓")
-  process.exit(0)
+  await exitAfterDrain(0)
+}
+
+// Node 24 on Windows hits a libuv assertion
+// (`!(handle->flags & UV_HANDLE_CLOSING)` in src/win/async.c) when fetch
+// against Supabase leaves TLS handles mid-close as process.exit() runs.
+// A short timeout gives libuv enough wall time to finish closing those
+// handles cleanly before we exit. setImmediate is NOT enough — actual ms
+// must elapse. Kept narrow so non-DB code paths (early exits above) stay
+// instant.
+async function exitAfterDrain(code: number): Promise<never> {
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  process.exit(code)
 }
 
 main().catch((err) => {

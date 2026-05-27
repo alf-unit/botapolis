@@ -391,3 +391,77 @@ After the first session-log save, owner pushed back on deferring follow-ups ("т
 10. `feat(api): article-published bridges comparison MDX to public.comparisons table` (webhook bridge fix)
 11. `docs(chief): capture runtime CHIEF AGENTS.md from Mac Mini for audit trail` (Tier 2 capture)
 12. `docs(sessions): 2026-05-26 Phase 3 extended fixes` (this update — final session log)
+
+---
+
+## 2026-05-26 (session 2) — GSC ingestion incident: backfill May 12-24 + OPS safety gates + infra-mode read protocol
+
+### Commits
+
+- docs(claude-md): require full read of FINAL-ARCHITECTURE-V4.md in infra mode
+- fix(ops): GSC ingestion incident — backfill May 12-24 + safety gates
+- docs(sessions): 2026-05-26 session 2 — GSC ingestion incident
+
+### Задача
+
+CHIEF's утренний brief 2026-05-26 07:02 LA повторил "нет данных GSC" — паттерн продолжался 2 недели подряд. Owner эскалировал ("сайт индексируется две недели, ты охуел?"). CHIEF проверил GSC API напрямую: реальные данные есть (402 imp / 1 click / avg pos 43.68 за 11-24 мая), но в `performance_snapshots` null/0. CHIEF открыл два request-файла (`ops-requests/gsc-incident-2026-05-26.md` + `programmer-requests/gsc-metrics-ingestion-2026-05-26.md`). Мишн Claude Code: closed-loop remediation — backfill 14 дней + lockdown OPS спецификации чтобы silent ingestion failure больше не проходил. Параллельно owner потребовал hard-codify правило "infra-mode = полное чтение FINAL-ARCHITECTURE-V4.md" в CLAUDE.md после того как я дважды пропустил pagination на token-limit ошибке.
+
+### Сделано
+
+- **CLAUDE.md infra-mode reading protocol** — owner reissued explicit rule после повторного скипа. Жёсткая строка в Operating modes таблице ("ОБЯЗАТЕЛЬНО прочитай FINAL-ARCHITECTURE-V4.md ПОЛНОСТЬЮ") + новая секция с pagination-protocol (3 параллельных Read'а offset=1/601/1201 limit=600). Дублировано как `feedback_infra-mode-read-architecture-fully.md` в memory — срабатывает до чтения CLAUDE.md.
+
+- **`scripts/backfill-gsc-metrics.ts` + npm `backfill:gsc[:dry]`** (~200 строк, прямой fetch без googleapis-dep) — OAuth token mint → Search Analytics API → per-day upsert в `performance_snapshots`. Live прогон 2026-05-12 .. 2026-05-24: 13 mature days записаны, итоги 402 imp / 1 click / avg pos 43.68 — матч CHIEF's direct API check 1:1. Per-day breakdown (12 мая 4 imp ✓, 18 мая 1 click 70 imp ✓, 22 мая 45 imp ✓, etc.) тоже совпадает.
+
+- **NULL'нуты ошибочные нули OPS-а** за 2026-05-25 и 2026-05-26 — было `gsc_*=0` (false "у нас данные, они нулевые"), стало NULL (correct "не созрели ещё"). Это чтобы CHIEF не интерпретировал ноль как factual.
+
+- **OPS instruction overhaul** (`agent-snapshots/ops/{AGENTS,TOOLS}.md`):
+  - TOOLS.md: убрана stale строка "GSC service-account TBD, skip". Документирован OAuth refresh-token (4 env переменные). Добавлено явное правило "creds present + API empty ≠ skip integration".
+  - AGENTS.md step 1: hardcoded "last 24h" заменён на adaptive window `today-4..today-1` где источник истины = что вернул API (а не наш fixed offset). Per-mature-date upsert. Запрет писать 0 для дат которых API не отдал. Reference к backfill script как ground truth ("если runtime даёт другие числа чем скрипт на том же окне — runtime bug").
+  - AGENTS.md step 7: GSC поля для `snapshot_date=today` намеренно не пишутся (Google has no mature data); future-day's run заполнит. Beehiiv/affiliate на today пишутся как обычно.
+  - AGENTS.md новая секция "GSC ingestion safety gates" — 6 правил с обязательной severity: auth fail = critical, "API rows есть но snapshot пишет 0" = error (тот самый bug что 2 недели hid), 3+ зрелых дня пустоты после данных = warning. Фраза "site too new, no data yet" забанена для botapolis после 2026-05-25.
+  - Owner перенёс файлы на Mac Mini (`~/.openclaw/agents/ops/workspace/`) вручную, перезапустил OPS session.
+
+- **Audit log + programmer-request RESOLVED** — `agent_logs.id=b5eb421a-7999-4adf-9733-e804539aef4c` (event_type='gsc_backfill'). Programmer-request файл помечен RESOLVED с полным резюме что сделано и next steps для CHIEF + owner.
+
+- **Memory additions:**
+  - `feedback_infra-mode-read-architecture-fully.md` — token-limit ошибка = signal "paginate", не "skip".
+  - `reference_ags-drop-folder.md` — owner использует `ags/{chf,sct,ps}/` как untracked drop zone для capture-from-Mac-Mini файлов перед promote в tracked `agent-snapshots/`.
+
+### Обнаружено
+
+- **GSC ingestion-кода в репо нет вообще.** OPS делает GSC HTTP requests из своего OpenClaw runtime на Mac Mini, follow'я инструкциям в AGENTS.md. "Фикс кода" = фикс инструкций. Единственный actual код = мой backfill script, который служит double duty: (а) one-shot remediation, (б) reference implementation для рантайма. Pattern worth keeping for SCOUT/CHIEF ingestion paths тоже когда они баг'нут.
+
+- **TOOLS.md vs AGENTS.md conflict была root cause тишины.** AGENTS.md правильно описывал OAuth setup но TOOLS.md ("первый список инструментов") говорил "GSC service-account TBD, skip". OPS видел противоречие, выбирал safe path "skip + log info", 2 недели. Lesson: при двух source-of-truth-документах с overlapping content — drift гарантирован. Один должен ссылаться на другой как authoritative, или объединить.
+
+- **"Empty response = site new, no data yet (normal)" branch** — explicit false-success path в AGENTS.md. Без guard'а "if API said empty AND prior days had data" эта строка маскирует bug как expected behavior. Owner instinct правильный: после индексации нулевые дни — incident, не normal.
+
+- **GSC date-window нюанс.** Google публикует "fresh" данные за сутки, но они downstream пересчитываются вверх ~3 дня. UI показывает их сразу — owner видел "новые данные каждый день" — но они provisional. Адаптивная схема "забери что API считает готовым" корректнее чем hardcoded `today-2`. Источник истины = response, не наш offset.
+
+- **`.env.local` имеет двойную gitignore защиту** (`.env*` + `.env*.local`). `git check-ignore -v .env.local` показывает оба матча. Безопасно для creds на время backfill.
+
+- **GSC credential security note:** owner вставил Client Secret + Refresh Token в чат. После discussion owner declined ротацию ("мне секретов не жалко"). Future credential-handling — спрашивать до того как просить пастить (default-route: дать ему путь файла, попросить скопировать в .env.local напрямую без проксирования через чат).
+
+- **Owner communication style under stress:** matter-of-fact + raw. Когда я ушёл в OAuth/PostgREST жаргон ("mint token, upsert by conflict, etc.") — взорвался "пиши блять нормальным человеческим языком". Переход на "Гугл публикует с задержкой 2-3 дня, поэтому скрипт берёт позавчера и старше" — конструктивный разговор. Reinforce: technical depth по запросу, default = explain-like-i'm-running-a-business.
+
+- **`ags/` untracked drop folder** (mirrors `agent-snapshots/` через short paths chf/sct/ps) — owner копирует туда файлы с Mac Mini через Finder/File Explorer когда нужно дать мне свежие версии. Узнал по скриншоту с File Explorer. Файлы в `ags/ps/` сегодня матчили `agent-snapshots/ops/` — snapshot был current, правки шли в canonical tracked путь.
+
+### Fixes
+
+- **performance_snapshots backfill** — 13 rows с реальными значениями + 2 NULL'нутых row + 1 audit log entry. Closes original CHIEF observation 1:1.
+- **AGENTS.md hard-codes removed** — "last 24h" → adaptive window, "site new = normal" → 6-rule safety gates с явной severity ladder.
+- **TOOLS.md conflict resolved** — single source of truth: OAuth refresh-token, integration статусы стали честным mirror'ом реальности.
+- **programmer-request resolution-block** — для CHIEF видно что заявка closed + next steps. Closes feedback-loop без необходимости в Telegram.
+- **CLAUDE.md infra-mode rule** + duplicated в memory — two-layer defense (memory ловит до того как я даже доберусь до CLAUDE.md).
+
+### Open follow-ups
+
+- **2026-05-27 ~07:00 LA — verify утренний brief Чифа** показывает real GSC numbers (positions, impressions, top-N keyword counts) вместо "нет данных". Если опять "нет данных" — workspace files на Mac Mini не подхватились (не перезапустил session или paste был неполный); re-execute.
+- **GSC OAuth ротация — explicitly declined by owner.** Не reopen без новой команды.
+- **`tools` table missing columns** для SCOUT pricing scrape (`pricing_url`, `pricing_css_selectors`, `pricing_data`, `affiliate_health_checked_at`) — carryover из Phase 3 morning session, не закрыто.
+- **`system_config.modified_by` CHECK constraint** rejects agent values — carryover. Add enum or drop constraint.
+- **Capture SCOUT runtime AGENTS.md** в `/agent-snapshots/scout/` — carryover из Phase 3 morning. Same pattern как для CHIEF + OPS sync today.
+- **Option B refactor `/compare/[slug]` MDX-driven** — carryover. Current state: webhook bridge (Option C) папирует над несовместимостью.
+- **Newsletter ingestion via Beehiiv** — HIGH priority carryover из session 2 (2026-05-22). Покрывает 20-vendor gap по vendor news.
+- **OPS runtime model drift (gpt-5.5 vs spec Haiku 4.5)** cost reconciliation — pending первого месяца `agent_logs.cost_usd` данных.
+- **Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md** — carryover. Сегодня GSC adaptive-window logic осталась только в OPS AGENTS.md + programmer-request, не в архитектуре. Promote когда руки дойдут.
+- **TOOLS.md ↔ AGENTS.md drift prevention pattern** — applied только к OPS today. Stay alert for same anti-pattern в CHIEF + SCOUT.

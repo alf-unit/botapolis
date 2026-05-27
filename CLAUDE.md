@@ -19,7 +19,7 @@
 |------|-------------------|----------------------|
 | **Content writing** | Написание статей, MDX, refresh контента, RU переводы | `CONTENT-WRITING.md` |
 | **Code/feature** | Развитие сайта, новые компоненты, фичи, баги | работает по дефолту, читай `HANDOFF.md` и спроси нужно ли дальнейшее углубление в контекст проекта по указанным в файле связаным файлам |
-| **Infrastructure** | Setup новых агентов, миграции БД, новые скрипты | смотри `FINAL-ARCHITECTURE-V4.md` |
+| **Infrastructure** | Setup новых агентов, миграции БД, новые скрипты | **ОБЯЗАТЕЛЬНО прочитай `FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ** — см. секцию "Infrastructure mode — mandatory reading protocol" ниже |
 
 В начале каждой сессии перечисли доступные mode, и спроси оператора в каком режиме будем работать? . Не пытайся одновременно "и контент и код".
 
@@ -41,6 +41,24 @@
 | Infrastructure | `/sessions/infra-log.md` |
 
 Это даст контекст последних работ: что было сделано, какие quirks обнаружены, какие fixes применены, open follow-ups которые могут быть релевантны текущей задаче.
+
+### Infrastructure mode — mandatory reading protocol
+
+**При выборе оператором Infrastructure mode ты ОБЯЗАН прочитать `FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ до того как задашь "что делаем сегодня?" или начнёшь любую работу.**
+
+Этот файл — единственный источник правды по multi-agent системе (CHIEF/SCOUT/OPS/CLAUDE_CODE, схема Supabase, HEARTBEAT cron'ы, Deep Research format, setup phases). Без него ты будешь предлагать решения противоречащие спеке, и оператору придётся всё переобъяснять.
+
+**Protocol чтения:**
+
+1. Сделай `Read` на `FINAL-ARCHITECTURE-V4.md`.
+2. **Если получаешь ошибку "File content exceeds maximum allowed tokens"** — это ожидаемо, файл ~1771 строк / ~28k токенов. Read'ни постранично через `offset`/`limit`, три параллельных вызова в одном сообщении:
+   - `offset=1, limit=600`
+   - `offset=601, limit=600`
+   - `offset=1201, limit=600`
+3. **НИКОГДА не пропускай файл из-за token-limit ошибки.** Это паттерн нарушения зафиксирован в memory (`feedback_infra-mode-collaboration`, `feedback_act-on-source-not-theorize`). Token limit — это сигнал "разбей на страницы", а не "забей".
+4. Только после полного прочтения architecture + последних 2-3 блоков `infra-log.md` — спрашивай "что делаем сегодня?".
+
+**Если файл переименовали или вынесли** — найди актуальный (Glob `**/FINAL-ARCHITECTURE*.md` или ищи в `/sessions/infra-log.md` упоминания) и прочитай его. Не работай без architecture context.
 
 ### В конце сессии (когда оператор просит сохраниться)
 

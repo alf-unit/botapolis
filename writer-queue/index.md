@@ -31,6 +31,8 @@ _None._
 
 ## Recently done (last 10)
 
+- 002-klaviyo-review-refresh.md — 2026-05-27
+- 004-gorgias-review-refresh.md — 2026-05-27
 - 003-klaviyo-vs-mailchimp.md — 2026-05-26
 - 001-skio-to-loop-migration.md — 2026-05-20
 <!-- OPS appends here when moving a packet to done/. Most recent first. -->
@@ -39,8 +41,8 @@ _None._
 
 ## Counts
 
-- pending: 2
-- done: 2
+- pending: 0
+- done: 4
 - archive: 0
 
 _Updated by after-publish.sh on each packet move (formerly OPS-managed; see Phase 3 finding 2026-05-26)._

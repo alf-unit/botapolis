@@ -18,6 +18,8 @@
     "import:semantic-core": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/import-semantic-core.ts",
     "import:semantic-core:dry": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/import-semantic-core.ts --dry-run",
     "validate:infra": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/validate-infra.ts",
+    "backfill:gsc:dry": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/backfill-gsc-metrics.ts --dry-run",
+    "backfill:gsc": "node --env-file=.env.local --experimental-strip-types --no-warnings scripts/backfill-gsc-metrics.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

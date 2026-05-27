@@ -39,10 +39,14 @@ For any missing integration: log `severity='info'` "integration X not configured
    - Load creds from `~/.openclaw/credentials/botapolis-gsc.env`
    - Mint access token: POST https://oauth2.googleapis.com/token (client_id, client_secret, refresh_token, grant_type=refresh_token)
    - Query endpoint: POST https://www.googleapis.com/webmasters/v3/sites/sc-domain%3Abotapolis.com/searchAnalytics/query
-   - Pull: total impressions, clicks, avg position (last 24h)
-   - Pull: top 30 queries by impressions
-   - Pull: top 30 pages by clicks
-   - Empty response = site new, no data yet (normal). 401/403 = notify operator immediately.
+   - **Adaptive date window (GSC has 2-3 day publish lag):** request `startDate=today-4, endDate=today-1, dimensions=['date']`. The API itself will return rows ONLY for dates Google considers ready — that is the source of truth for "mature", do NOT hardcode a fixed offset.
+   - For EACH date in the API response (one row per mature date):
+     - Pull per-day query distribution: `startDate=date, endDate=date, dimensions=['query'], rowLimit=25000` → compute `gsc_keywords_top10/20/50` (count of queries with position ≤ N)
+     - Pull per-day top pages: `startDate=date, endDate=date, dimensions=['page'], rowLimit=20`
+     - Upsert `performance_snapshots` on `snapshot_date=date` with GSC fields only (do NOT overwrite Beehiiv / affiliate / etc. on the same row — those belong to that day's own daily run)
+   - **Never write `gsc_*=0` for a date the API didn't return.** A missing date means "not yet mature" — leave the snapshot's GSC fields untouched (NULL if first time, or prior value if revisit).
+   - **Never write `gsc_*=0` when the API returned rows with non-zero values** (sanity gate, see "GSC ingestion safety gates" below).
+   - Reference implementation: `scripts/backfill-gsc-metrics.ts` in repo — same recipe, one-shot mode. The runtime path in OPS must produce identical numbers; if it diverges from the script for the same window, the runtime path is the bug.
 2. Pull Plausible: SKIPPED (no API key) — log 'integration Plausible not configured'
 3. Pull Supabase metrics:
    - `SELECT count(*) FROM affiliate_clicks WHERE created_at > now() - interval '24 hours'`
@@ -54,9 +58,28 @@ For any missing integration: log `severity='info'` "integration X not configured
    - Fill: new_subscribers, total_subscribers, newsletter_open_rate, newsletter_click_rate
 5. Pull PostHog: SKIPPED (write-only key) — log 'integration PostHog not configured'
 6. Vercel health: SKIPPED (no API token) — site health done via curl in hourly check instead
-7. Compile all into one `performance_snapshots` row (snapshot_date = today)
-   - Schema reference (verified 2026-05-21): only `snapshot_date` is required. Use dedicated columns: total_sessions, total_pageviews, total_unique_visitors, gsc_total_impressions, gsc_total_clicks, gsc_avg_position, gsc_keywords_top10/20/50, affiliate_clicks, affiliate_conversions, affiliate_revenue_usd, new_subscribers, total_subscribers, newsletter_open_rate, newsletter_click_rate, top_pages (jsonb), vercel_function_error_rate. NO `data`/`metric_source` column.
+7. Compile non-GSC metrics into TODAY's `performance_snapshots` row (snapshot_date = today):
+   - Beehiiv: `new_subscribers`, `total_subscribers`, `newsletter_open_rate`, `newsletter_click_rate`
+   - Supabase aggregates: `affiliate_clicks`, `affiliate_conversions`, `affiliate_revenue_usd`
+   - (GSC fields for `snapshot_date=today` are intentionally left untouched — Google has no mature data for today yet; today's GSC will be written 1-3 days from now when it matures, per step 1's adaptive-window logic.)
+   - Upsert by `snapshot_date=today`. The same row may already have GSC fields populated by a future day's run — preserve them.
+   - Schema reference (verified 2026-05-21): only `snapshot_date` is required. Available columns: total_sessions, total_pageviews, total_unique_visitors, gsc_total_impressions, gsc_total_clicks, gsc_avg_position, gsc_keywords_top10/20/50, affiliate_clicks, affiliate_conversions, affiliate_revenue_usd, new_subscribers, total_subscribers, newsletter_open_rate, newsletter_click_rate, top_pages (jsonb), vercel_function_error_rate. NO `data`/`metric_source` column.
 8. If any anomaly detected (e.g., revenue drop >50%, error rate >5%): log to `agent_logs` (severity='warning' or higher) and notify CHIEF
+
+### GSC ingestion safety gates (added 2026-05-26)
+
+These gates exist because OPS silently wrote zeros into `performance_snapshots` for 2 weeks (12-26 May 2026) while real GSC data existed — discovered when CHIEF queried the API directly. Every gate below MUST fire as `agent_logs` row of the stated severity. **None of these are "info / skip" conditions.**
+
+| Condition | Severity | Action |
+|-----------|----------|--------|
+| OAuth token mint returns 4xx/5xx | `critical` | Log + notify CHIEF immediately. Do NOT mark GSC integration as "skipped" — credentials exist, this is an auth failure. |
+| Search Analytics API returns non-2xx (401/403/500/etc.) | `critical` | Same as above. The integration is configured; this is a runtime failure, not "no data". |
+| API returns rows with non-zero impressions/clicks, but resulting write to `performance_snapshots` would be `gsc_*=0` or NULL | `error` | The aggregation lost the data. Halt write, log values seen vs values intended-to-write, alert CHIEF. This is the bug that hid the May 2026 incident. |
+| API returns 0 rows for all dates in window, AND prior 3+ days had non-zero data | `warning` | Possible upstream lag or de-indexing event. Log, do NOT overwrite existing GSC fields with zero. |
+| API returns 0 rows for all dates in window, AND no prior history exists (true site-new condition) | `info` | Only valid "site too new" branch. Restricted to first 14 days after sitemap submission. After that, use `warning` instead. |
+| OPS run completes but no GSC row was upserted AND no API call was attempted | `error` | Means GSC step was skipped without explicit reason. Log + alert. |
+
+The wording "site too new, no data yet (normal)" must NEVER appear in agent_logs for `botapolis.com` after 2026-05-25 — site has been indexed since 2026-05-11. Use this phrase only for true cold-start conditions on a brand-new property.
 
 Note: Phase-1 launch may run with only the integrations that actually have credentials. Skip pulls that have no key, log a `severity='info'` note "integration X not configured", and continue with the rest. Don't fail the whole job.
 

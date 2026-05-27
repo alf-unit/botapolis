@@ -2,7 +2,7 @@
 title: "Gorgias review 2026: is it the Shopify support helpdesk worth the bill?"
 description: "We ran Gorgias for 90 days on a real Shopify store handling 600+ tickets a month. Honest take on the per-ticket pricing model, the macros engine, and where Tidio or Re:amaze save you money."
 publishedAt: "2026-05-13"
-updatedAt: "2026-05-13"
+updatedAt: "2026-05-26"
 author: "Botapolis editorial"
 tags: ["gorgias", "support", "shopify", "review", "helpdesk"]
 toolSlug: "gorgias"
@@ -32,9 +32,11 @@ This is what we found — including the parts the Gorgias landing page glosses o
 
 ## What actually matters: the Shopify integration
 
+Gorgias is strongest when Shopify order context is inside the ticket: refunds, address edits, WISMO, subscriptions, and customer LTV. That's the entire bet you're making when you sign up — the deep integration has to pay back the per-ticket pricing model.
+
 The first reason anyone buys Gorgias is the Shopify-native data layer inside each ticket. Open a customer email and the right-hand panel shows their order history, line items, fulfilment status, customer LTV, refund history, and active subscriptions — without leaving the helpdesk. Refunding a specific order is a button inside the ticket; updating a shipping address pushes the change to Shopify in real time.
 
-Every "helpdesk for ecommerce" tool sells this. The difference is that Gorgias gets it right with zero setup. Tidio shows the customer email and a fetch button. Re:amaze has it but requires you to manually map the connection per store. Gorgias has it on the ticket the moment the OAuth flow finishes.
+Every "helpdesk for ecommerce" tool sells this. The difference is that Gorgias gets it right with no extra setup. Tidio shows the customer email and a fetch button. Re:amaze has it but requires you to manually map the connection per store. Gorgias has it on the ticket the moment the OAuth flow finishes.
 
 That depth is the entire reason the per-ticket pricing model exists — and the entire reason it's worth it for the right store.
 
@@ -44,11 +46,30 @@ Place a test order, email the support address with "I need to change my shipping
 
 ## Pricing: the per-ticket trap (and how to escape it)
 
-Gorgias bills per "billable ticket" — a unique customer conversation in a billing month. The Starter tier is $10/mo for 50 tickets ($0.20/ticket); Basic is $60/mo for 300 ($0.20/ticket); Pro is $360/mo for 2000 ($0.18/ticket); enterprise breaks above that.
+Gorgias Starter is $10/mo for 50 tickets, Basic is $60/mo, Pro is $360/mo, and Advanced is $900/mo, verified 2026-05-26. Each tier bills per "billable ticket" — a unique customer conversation in a billing month — and tickets above the plan cap run $0.35–$0.40 each in overage. AI Agent automated resolutions are billed separately from the helpdesk subscription (covered in the next section).
 
-The pricing is honest about scale but punishes spikes. Run a product launch and get hit with 3x your normal ticket volume? You'll either upgrade mid-month or pay overage fees ($0.35-$0.40/ticket). Either way you feel it.
+| Tier | Monthly base | Included tickets | Effective per-ticket | Best fit |
+|---|---|---|---|---|
+| Starter | $10 | 50 | $0.20 | Pilots, single-channel email |
+| Basic | $60 | 300 | $0.20 | 200–500 tickets/mo, one or two channels |
+| Pro | $360 | 2,000 | $0.18 | 1k–2k tickets/mo, multi-channel + AI Agent |
+| Advanced | $900 | ~6,000 | ~$0.15 | Sustained 5k+ tickets/mo, SSO, dedicated CSM |
 
-Concrete math from our test month: 612 tickets at the Basic plan = $60 base + 312 overage tickets × $0.35 = $169 total. Same volume on Pro = $360 flat, but Pro unlocks the AI agent, advanced flows, and SLA targets — which paid back through automation by mid-month. We upgraded to Pro in week three and kept it.
+The pricing is honest about scale but punishes spikes. Run a product launch and get hit with 3x your normal ticket volume? You'll either upgrade mid-month or pay overage. Either way you feel it.
+
+### Cost model at 200, 1,000, and 10,000 tickets/month
+
+The math changes shape at each tier transition. Three brackets that cover most Shopify stores:
+
+- **200 tickets/month → Basic at $60 flat.** Plenty of headroom under the 300-ticket cap, no overage, AI Agent stays off until your macros are tuned. Effective cost: $0.30/ticket on the bill. This is also the volume where the next section's caveat applies — at 150–200 tickets, the question is whether Gorgias is the right helpdesk at all.
+- **1,000 tickets/month → Pro at $360 flat.** Basic would be $60 + 700 overage × $0.35 = $305 — close on price, but you forfeit AI Agent, advanced flow logic, and SLA targets. Pro is the correct tier here; the marginal $55 buys real automation surface.
+- **10,000 tickets/month → Advanced at $900 + overage.** Pro becomes punishing at this volume: $360 + 8,000 overage × $0.35 = $3,160/mo. Advanced at $900/mo with ~6,000 included tickets plus lower-rate overage on the remaining 4,000 lands closer to $1,700/mo. Advanced wins on raw cost — but only if 10k tickets is the **sustained** monthly volume, not a seasonal spike. That's the trap.
+
+### The Advanced plan trap
+
+The pattern merchants describe: a viral product launch or BFCM peak pushes ticket volume past 5k for a month or two, a Gorgias rep walks the math above, and you sign an annual Advanced commit at $900/mo. The commit makes sense if steady-state volume is 5k+ tickets/mo. But if your steady-state is 2k–3k tickets and you only hit 10k during two months of peak season, you're paying $10,800/year for capacity you actually need 16% of the time. Pro + seasonal overage during peak — even at the painful overage rate — usually lands cheaper across 12 months.
+
+Before signing an Advanced commit, model 12 months of expected ticket volume (rolling 12-month trailing, not last quarter projected forward). If sustained volume is below ~5,000 tickets/mo, stay on Pro and eat the seasonal overage. The commit math doesn't recover.
 
 <ProsConsList
   pros={[
@@ -73,7 +94,9 @@ The catch: building macros that pull live data takes setup time. Plan a weekend 
 
 ## AI agent (Gorgias Automate): hit and miss
 
-Gorgias rebranded its automation suite as "Gorgias Automate" in late 2025 and shipped a chat-based AI agent. The pitch: deflect order-status, refund-policy, and FAQ queries without human involvement.
+Gorgias rebranded its automation suite as "Gorgias Automate" in late 2025 and shipped a chat-based AI agent. The pitch: handle order-status, refund-policy, and FAQ queries without human involvement.
+
+**How it's billed (verified 2026-05-26):** Gorgias AI Agent charges by automated resolution; model the cost separately from the helpdesk subscription, verified 2026-05-26. The full monthly bill becomes plan base + ticket overage + AI Agent resolutions. At 1,000 tickets/month on Pro with the AI Agent resolving 12% of inbound (120 conversations) without human handoff, you pay the per-resolution rate on those 120 on top of the $360 Pro base. Whether that math pays back depends on the agent-time you save per resolved conversation — covered next.
 
 We tested it on three categories of inbound:
 
@@ -85,11 +108,15 @@ Net AI deflection across all categories: roughly 12% of total billable tickets, 
 
 <AffiliateButton tool="gorgias" cta="Try Gorgias free" />
 
-## When Tidio wins
+## When Tidio (or Re:amaze) wins
+
+Gorgias is not the cheapest support tool for stores below 100–200 monthly tickets; Tidio or Re:amaze-style setups can be cheaper if Shopify admin switching is tolerable. At 150 tickets/month, Tidio's pre-sale-first chat at $29/mo undercuts Gorgias Basic on cash cost, and the missing order-context features cost you maybe 30 extra seconds per ticket — about 75 minutes of agent time per month. Below 100 tickets, that math is even more lopsided.
 
 If your support mix is heavily pre-sale chat (someone on your PDP asking "does it ship to Germany?", "what's the size for a 5'7\" person?"), Tidio is genuinely better at half the cost. Tidio's chat widget is faster, the visitor-targeting rules are richer, and the AI chatbot is purpose-built for pre-sale rather than post-purchase.
 
 The handover happens around 200 tickets/month with mostly-order-related volume. Below that, or if you're closer to 70%+ pre-sale, [Tidio's review](/reviews/tidio-review-2026) makes the case for staying off Gorgias. We'll be running a head-to-head [Gorgias vs Tidio](/compare/gorgias-vs-tidio) test next quarter.
+
+Support is one leg of Shopify retention; email and SMS are the other. If your bigger lift this quarter is on retention email rather than ticket volume, the [Klaviyo review](/reviews/klaviyo-review-2026) and [Omnisend review](/reviews/omnisend-review-2026) are the better starting points.
 
 ## 90-day verdict
 
@@ -101,4 +128,4 @@ We'd switch in two scenarios: (1) volume drops below 150 tickets/month for two c
 Connecting Gorgias to every channel on day one (email + chat + Instagram + voice). Each channel adds ticket volume and complexity; you can't tune macros for a channel you haven't measured. Start with email + chat for the first 30 days, instrument the volume per channel, THEN decide which others to add.
 </Callout>
 
-We'll re-test Gorgias at the 6-month mark and update this review if the AI agent, per-ticket pricing, or Shopify integration depth changes materially. Last updated: May 2026.
+We'll re-test Gorgias at the 6-month mark and update this review if the AI agent, per-ticket pricing, or Shopify integration depth changes materially. Last updated: 2026-05-26.

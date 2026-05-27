@@ -2,7 +2,7 @@
 title: "Klaviyo review 2026: is it still worth it for Shopify stores?"
 description: "We ran Klaviyo for 90 days on a real Shopify store with 12k contacts. Honest take on pricing past the 50k threshold, deliverability, and which AI features actually pay back."
 publishedAt: "2026-05-12"
-updatedAt: "2026-05-12"
+updatedAt: "2026-05-26"
 author: "Botapolis editorial"
 tags: ["klaviyo", "email", "shopify", "review", "deliverability"]
 toolSlug: "klaviyo"
@@ -46,9 +46,11 @@ Connect the platform, place a test order, refund it within 5 minutes, and then c
 
 ## Pricing: the math past 50k contacts
 
-Klaviyo's pricing curve is the most-debated part of the platform, and the criticism is mostly fair. Up to ~30k contacts, the bill is competitive with Omnisend ($150/mo at 30k contacts). Past 50k it starts to climb sharply — at 100k active contacts, you're looking at $720/mo, and at 250k you're past $1,500/mo. That's before SMS.
+Klaviyo's pricing curve is the most-debated part of the platform, and the criticism is mostly fair. The free tier covers up to 250 contacts and 500 monthly emails, verified 2026-05-26 — fine for piloting, not for any store with real revenue. Up to ~30k contacts, the paid bill is competitive with Omnisend ($150/mo at 30k contacts). Past 50k it starts to climb sharply — at 100k active contacts, you're looking at $720/mo, and at 250k you're past $1,500/mo. That's before SMS.
 
 The honest framing: this is a platform that gets more expensive as your list grows, and the question is whether your list is generating proportionally more revenue. If your email-attributed revenue per subscriber holds steady at $0.80–$1.20/mo as you scale, Klaviyo pays back. If you're past 75k contacts and bringing in $0.30/sub or less, you've outgrown your audience's engagement — switching platforms won't fix that.
+
+The Feb 2025 active-profile billing migration is the historical context behind these numbers: Klaviyo moved from billing on total contacts to billing on active profiles (those who opened, clicked, or purchased in roughly the last 365 days). Most stores saw a month-1 bill drop on migration day — dormant profiles stopped counting. The follow-up cost shows up later, which is the section below. A dedicated [active-profile billing how-to](/guides/klaviyo-bill-jumped-active-profile) — currently queued — will walk through the operator playbook when your bill jumps unexpectedly.
 
 <ProsConsList
   pros={[
@@ -63,6 +65,23 @@ The honest framing: this is a platform that gets more expensive as your list gro
   ]}
 />
 
+## Cost after 6 months: what active-profile billing actually does
+
+The pattern operators report since the Feb 2025 active-profile migration: month-1 bill drops slightly because dormant profiles stop counting, then drifts back up over the next ~6 months as re-engagement flows pull dormant profiles into active status and list growth adds new active profiles on top. Net for most stores: month-6 bill lands 15–25% above month-1.
+
+That drift is the unique cost story the SERP top-10 doesn't model, and it matters most for stores in the 30k–100k active-profile band, where one tier bump costs an extra $200–300/mo.
+
+| Active profiles month 1 | Klaviyo bill month 1 | Active profile drift by month 6 | Klaviyo bill month 6 |
+|---|---|---|---|
+| 30,000 | $150 | +18% to ~35,500 | ~$190 |
+| 100,000 | $720 | +18% to ~118,000 | ~$870 |
+| 250,000 | $1,500 | +12% (drift slows at scale) to ~280,000 | ~$1,700 |
+
+Two consequences for the buying decision:
+
+- **Don't budget Klaviyo on month-1 numbers.** The platform you're piloting at $150/mo is closer to $190/mo six months later. Build that into the per-subscriber payback math up front.
+- **The bigger your re-engagement flow library, the steeper your drift.** Operators running 6+ flows (welcome, browse-abandon, cart-abandon, post-purchase, win-back, replenishment) see drift closer to the 25% end; operators running only welcome + cart-abandon see closer to 10–12%.
+
 ## AI features: which ones earn their keep
 
 Klaviyo shipped a half-dozen AI features in 2024–2025. Three of them are genuinely useful; the rest are demo-bait. From most useful to least:
@@ -71,6 +90,14 @@ Klaviyo shipped a half-dozen AI features in 2024–2025. Three of them are genui
 2. **Predictive CLV** — The predicted lifetime value field is accurate enough (we cross-checked against 18 months of cohort data) to be a useful segment input. Send "VIP" treatment to predicted-CLV-top-10% and watch the conversion rate.
 3. **Predictive churn-risk** — Useful as a trigger for win-back flows, less useful for one-off campaigns.
 4. **AI-generated email content** — Skip it. The output is generic, the brand-voice fine-tuning is shallow, and you can do better in five minutes with [Claude](https://claude.ai) or a tool like Hypotenuse.
+
+### Customer Agent: AI customer service ($0.70/conv)
+
+Klaviyo shipped Customer Agent in late 2025 — an AI customer-service product that sits on the Klaviyo data layer and handles conversational support across chat, email reply, and in-app touchpoints. Pricing is fundamentally different from the rest of Klaviyo: Customer Agent is $0.70 per conversation, verified 2026-05-26, billed on top of your Standard plan. The Customer Agent intro pricing of $140/mo flat expired 2026-03-31, so any new account today is on per-conversation billing from day one.
+
+The buying-decision implication: this is the first Klaviyo product priced on usage, not contact count. A store with 5,000 monthly customer-service conversations is looking at $3,500/mo for Customer Agent alone, separate from its email contact bill. The math only pays back when Customer Agent's deflection rate against your existing support tool (Gorgias, Zendesk, Tidio) saves agent-hours worth more than $0.70 per conversation deflected. At $25/hr part-time agent labor, that's roughly 1.7 minutes saved per conversation — achievable for FAQ-heavy stores, much harder for order-context-heavy stores already running [Gorgias's macro engine](/reviews/gorgias-review-2026).
+
+The dedicated [Klaviyo Customer Agent review](/tools/klaviyo) — currently queued — will dig into resolution-rate benchmarks, integration depth, and the brand-voice training surface. For this review, the relevant finding is that Customer Agent doesn't replace your support helpdesk; it sits alongside it as a deflection layer, and the $0.70/conv add-on changes the Klaviyo total-cost calculation for any store seriously evaluating it.
 
 <AffiliateButton tool="klaviyo" cta="Try Klaviyo free" />
 
@@ -105,4 +132,4 @@ The catch is that we'd switch the moment that ratio drops below 5×. Klaviyo isn
 Importing your entire historical contact list including suppressed and unengaged contacts. Klaviyo bills based on **total** contacts — suppressed counts. Re-engage or hard-delete your 2-year-stale contacts before you import. We burned ~$80/mo for two months before we caught it.
 </Callout>
 
-We'll re-test Klaviyo at the 6-month and 12-month mark and update this review when the bill, AI feature set, or Shopify integration changes materially. Last updated: May 2026.
+We'll re-test Klaviyo at the 6-month and 12-month mark and update this review when the bill, AI feature set, or Shopify integration changes materially. Last updated: 2026-05-26.

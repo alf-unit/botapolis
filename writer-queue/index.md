@@ -20,9 +20,10 @@ If the queue is empty, ping CHIEF in Telegram: "queue empty — assign next prio
 1. `priority/NNN-slug.md` — primary keyword — cluster — target YYYY-MM-DD
 -->
 
-1. `pending/007-klaviyo-vs-omnisend.md` — klaviyo vs omnisend — klaviyo — target 2026-05-28 — **ready-to-write** (research linked, Klaviyo side covered; verify Omnisend pricing on visit)
-2. `pending/006-loox-vs-judge-me.md` — loox vs judge me — reviews-ugc — target 2026-05-30 — **research-blocked** (Block B paste-ready prompt inside packet; one research unblocks 006 + 008)
-3. `pending/008-judge-me-review.md` — judge me review — reviews-ugc — target 2026-05-30 — **research-blocked** (shares research with 006)
+1. `pending/006-loox-vs-judge-me.md` — loox vs judge me — reviews-ugc — target 2026-05-30 — **research-blocked** (Block B paste-ready prompt inside packet; one research unblocks 006 + 008)
+2. `pending/008-judge-me-review.md` — judge me review — reviews-ugc — target 2026-05-30 — **research-blocked** (shares research with 006)
+
+> Both pending packets are research-blocked. To unblock: copy Block B from packet 006 into Claude.ai Web Chat (Deep Research mode), save output to `/research/2026-MM-DD-reviews-ugc-loox-judge-me.md`, then update both packets' `research_file` frontmatter.
 
 ## In progress
 
@@ -32,6 +33,7 @@ _None._
 
 ## Recently done (last 10)
 
+- 007-klaviyo-vs-omnisend.md — 2026-05-28
 - 005-klaviyo-pricing.md — 2026-05-28
 - 002-klaviyo-review-refresh.md — 2026-05-27
 - 004-gorgias-review-refresh.md — 2026-05-27
@@ -43,8 +45,8 @@ _None._
 
 ## Counts
 
-- pending: 3
-- done: 5
+- pending: 2
+- done: 6
 - archive: 0
 
 _Updated by after-publish.sh on each packet move (formerly OPS-managed; see Phase 3 finding 2026-05-26)._

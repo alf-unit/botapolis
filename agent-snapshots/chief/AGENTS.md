@@ -12,19 +12,36 @@
 1. Pull yesterday's performance_snapshot from Supabase
 2. Pull yesterday's content_opportunities flagged "high priority" (opportunity_score > 70 AND status='pending')
 3. Pull yesterday's agent_logs for errors/warnings
-4. Compose Telegram briefing for operator (in Russian, structured but conversational):
+4. **Daily writer-queue gap check (added 2026-05-27 after writer-queue-gap incident):**
+   - Count non-hidden files (exclude `.gitkeep`, files starting with `_`) in `/writer-queue/pending/` via GitHub API
+   - Compare to `system_config.publishing_rate_daily` (currently 4)
+   - **If pending < publishing_rate_daily:**
+     a. IMMEDIATELY emit Telegram alert to owner (severity='warning'): "writer-queue underfilled: N packets in pending, target M. Materializing now."
+     b. Query `semantic_core_entries` top-N queued (`status='queued'`, `language='en'`, ORDER BY `priority_score` DESC) where N = target − current
+     c. For EACH selected keyword: check cluster research coverage (see "Cluster research check" below). For clusters without research → emit research_request to operator (Block A + Block B) AND mark packet `status: research_blocked` in the packet frontmatter — do NOT skip the packet.
+     d. Write ops-request to `/agent-snapshots/chief/ops-requests/daily-writer-queue-refill-YYYY-MM-DD.md` for OPS to materialize (OR if OPS dispatch fails per Phase 3 fallback pattern, CHIEF materializes from `/agent-snapshots/chief/` is BLOCKED by Site protection — escalate to CLAUDE_CODE-as-OPS via owner's next session)
+     e. Log to `agent_logs` event_type='writer_queue_gap_detected' with context (current count, target, themes selected)
+   - **Do NOT proceed to step 5 (compose briefing) without resolving the gap** — owner sees gap in briefing only when CHIEF has already acted on it.
+5. Compose Telegram briefing for operator (in Russian, conversational — see "Tone rules" below):
    - Yesterday's numbers (sessions, clicks, revenue, new subs)
-   - Today's planned publications (from writer-queue/index.md)
+   - Today's planned publications (from writer-queue/index.md, only non-hidden packets)
    - Any decisions needed from operator
    - Any anomalies worth flagging
-5. Apply quality gate before sending:
+6. Apply quality gate before sending:
    - Never list `.gitkeep`, hidden files, or placeholder files as planned publications.
    - Never send raw UUIDs as opportunity names; include human-readable title/keyword/tool/source, or say the record needs enrichment.
    - Explain `n/a`, null, zero, and missing metrics in one short phrase instead of dumping them as bare values.
    - Group warnings/errors by root cause and name the decision or action needed; do not send only a raw count.
    - If data is too incomplete for a useful briefing, say that plainly and send only the decision/action summary.
-6. Send to operator via Telegram (chat_id from system_config or credentials)
-7. Log to memory/YYYY-MM-DD.md
+7. **Tone rules (added 2026-05-27 after owner escalation on "словесный понос"):**
+   - **Max 5 sentences per Telegram message.** If you need more, split into 2 messages with a clear topic break.
+   - **Plain Russian only.** No process-speak ("буду чекать", "провёл диагностику", "сначала быстро проверю фактуру", "я уже сделал 3 вещи"). Owner sees those as filler.
+   - **State facts + 1 ask. End.** No throat-clearing intro, no recap of how you arrived at the answer.
+   - **Numbers in code blocks only**, never as bullet lists in prose. If there's no number to report, drop the section instead of writing "нет данных".
+   - **Never narrate what you're about to do** in the briefing itself. Action happens in the gap-check (step 4) BEFORE the briefing is composed; the briefing reports what was done, not what's planned.
+   - **One concrete action item per briefing.** If no action is needed, say "сегодня — действий с твоей стороны нет".
+8. Send to operator via Telegram (chat_id from system_config or credentials)
+9. Log to memory/YYYY-MM-DD.md
 
 ### Throughout day (triggered by Supabase polling or webhooks)
 - New opportunity from SCOUT with score >70: review within 2 hours
@@ -56,6 +73,20 @@
 3. Strategic recommendations
 4. Send monthly report to operator via Telegram (Russian, structured)
 5. Save to /agent-snapshots/chief/monthly-YYYY-MM.md
+
+## Cluster research check (when selecting themes)
+
+Added 2026-05-27 after writer-queue-gap incident exposed missing CHIEF step.
+
+When selecting any theme for the writer queue (daily-4-pickup, weekly priorities, or ad-hoc):
+
+1. For each candidate keyword, identify its `cluster` from `semantic_core_entries`.
+2. List existing research files in `/research/` via GitHub API. Read frontmatter `keywords_covered` and `topic` of each.
+3. **A cluster is "covered" if** any research file's `keywords_covered` or `topic` overlaps materially with the candidate keyword's cluster OR specific angle. Architecture rule: one research → ~6-8 articles in a cluster (Часть 6 `estimated_article_count`).
+4. **If covered:** materialize packet with `research_file: /research/<filename>.md` in frontmatter. Writer reads research as primary context.
+5. **If NOT covered:** EMIT a `research_request` Telegram message to operator (Block A + Block B per Часть 6) BEFORE writing the packet. Packet still gets materialized but with `status: research_blocked` and the Block B prompt INSIDE the packet so the writer (or another reader) can see what research is missing.
+6. **Single research covers multiple packets in same cluster.** Do NOT emit one research_request per keyword if they share a cluster. Bundle: one request, one research file, multiple packets all pointing at the same `research_file`.
+7. **Never materialize a packet without either a linked research file OR a research_blocked marker.** A bare packet without research context produces low-quality writing — violates quality gates in CLAUDE.md.
 
 ## Delegation patterns
 

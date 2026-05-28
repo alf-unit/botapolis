@@ -5,6 +5,16 @@
 2. Check Supabase `agent_logs` for recent OPS errors (last 24h, severity in ('error','critical'))
 3. Check `/agent-snapshots/chief/ops-requests/` via GitHub API for special tasks
 4. Check `/agent-snapshots/chief/priorities-YYYY-WNN.md` — if current-week file appeared since last check, process it
+5. **Daily writer-queue gap check (added 2026-05-27 after writer-queue-gap incident):**
+   - Count non-hidden files (exclude `.gitkeep`, files starting with `_`) in `/writer-queue/pending/` via GitHub API
+   - Pull target from `system_config.publishing_rate_daily` (currently 4)
+   - **If pending count < target AND no fresh priorities/ops-request awaits processing:**
+     a. Pull `semantic_core_entries` top-N queued (`status='queued'`, `language='en'`, ORDER BY `priority_score` DESC) where N = target − current
+     b. For each selected keyword: list `/research/` via GitHub API and check coverage (see "Research-coverage decision" in Task packet generation below)
+     c. Materialize packets per "Task packet generation" flow (research-linked OR research_blocked with paste-ready Block B inside)
+     d. Update `/writer-queue/index.md`
+     e. Log to `agent_logs` event_type='writer_queue_auto_refill', severity='info', with context (themes picked, research coverage status)
+   - **Do NOT wait for CHIEF priorities-WNN.md if the queue is empty.** This step is the safety net: CHIEF priorities are the primary input, semantic_core top-priority is the fallback.
 
 ## Standard data flows
 
@@ -98,20 +108,29 @@ Note: Phase-1 launch may run with only the integrations that actually have crede
 
 Background: discovered 2026-05-22 that 4-5 deployments silently failed due to a TypeScript error in `scripts/validate-infra.ts` (unused `@ts-expect-error` directive). Without OPS monitoring this could continue undetected for weeks. Vercel notifications are not configured at platform level — OPS is the safety net via GitHub HEAD vs `last_deployed_sha` comparison.
 
-### Task packet generation (when CHIEF assigns priorities)
-Triggered when CHIEF writes `/agent-snapshots/chief/priorities-YYYY-WNN.md`.
+### Task packet generation (when CHIEF assigns priorities OR daily gap check fires)
+Triggered when CHIEF writes `/agent-snapshots/chief/priorities-YYYY-WNN.md` OR when "Daily writer-queue gap check" (Every session step 5) selects keywords from `semantic_core_entries`.
 
-For each keyword in priority list:
+For each keyword:
 1. Pull `semantic_core_entries` record (full data)
 2. Pull associated tool(s) data from Supabase
-3. Pull research file if exists in `/research/[topic].md` via GitHub API
+3. **Research-coverage decision (added 2026-05-27):**
+   - List all files in `/research/` via GitHub API
+   - For each, read frontmatter `keywords_covered` and `topic`
+   - **Match if:** candidate keyword's `cluster` matches an existing research's topic cluster OR an entry in `keywords_covered` matches the keyword (or close synonym). Architecture rule: one research → ~6-8 articles per Часть 6 `estimated_article_count`.
+   - **If matched:** packet frontmatter `research_file: /research/<filename>.md`, status defaults to ready-to-write.
+   - **If NOT matched:**
+     - Packet frontmatter `research_file: /research/TBD-<cluster>-<slug>.md` AND `status: research_blocked`
+     - Inside packet body include BOTH Block A (operator-facing summary) AND Block B (paste-ready Web Chat prompt) per Часть 6
+     - Bundle: if multiple keywords in this batch share a cluster, ONE Block B covers all — packets cross-reference each other
+     - Log to `agent_logs` event_type='research_request_emitted' severity='info' so CHIEF can pick it up for the next Telegram briefing
 4. Pull screenshots list from Supabase Storage
 5. Pull related articles for internal-linking suggestions (`semantic_core_entries` WHERE cluster=<current> AND status='published')
-6. Compose task packet per template in `/writer-queue/_template.md`
-7. Write to `/writer-queue/pending/[priority]-[slug].md` via GitHub API
-8. Update `semantic_core_entries.status='in_writer_queue'` and `writer_packet_path`
-9. Update `/writer-queue/index.md` (append new entry at top)
-10. Log to `agent_logs`
+6. Compose task packet per template in `/writer-queue/_template.md` (see also Phase 3 reference packet `/writer-queue/done/003-klaviyo-vs-mailchimp.md` for full-quality example)
+7. Write to `/writer-queue/pending/[NNN]-[slug].md` via GitHub API (NNN = next available 3-digit prefix)
+8. Update `semantic_core_entries.status='in_writer_queue'`, set `writer_packet_path` and (if matched) `research_file_path`
+9. Update `/writer-queue/index.md` Next up section (flag each entry as ready-to-write OR research-blocked)
+10. Log to `agent_logs` event_type='task_packet_created' with research-coverage status in context
 
 ### Refresh candidate identification (weekly Friday 10:00 America/Los_Angeles)
 1. Query `performance_snapshots` for pages with:

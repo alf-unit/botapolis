@@ -20,8 +20,10 @@ If the queue is empty, ping CHIEF in Telegram: "queue empty — assign next prio
 1. `priority/NNN-slug.md` — primary keyword — cluster — target YYYY-MM-DD
 -->
 
-1. `pending/004-gorgias-review-refresh.md` — gorgias review refresh — gorgias — target 2026-05-28
-2. `pending/002-klaviyo-review-refresh.md` — klaviyo review refresh — klaviyo — target TBD
+1. `pending/005-klaviyo-pricing.md` — klaviyo pricing — klaviyo — target 2026-05-28 — **ready-to-write** (research linked)
+2. `pending/007-klaviyo-vs-omnisend.md` — klaviyo vs omnisend — klaviyo — target 2026-05-29 — **ready-to-write** (research linked, Klaviyo side covered; verify Omnisend pricing on 2026-05-27)
+3. `pending/006-loox-vs-judge-me.md` — loox vs judge me — reviews-ugc — target 2026-05-30 — **research-blocked** (Block B paste-ready prompt inside packet; one research unblocks 006 + 008)
+4. `pending/008-judge-me-review.md` — judge me review — reviews-ugc — target 2026-05-30 — **research-blocked** (shares research with 006)
 
 ## In progress
 
@@ -41,7 +43,7 @@ _None._
 
 ## Counts
 
-- pending: 0
+- pending: 4
 - done: 4
 - archive: 0
 

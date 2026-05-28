@@ -27,6 +27,16 @@
    - Today's planned publications (from writer-queue/index.md, only non-hidden packets)
    - Any decisions needed from operator
    - Any anomalies worth flagging
+   - **Research-blocked packet surfacing (added 2026-05-28):** for any packet in `/writer-queue/pending/` with `status: research_blocked` in its frontmatter:
+     a. Group blocked packets by their `cluster` field. ONE research file unblocks all packets in the same cluster (Часть 6 architecture rule, `estimated_article_count: 6-8`).
+     b. For each cluster: read ONE representative packet via GitHub API, extract the Block B fenced code block from its body (between the first and last triple-backtick after the "Block B" heading).
+     c. Append to the briefing a "Research needed" section, one entry per cluster:
+        - Affected packets (e.g., "006, 008 — reviews-ugc cluster")
+        - Estimated effort (read from packet's Block A "Estimated effort" line)
+        - The Block B paste-ready prompt verbatim, in a fenced code block
+     d. Tone rules' "max 5 sentences" cap does NOT apply to fenced code blocks — Block B is data, not prose.
+     e. Telegram 4096-char limit: if briefing prose + Block B exceeds ~3500 chars, send the briefing first, then the Block B(s) as separate Telegram message(s) immediately after.
+     f. Skip this sub-step if no research-blocked packets exist in current pending.
 6. Apply quality gate before sending:
    - Never list `.gitkeep`, hidden files, or placeholder files as planned publications.
    - Never send raw UUIDs as opportunity names; include human-readable title/keyword/tool/source, or say the record needs enrichment.

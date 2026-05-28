@@ -1,0 +1,197 @@
+---
+title: "Klaviyo vs Omnisend in 2026: MCP, Customer Agent & the sub-25k math"
+description: "Klaviyo vs Omnisend for Shopify stores under 25k contacts in 2026 — AI feature delta (MCP vs Customer Agent), active-profiles vs subscribed-contacts billing, and a segmented verdict by list size. Pricing verified 2026-05-26."
+slug: klaviyo-vs-omnisend
+locale: en
+template: vs-comparison
+datePublished: 2026-05-27
+dateModified: 2026-05-27
+author: editorial
+tools:
+  - klaviyo
+  - omnisend
+primaryKeyword: "klaviyo vs omnisend"
+relatedKeywords:
+  - "klaviyo or omnisend"
+  - "omnisend vs klaviyo shopify"
+  - "klaviyo vs omnisend pricing"
+  - "klaviyo vs omnisend mcp"
+  - "klaviyo vs omnisend ai"
+verdict:
+  winner: it-depends
+  best_for_a: "Shopify stores at 5k+ contacts that need ecommerce automation depth, predictive analytics, and Customer Agent's email-attributed conversation handling."
+  best_for_b: "Sub-5k stores that want cheaper email math, faster setup, and the MCP/ChatGPT integration without paying Klaviyo's active-profile premium."
+faq:
+  - q: "Is Omnisend cheaper than Klaviyo at 5,000 contacts?"
+    a: "At list-size parity, yes — Omnisend Standard runs roughly $51/mo at 5,000 contacts (verify on omnisend.com/pricing 2026-05-26), Klaviyo Email is closer to $100/mo at the same band. The denominator is different though — Omnisend bills on subscribed contacts only, Klaviyo on all active profiles (anyone who opened, clicked, or purchased within ~365 days). On the same store, Klaviyo's denominator can be 30–50% larger before any list growth."
+  - q: "What is Omnisend's MCP integration and how does it compare to Klaviyo Customer Agent?"
+    a: "Omnisend introduced an MCP (Model Context Protocol) integration in 2026 that lets ChatGPT and other compatible AI clients query the store's Omnisend data conversationally — segment lookups, campaign suggestions, performance queries. Klaviyo's Customer Agent ($200/mo from April 1, 2026) is a different product line — it handles conversational customer-facing interactions (order status, FAQ, returns), not operator-facing analytics. Verify each vendor's published scope on omnisend.com/features and klaviyo.com/customer-agent before deciding."
+  - q: "Which one wins on Shopify integration depth?"
+    a: "Klaviyo. Real-time bidirectional sync of orders, products, customers, browse, cart, and checkout events with full event payloads — the level of detail that lets you build 'viewed product in collection X but did not buy within 72 hours' segments without custom code. Omnisend's Shopify integration is solid but lighter on event granularity — adequate for newsletter-style segmentation, less so for behavioral ecommerce flows."
+  - q: "Can I migrate between the two?"
+    a: "Contacts and basic templates export cleanly via CSV/JSON from either platform. What does not migrate: automation logic (rebuild from scratch), segment definitions (semantics differ), engagement history, predictive scores (Klaviyo) or scoring rules (Omnisend). Expect a 1–2 week deliverability ramp on the new platform if you're moving more than 5k contacts."
+  - q: "Will my bill be lower if I switch from Klaviyo to Omnisend?"
+    a: "Almost certainly at sub-15k contacts, especially if your Klaviyo bill is being inflated by dormant active profiles. Most stores see a 30–50% monthly bill drop. The trade-off is capability — multi-step ecommerce flows in Omnisend require manual rebuild and the segmentation depth is shallower."
+  - q: "Why is Omnisend on this list and not Postscript or Drip?"
+    a: "Postscript is an SMS-first stack (different category); Drip exists but is a much smaller share of Shopify-store mindshare in 2026. Omnisend is the most-considered Klaviyo alternative for sub-25k Shopify operators per SERP analyses; it competes directly on price-per-contact while pitching MCP/AI as the 2026 differentiator."
+schema:
+  type: ComparisonArticle
+---
+
+> **TL;DR.** For Shopify stores under 25,000 contacts in 2026, the answer splits on what you're optimizing. **Pick Omnisend** if you want cheaper math, faster setup, and the new MCP/ChatGPT integration — typical sub-5k stores save 30–50% per month vs Klaviyo. **Pick Klaviyo** if you need ecommerce flow depth (browse abandonment, post-purchase product recommendations, predicted CLV), or if you're already paying for support and want Customer Agent's email-attributed conversation handling. The April 1, 2026 Customer Agent jump from $140 to $200 doesn't change this — it's a separate $200/mo add-on, not a baseline price bump.
+
+## Quick verdict
+
+| | Klaviyo | Omnisend |
+|---|---|---|
+| **Free tier (verified 2026-05-26)** | 250 active profiles / 500 emails / 150 SMS credits | 250 contacts / 500 emails / 60 SMS credits |
+| **Paid entry tier at 500 contacts** | $20/mo (Email plan) | $16/mo (Standard) |
+| **Paid at 5,000 contacts** | ~$100/mo (Email plan) | ~$51/mo (Standard) |
+| **Billing dimension** | All active profiles (anyone active in ~365 days) | Subscribed contacts only |
+| **AI flagship (2026)** | Customer Agent — $200/mo add-on for shopper conversations | MCP — conversational AI access to store data, no separate price |
+| **Multi-step automation depth** | 80+ pre-built ecommerce flows on Email plan | Strong on Standard; lighter on conditional splits |
+| **Shopify integration** | Real-time, bidirectional, event-rich | Real-time, lighter event payload |
+| **Best for** | 5k+ contact stores with ecommerce flow needs | Sub-5k stores wanting cheaper math + AI access |
+
+## Pricing showdown
+
+Both vendors moved their pricing in 2026, and the differences matter more than the headline numbers.
+
+### Klaviyo (verified 2026-05-26 via klaviyo.com/pricing + cross-referenced research)
+
+| Plan | 500 contacts | 1,500 contacts | 5,000 contacts | 15,000 contacts | 25,000 contacts |
+|---|---|---|---|---|---|
+| Free | $0 (250 cap) | n/a | n/a | n/a | n/a |
+| Email | $20 | ~$45 | ~$100 | ~$245 | ~$385 |
+| Email + SMS (+$15 base) | $35 | ~$60 | ~$115 | ~$260 | ~$400 |
+| Customer Agent add-on | +$200 (post-April-1) | +$200 | +$200 | +$200 | +$200 |
+
+Klaviyo pricing notes:
+- **Feature parity across every paid tier** — you don't unlock new features by paying more; price scales only with active profile count.
+- **February 18, 2025: active-profiles billing.** Klaviyo shifted from billing on "profiles you email" to "all active profiles" (anyone active in roughly the last 365 days). Dormant subscribers count.
+- **April 1, 2026: Customer Agent regular pricing.** Introductory $140/mo replaced by $200/mo regular rate. Separate from Email plan — can be skipped entirely.
+- **Klaviyo One mandatory above $10,000/mo standard spend** — adds 20% to the bill. Doesn't apply at sub-25k contacts unless heavy SMS usage.
+
+For the full pricing story on Klaviyo, see the [Klaviyo pricing breakdown](/reviews/klaviyo-pricing).
+
+### Omnisend (verified 2026-05-26 via omnisend.com/pricing + research cross-reference)
+
+| Plan | 500 contacts | 2,500 contacts | 5,000 contacts | 15,000 contacts | 25,000 contacts |
+|---|---|---|---|---|---|
+| Free | $0 (250 contacts cap) | n/a | n/a | n/a | n/a |
+| Standard | $16 | ~$35 | ~$51 | ~$160 | ~$285 |
+| Pro (SMS bundled) | $59 | ~$95 | ~$135 | ~$305 | ~$420 |
+
+Omnisend pricing notes:
+- **Subscribed-contacts billing.** Only contacts who actively opted in to marketing count. Unsubscribed and bot contacts are excluded — denominator stays smaller than Klaviyo's "active profiles".
+- **SMS bundled on Pro** vs Klaviyo's per-message overage model. For high-SMS senders, Omnisend Pro can pencil out cheaper than Klaviyo Email + SMS at the same band.
+- **MCP integration** — Omnisend's 2026 differentiator. Lets ChatGPT and other compatible AI clients query the Omnisend account conversationally. No separate cost.
+- No equivalent of Klaviyo One's surcharge at higher tiers.
+
+### Real-world cost delta at 5,000 contacts
+
+A typical sub-15k Shopify store carries ~30% dormant-but-active-by-Klaviyo's-definition profiles (no sunset flow, list growth from acquisitions a year+ ago that never re-engaged). So a 5,000-subscribed-contacts store on Omnisend is closer to 6,500 active profiles on Klaviyo. That widens the apparent delta:
+
+- **Omnisend Standard at 5,000 subscribed:** ~$51/mo
+- **Klaviyo Email at ~6,500 active profiles:** ~$120/mo
+
+Net: roughly 2.4× more on Klaviyo for the same actual subscriber base, before any Customer Agent or Klaviyo One add-ons. Aggressive list hygiene on Klaviyo (sunset flows, suppression sweeps) closes that gap to ~$100/mo — still about 2× Omnisend.
+
+## The 2026 AI feature delta
+
+This is the part most "Klaviyo vs Omnisend" comparisons still get wrong by treating it as a vendor-equivalence issue. The two products solve different problems.
+
+**Omnisend MCP (Model Context Protocol).** Operator-facing. Connect ChatGPT (or any MCP-compatible AI client) to your Omnisend account, then ask in natural language: "show me my best-performing campaign last quarter and suggest a follow-up to the 10% of subscribers who clicked but didn't buy". The AI queries the live data. Use cases: campaign post-mortems, segment ideation, performance debugging without clicking through five reports. Verify the actual current scope on omnisend.com/features 2026-05-26 — what MCP exposes evolves as Omnisend ships new endpoints.
+
+**Klaviyo Customer Agent.** Shopper-facing. Handles conversational interactions with your customers — order status queries, FAQ answers, return initiation. Routes to a human on complex disputes or complaints. The closest analog isn't another email tool's AI — it's Gorgias or Intercom's chatbot tier. Price: $200/mo regular (from April 1, 2026), separate from the Email plan.
+
+A 5,000-contact store running both products would pay ~$51/mo Omnisend Standard (with MCP included) + nothing else for AI; on Klaviyo, ~$100/mo Email plus +$200/mo Customer Agent = $300/mo total. Different value propositions, very different price points.
+
+**Which one matters for you depends on whether you're solving an analytics problem or a support-volume problem.** They're not substitutes.
+
+## Feature comparison
+
+**Automations and flows.** Klaviyo's depth is in the 80+ pre-built ecommerce flow templates — welcome, abandoned cart, browse abandonment, post-purchase, win-back, price drop, back-in-stock, replenishment — with conditional splits, A/B within flows, and dynamic wait times. Omnisend covers the headline flows (welcome, cart, browse, post-purchase) on Standard but the conditional logic is shallower; multi-branch decision trees that Klaviyo handles natively often require Omnisend Pro plus manual setup.
+
+**Segmentation.** Klaviyo: unlimited conditions per segment on Email plan; predicted CLV, churn risk, next purchase date, behavioral filters. Omnisend: solid demographic + engagement + purchase-history segmentation on Standard; predictive segmentation is lighter than Klaviyo's. The practical test: can you build a segment like "viewed product in collection X in the last 14 days, predicted CLV >$200, hasn't purchased in 60 days"? Klaviyo yes. Omnisend, partially — the predictive CLV piece is the gap.
+
+**Shopify integration.** Both are real-time-native. Klaviyo's edge is event granularity — every `Placed Order`, `Started Checkout`, `Viewed Product` populates as a discrete profile event with full payload, which is what enables the rich segmentation above. Omnisend's integration syncs customers, products, and orders cleanly but with lighter event metadata. For broadcast-newsletter use cases, neither edge matters. For behavioral flows, Klaviyo's depth shows up.
+
+**Deliverability.** Both adequate at sub-25k volume. Klaviyo recommends dedicated sending-domain setup past 5,000 active profiles; Omnisend handles deliverability on shared IPs through 50,000 contacts with no friction reports in 2026 operator threads. SPF/DKIM/DMARC setup is comparable.
+
+**SMS.** Omnisend Pro bundles SMS credits into the monthly plan; Klaviyo charges per-message overage on top of the +$15 SMS plan add-on. For stores doing meaningful SMS volume (>1,000 sends/mo), Omnisend Pro can be the cheaper option.
+
+**Support.** Klaviyo: email and chat support, with reported queue times of 6–24 hours on the lower tiers. Omnisend: 24/7 email and chat across all paid tiers, including Standard. Premium support tier on Klaviyo One only.
+
+## What operators actually say
+
+Per the [klaviyo-vs-mailchimp research file](/research/2026-05-26-klaviyo-vs-mailchimp.md), the most-cited operator pain on Klaviyo is the billing model:
+
+> Pricing represents one of the most significant differentiators between Klaviyo and Mailchimp... Klaviyo's pricing increases proportionally with subscriber count, which can become expensive as your list grows. Reddit users frequently mention that while the platform delivers exceptional value for e-commerce businesses, the cost can be prohibitive for smaller companies or those with large but less engaged subscriber lists.
+>
+> — Nudgify (citing Reddit aggregate sentiment), 2026
+
+> Just checked my Klaviyo bill and I'm honestly mad at myself. Been paying for 50K+ profiles when maybe 15K actually give a [expletive] about my emails.
+>
+> — Shopify Community forum, 2025
+
+An Omnisend employee on the Klaviyo billing shift (bias disclosed — competing-ESP source):
+
+> Klaviyo pricing uses active profiles in 2026, a change introduced in February 2025 to move away from the number of profiles you email, in line with most other tools. Its Email plan costs $20/month for 500 contacts and 5,000 emails. The move to active profiles raised costs for many businesses and made list hygiene a non-negotiable activity to keep costs in check.
+>
+> — Milda Bernatavičiūtė, Omnisend (May 15, 2026)
+
+The honest framing on the third-party pricing analyses: every comparison article you'll find about Klaviyo from Omnisend, Mailsoftly, Retainful, EmailToolTester, and similar sites is by a competing ESP. The bias direction is consistent — Klaviyo's pricing is critiqued, often fairly. The exception is Hustler Marketing (Klaviyo Elite Partner), which leans the other way.
+
+For a non-vendor framing of when Klaviyo wins, see the [full Klaviyo review](/reviews/klaviyo-review-2026).
+
+## Where the comparison gets weak
+
+Two things this article cannot honestly verify:
+
+1. **MCP operator outcomes are still thin.** The MCP integration shipped in 2026 and verifiable operator case studies at scale don't yet exist on r/shopify, G2, or Reddit. We've described the integration's scope per Omnisend's own docs — the actual "MCP saved us 4 hours/week on reporting" type claims aren't verified anywhere we trust.
+2. **Customer Agent operator outcomes are vendor-sourced.** Klaviyo's Customer Agent product is similarly new (rolled out into 2026 alongside K:AI Marketing Agent). Independent operator reports on the $200/mo price point's actual L1-deflection rate aren't established. Anyone publishing specific "Customer Agent saved us $X/mo" numbers in May 2026 is citing vendor case studies or speculating.
+
+If your decision hinges on either AI feature's real-world ROI, ask both vendors for current customer references in your contact-size band before committing.
+
+## Migration cost (either direction)
+
+What moves cleanly:
+- Contact CSV with subscription status and basic engagement metadata (last open date, last click date).
+- Campaign templates as static HTML (visual styling may break — both platforms use proprietary block systems).
+- Suppression lists.
+
+What does not move:
+- Automation logic (rebuild from scratch on the target platform).
+- Segment definitions (the underlying schemas differ — predicted-CLV segments on Klaviyo have no direct Omnisend equivalent).
+- Engagement scores or predictive labels.
+- Consent history beyond opt-in date.
+
+Expected timeline: 1–2 weeks at sub-10k contacts including deliverability warm-up; 3–4 weeks at 10–25k. The warm-up matters — both platforms will throttle new accounts during the first send batches to protect IP reputation.
+
+## Our recommendation
+
+**Choose Omnisend if:**
+- You're under 5,000 active subscribers and want predictable cheaper math.
+- You'd actually use MCP — meaning you want ChatGPT-style queries against your own marketing data.
+- You send meaningful SMS volume and want bundled credits, not per-message overage.
+- You're optimizing for fast setup and adequate (not category-leading) ecommerce flows.
+
+**Choose Klaviyo if:**
+- You're past 5,000 active profiles AND your list is generating revenue at $0.80+ per subscriber per month.
+- You need browse abandonment, predicted CLV, or any behavioral flow that hinges on event-level granularity.
+- You're already paying $300+/mo on support and Customer Agent's $200/mo would replace equivalent VA or helpdesk spend.
+- You want a single platform that scales from 5k to 250k contacts without changing tools.
+
+**Tie-breaker (the one thing that flips the decision).** If your list has a significant dormant-but-not-suppressed segment, Klaviyo's active-profile billing is going to surprise you. Until you've run list hygiene (sunset flows, suppression sweeps), Klaviyo's bill will look 30–50% higher than the headline tier suggests. If you don't want to commit to ongoing list hygiene as a recurring monthly task, Omnisend's subscribed-contacts denominator is the lower-stress choice — even at higher per-contact prices.
+
+## Alternatives worth considering
+
+- **Mailchimp** at sub-2k stores running newsletter-grade campaigns. The Essentials tier is genuinely cheaper. See [Klaviyo vs Mailchimp for sub-2k stores](/compare/klaviyo-vs-mailchimp) and the [Mailchimp review](/reviews/mailchimp-review-2026).
+- **Postscript** if your primary channel is SMS, not email — different category entirely. See the [Postscript review](/reviews/postscript-review-2026).
+
+<AffiliateButton tool="klaviyo" cta="Try Klaviyo free (250 active profiles)" />
+
+<AffiliateButton tool="omnisend" cta="Try Omnisend free (250 contacts)" />
+
+<AffiliateDisclosure />

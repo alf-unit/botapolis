@@ -465,3 +465,76 @@ CHIEF's утренний brief 2026-05-26 07:02 LA повторил "нет да
 - **OPS runtime model drift (gpt-5.5 vs spec Haiku 4.5)** cost reconciliation — pending первого месяца `agent_logs.cost_usd` данных.
 - **Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md** — carryover. Сегодня GSC adaptive-window logic осталась только в OPS AGENTS.md + programmer-request, не в архитектуре. Promote когда руки дойдут.
 - **TOOLS.md ↔ AGENTS.md drift prevention pattern** — applied только к OPS today. Stay alert for same anti-pattern в CHIEF + SCOUT.
+
+---
+
+## 2026-05-27 — writer-queue gap incident: 4 packets materialized + CHIEF/OPS spec patches + 2 articles shipped + AffiliateDisclosure drift closed
+
+### Commits
+
+- fix(writer-queue): close daily-pickup gap + spec patches for CHIEF/OPS
+- content(reviews): klaviyo pricing — Customer Agent jump + active-profiles trap
+- fix(content): add primaryKeyword to klaviyo-pricing + trim index Next up
+- content(comparisons): klaviyo vs omnisend — MCP, Customer Agent, sub-25k math
+- chore(writer-queue): move 007 pending→done + trim index Next up
+- spec(chief): morning brief surfaces Block B for research-blocked packets
+- fix(content): remove <AffiliateDisclosure /> from klaviyo-pricing
+- docs(content-writing): drop AffiliateDisclosure checklist line + track file
+
+### Задача
+
+Owner escalated 2026-05-27 22:37 LA after CHIEF's morning briefs were "словесный понос" and the daily 4-article pipeline had silently stopped: `writer-queue/pending/` empty (only `.gitkeep`), `writer-queue/index.md` stale, no fresh priorities. CHIEF's diagnostic in Telegram named one root cause (no daily-4-pickup rule); my verification surfaced two more (CHIEF→repo push instability, briefing tone not codified). Session pivoted mid-way into Content writing mode to actually publish off the new queue.
+
+### Сделано
+
+- **Verified CHIEF's facts + found two additional gaps.** `daily-writer-queue-gap-2026-05-27.md` he claimed to write was NOT in repo (he wrote to Mac Mini workspace, never pushed); `priorities-2026-W22.md` was stale (themes already executed); `writer-queue/index.md` "Next up" listed 002/004 as pending even though they were in `/done/`.
+- **Materialized 4 packets (005-008)** in `/writer-queue/pending/` from top semantic_core_entries by priority_score: klaviyo pricing (514, ready-to-write), loox vs judge me (420, research-blocked), klaviyo vs omnisend (375, ready-to-write), judge me review (343, research-blocked). One existing research file (`/research/2026-05-26-klaviyo-vs-mailchimp.md`) covers 005 + 007 (klaviyo cluster); reviews-ugc cluster needs a new research session — Block B paste-ready prompts embedded inside packets 006 + 008.
+- **Flipped `semantic_core_entries.status='in_writer_queue'`** for all 4 picked entries; linked `research_file_path` for 005 + 007; logged `agent_logs` event_type='writer_queue_recovery' with full context.
+- **CHIEF AGENTS.md — 2 patches** (synced to `ags/chf/AGENTS.md` for Mac Mini pickup):
+  1. Morning briefing step 4 — Daily writer-queue gap check (count non-hidden pending vs `publishing_rate_daily=4`; if short, immediately materialize from semantic_core top queued + emit research_request for clusters without research + log gap detection). Section "Cluster research check" added (one research → ~6-8 articles per Часть 6; never materialize packet without linked research OR research_blocked marker). Tone rules section added: max 5 sentences, plain Russian, no process-speak, numbers in code blocks only, one concrete action per brief.
+  2. Morning briefing step 5 sub-section — Research-blocked packet surfacing: when any packet in pending has `status: research_blocked` in frontmatter, group by cluster, read ONE representative packet's Block B via GitHub API, append to brief in fenced code block. Tone rules' 5-sentence cap explicitly does NOT apply to code blocks. Telegram 4096-char split spelled out.
+- **OPS AGENTS.md** — Every session step 5 added (daily gap check fires on every wake; if pending < target AND no fresh priorities/ops-request, auto-materialize from semantic_core top queued — same flow as CHIEF gap check but OPS-executed). Task packet generation extended with research-coverage decision branch (matched → link research file; not matched → research_blocked packet with paste-ready Block A+B inside, log `research_request_emitted` for CHIEF pickup).
+- **Owner restarted OpenClaw gateway** with both AGENTS.md files (first patch only; second CHIEF patch landed AFTER restart — needs re-sync, flagged in handoff).
+- **Switched to Content writing mode** mid-session. Shipped 2 articles (see writer-log block).
+- **Fixed 500 on `/reviews/klaviyo-pricing`** post-deploy: `<AffiliateDisclosure />` in MDX hit the runtime gap from `components/content/mdx-components.tsx:65` (only `Callout` / `ProsConsList` / `AffiliateButton` registered). Removed from EN + RU MDX; ArticleHero's `showAffiliateNotice` already renders the FTC notice upstream.
+- **Closed AffiliateDisclosure doc drift permanently:** deleted line 206 of `CONTENT-WRITING.md` ("AffiliateDisclosure component на любой странице с /go/ ссылками") AND brought the file under git tracking. Was untracked since at least session start — flagged in writer-log 2026-05-20 as open follow-up, finally addressed.
+- **Sync log artifacts:** `priorities-2026-W22.md` rewritten with today's themes + research-dependency call-out; `writer-queue/index.md` Next up trimmed + Counts recomputed via `after-publish.sh`; 2 memory notes added (publish-direct-urls, affiliate-disclosure-drift).
+
+### Обнаружено
+
+- **CHIEF's morning brief tone wasn't codified — only fact-correctness was.** Pre-patch AGENTS.md had a quality gate (no `.gitkeep`, no raw UUIDs, explain `null`/`zero`, group warnings by root cause) but no rule about prose length, plain language, no process-speak. Robot text passed the fact gate and shipped as словесный понос. New tone rules section codifies "max 5 sentences, plain Russian, no buy-time phrases like 'буду чекать', state facts + 1 ask".
+- **CHIEF→repo push is async.** CHIEF can write to Mac Mini workspace (memory/, etc.) without pushing to GitHub. OPS reads ops-requests via GitHub API — so CHIEF's "I wrote the ops-request" can be true on Mac Mini but invisible to OPS. The daily-writer-queue-gap-2026-05-27.md file CHIEF claimed today never landed in repo. Worth surfacing in CHIEF AGENTS.md eventually as "any artifact OPS needs to consume → push immediately, not at end-of-turn".
+- **Weekly priorities + daily 4-pace are architecturally incoherent.** Priorities drop Monday 07:15 LA covering ~7 packets for the week; if those execute by Thursday, no mechanism adds new ones inside the week. Fixed via OPS auto-materialize-from-semantic-core fallback in this patch — OPS no longer waits for CHIEF priorities if pending count drops.
+- **post-commit hook requires `primaryKeyword:` in frontmatter** to flip `semantic_core_entries.status='published'`. Without it, webhook returns OK but silently no-matches (tried keyword match → empty; tried slug fallback → no `published_article_path` to match against). Affected 005 initially; fixed with follow-up commit. Deep-review template (`content-templates/deep-review.md`) doesn't include `primaryKeyword` in its frontmatter example — drift. Existing `klaviyo-review-2026.mdx` also lacks it (status never flipped via webhook, presumably set manually at some earlier point).
+- **`/compare/[slug]` page is DB-driven, MDX is dead-weight.** Confirmed today for klaviyo-vs-omnisend — committed MDX, webhook bridge attempted but returned `skipped=fetch_failed` (raw.githubusercontent.com CDN lag). Bridge would have only touched `updated_at` anyway because existing row from 2026-05-11 (Phase 3 finding pattern). Manually populated `public.comparisons.klaviyo-vs-omnisend (en)` with rich verdict + custom_intro + comparison_data JSONB matching the MDX content, then revalidated. Reinforces open follow-up #5: refactor /compare/[slug] to MDX-driven so authoring path and serving path are the same.
+- **content-validator.ts doesn't cover comparisons schema** (`[validate] no MDX targets — nothing to check.` for `content/comparisons/*.mdx`). Comparisons pass pre-commit unchecked. Minor gap to log.
+- **pre-commit translate-script supports only `--type=reviews|guides`** — comparisons committed today emitted "--type must be 'reviews' or 'guides'" warning. Hook intentionally swallows the failure (`continuing`) but RU twin for comparisons is never generated this way (and wouldn't matter since comparisons are DB-driven for both languages).
+- **`after-publish.sh` helper doesn't trim "Next up" section** in `writer-queue/index.md` — only updates "Recently done" + Counts. Trimmed manually both times today (005 → done, 007 → done). Possible helper improvement.
+- **`primaryKeyword` is the canonical match field**, not `slug`. Webhook tries keyword first (lowercase exact match on `semantic_core_entries.keyword`), then `slug`-fallback against `published_article_path`. The slug fallback is broken for unpublished entries (no path to match yet).
+
+### Fixes
+
+- **Daily 4-pickup rule** — CHIEF and OPS now both check pending count on every wake against `publishing_rate_daily`; if short, immediately materialize from top semantic_core queued + log explicit `writer_queue_gap_detected` / `writer_queue_auto_refill` event. No more silent pipeline stoppage.
+- **Cluster research check rule** — CHIEF must verify research coverage by cluster when selecting themes (not by keyword 1:1) and emit one research_request per cluster, not per keyword. Architecture rule from Часть 6 (`estimated_article_count: 6-8`) now explicit in AGENTS.md.
+- **Block B surfacing in morning brief** — second CHIEF patch ensures research-blocked packets aren't left languishing without owner being told the specific Web Chat action. Reads packet body via GitHub API, extracts Block B fenced code, appends to brief.
+- **Tone rules** — codifies max 5 sentences, plain Russian, no process-speak, numbers-in-code-blocks, one concrete action per brief. Prevents the словесный-понос pattern that triggered today's escalation.
+- **`<AffiliateDisclosure />` runtime crash** — removed from MDX (both committed klaviyo-pricing files + CONTENT-WRITING.md instruction); upstream notice via `ArticleHero showAffiliateNotice={true}` keeps FTC compliance.
+
+### Open follow-ups (priority order)
+
+- **#1 Owner re-syncs `ags/chf/AGENTS.md` → Mac Mini** for second CHIEF patch (Block B surfacing). Gateway restarted with first patch only — without re-sync the morning brief tomorrow gets gap check + tone rules but NOT Block B surfacing for 006/008.
+- **#2 Owner runs Block B from packet 006-loox-vs-judge-me.md in Web Chat** to unblock reviews-ugc cluster — one Deep Research session unblocks both 006 + 008. ~45-60 min.
+- **#3 Verify 2026-05-28 07:00 LA CHIEF brief** for tone + gap check + (if #1 done) Block B surfacing. Drift catches show up at first cron firing.
+- **#4 Add `primaryKeyword` to deep-review template frontmatter example** (`content-templates/deep-review.md`) so future writers don't repeat the webhook no-match. Trivial.
+- **#5 `after-publish.sh` helper improvement** — trim "Next up" in `writer-queue/index.md` on packet move, not just Recently done + Counts.
+- **#6 content-validator.ts schema coverage for comparisons** — currently "no MDX targets" on `content/comparisons/`. Minor.
+- **#7 CHIEF push discipline.** Codify in AGENTS.md: "any artifact OPS needs to consume (ops-requests/, priorities-*) → `git push` immediately, not at end-of-turn" — prevents the today incident pattern.
+- **Carryovers from prior sessions (unchanged):**
+  - `tools` table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at)
+  - `system_config.modified_by` CHECK constraint rejects agent values
+  - Capture SCOUT runtime AGENTS.md to `/agent-snapshots/scout/`
+  - Option B refactor `/compare/[slug]` MDX-driven (Option C bridge papers over)
+  - Newsletter ingestion via Beehiiv (HIGH carryover from 2026-05-22)
+  - OPS GPT-5.5 cost reconciliation (after first month of `agent_logs.cost_usd`)
+  - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md
+  - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT

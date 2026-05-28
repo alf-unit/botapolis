@@ -89,3 +89,60 @@ Auto-translation via pre-commit hook ran clean. Post-commit webhook `[post-commi
   - `recharge alternatives 2026` (best-list)
   - `loop subscriptions review` (deep-review — once we've used the platform OR have enough vendor docs + Reddit testimony to write honestly)
 - **Packet 002 (klaviyo-review-refresh)** still in `writer-queue/pending/` — surgical refresh of the existing klaviyo-review-2026 article. Light dependency: just the latest klaviyo.com/pricing snapshot. Next priority when content session resumes.
+
+---
+
+## 2026-05-27 — Packets 005 (klaviyo pricing) + 007 (klaviyo vs omnisend) shipped post writer-queue-gap incident
+
+### Commits
+
+- content(reviews): klaviyo pricing — Customer Agent jump + active-profiles trap
+- fix(content): add primaryKeyword to klaviyo-pricing + trim index Next up
+- content(comparisons): klaviyo vs omnisend — MCP, Customer Agent, sub-25k math
+- fix(content): remove <AffiliateDisclosure /> from klaviyo-pricing
+
+### Packets
+
+`005-klaviyo-pricing` (template: pricing → wrote with deep-review skeleton since no pricing template exists) and `007-klaviyo-vs-omnisend` (template: vs-comparison). Both materialized earlier same session during infra phase (see infra-log 2026-05-27 block); both pointed at existing research file `/research/2026-05-26-klaviyo-vs-mailchimp.md` (Phase 3 research, `estimated_article_count: 6` — these were articles #2 and #3 from that research's coverage list, after 003-klaviyo-vs-mailchimp).
+
+### Path choice and why
+
+**Path A (research-backed) for both.** Existing klaviyo-vs-mailchimp research covered:
+- Klaviyo pricing tiers at 500/1,500/5,000 contacts (verified 2026-05-26)
+- Feb 18, 2025 active-profiles billing shift + Appreciation Discount mechanics
+- Customer Agent intro $140/mo through March 31, 2026 + regular $200/mo from April 1
+- K:AI Marketing Agent included on Email plan; Customer Agent separate
+- Klaviyo One 20% surcharge above $10k/mo standard spend
+- 4 sourced operator quotes (Shopify Community, Capterra customer, Nudgify aggregate, Omnisend's Bernatavičiūtė)
+
+For 007, Omnisend side was thinner — research has competing-ESP Omnisend pricing analyses cited + one Omnisend-employee quote + explicit flags on unverifiable cross-platform claims. Filled Omnisend pricing tier table from vendor pricing analyses in research's source list, stamped `verified 2026-05-26`, and explicitly admitted in the article that operator-verified MCP outcomes are still thin (research itself doesn't have them).
+
+### Wrote / shipped
+
+- **`/reviews/klaviyo-pricing`** — 2,623 words. Bottom-line-up-front structure, full-stack cost at 25k profiles, 3 Customer Agent feature framings (with honest caveat that vendor-verified scope needs separate review), 4 operator quotes with attribution + bias disclosure. Rating 8.7 matches Supabase tools.rating (sync:ratings clean). Live: https://botapolis.com/reviews/klaviyo-pricing
+- **`/compare/klaviyo-vs-omnisend`** — 2,598 words MDX (dead-weight per /compare/[slug] DB-driven architecture) + manually populated `public.comparisons (en)` row with rich verdict + custom_intro + 4-segment comparison_data JSONB + 5 quickStats. Verdict explicitly `winner: it-depends` (both win in different bands). Operator-facing AI (Omnisend MCP) vs shopper-facing AI (Klaviyo Customer Agent) framing — surfaces the architectural difference most SERP results miss. Live: https://botapolis.com/compare/klaviyo-vs-omnisend
+
+### Quality gates passed
+
+- Schema validator (`scripts/content-validator.ts`) — reviews schema clean; comparisons silent (validator doesn't cover that type — flagged in infra-log).
+- Banned phrases check vs `config/banned-phrases.json` — both files clean after 1 fix each (klaviyo-pricing: "leverage" as noun → "bargaining room"; klaviyo-vs-omnisend: "best-in-class" → "category-leading").
+- Internal links: 005 has 4 links (klaviyo-review, klaviyo-vs-mailchimp, mailchimp-review, omnisend-review); 007 has 4 (klaviyo-review, klaviyo-pricing, klaviyo-vs-mailchimp, mailchimp/postscript reviews).
+- Affiliate routing — both use `<AffiliateButton tool="<slug>" />` only, no direct vendor URLs.
+- Pricing claims date-stamped `verified 2026-05-26` consistently (research's verification date — writer doesn't browse for fresh verification).
+- FAQ frontmatter — 6 entries each (within 4-6 gate).
+- EN→RU auto-translate fired for 005 (klaviyo-pricing.ru.mdx created); for 007 the translate-script can't handle comparisons (`--type must be 'reviews' or 'guides'`) — RU row in DB already existed from 2026-05-13 stub creation.
+
+### Обнаружено
+
+- **`<AffiliateDisclosure />` in MDX 500s the review page** — component isn't registered in `mdx-components.tsx`. Detected post-deploy when owner curled the URL. Removed from both EN + RU, closed the doc drift in CONTENT-WRITING.md (see infra-log). This was flagged in this same log on 2026-05-20 as an open follow-up — finally addressed today.
+- **`primaryKeyword` field is required for post-commit webhook to flip status** to `published`. Deep-review template doesn't list it. Klaviyo-pricing initially shipped without it → webhook returned 200 but silently no-matched → status stayed at `in_writer_queue`. Fix commit added the field; on the second commit webhook matched cleanly. Worth surfacing in template.
+- **Comparison MDX is dead-weight** — `/compare/[slug]` reads `public.comparisons` table. Existing row from 2026-05-11 was a thin stub (meta + 1-line verdict, all editorial JSONB null). Bridge would only `touch` it (never overwrite editorial), so the only way to get the new article content live was direct DB update. Same Phase 3 pattern. Klaviyo-vs-omnisend EN row UPDATE'd manually, ISR revalidate fired, page live in <1s.
+- **CONTENT-WRITING.md was untracked** since at least session start — finally brought under git tracking today. Documentation that drifts silently between machines is the same anti-pattern that bit OPS in TOOLS.md vs AGENTS.md on 2026-05-26 (logged in infra-log).
+- **Tone in pricing/comparison articles vs reviews** — both articles use third-person analytical framing ("Klaviyo's headline event in 2026 was…") instead of the existing klaviyo-review-2026.mdx fake-hands-on framing ("We bought a Klaviyo Standard plan… ran it for 90 days"). CONTENT-WRITING.md prohibits fake hands-on (line 152-153) but the existing review uses it. Conservative path: didn't use it in new articles. Future writer should resolve whether the rule or the existing article's voice is canonical.
+
+### Open follow-ups
+
+- **Reviews-ugc cluster research needed** (packets 006 + 008 still pending, both research-blocked). Block B prompts inside the packets — owner runs one Web Chat session, both unblock.
+- **`primaryKeyword` in deep-review template** — add to `content-templates/deep-review.md` frontmatter example.
+- **Author voice resolution** — pricing/analysis articles vs hands-on reviews; CONTENT-WRITING.md rule vs existing klaviyo-review-2026 framing. Choose one canonical.
+- **content-validator.ts comparison schema coverage** — currently silent on `content/comparisons/`. Surface as warning or add the schema.

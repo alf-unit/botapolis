@@ -20,10 +20,9 @@ If the queue is empty, ping CHIEF in Telegram: "queue empty — assign next prio
 1. `priority/NNN-slug.md` — primary keyword — cluster — target YYYY-MM-DD
 -->
 
-1. `pending/005-klaviyo-pricing.md` — klaviyo pricing — klaviyo — target 2026-05-28 — **ready-to-write** (research linked)
-2. `pending/007-klaviyo-vs-omnisend.md` — klaviyo vs omnisend — klaviyo — target 2026-05-29 — **ready-to-write** (research linked, Klaviyo side covered; verify Omnisend pricing on 2026-05-27)
-3. `pending/006-loox-vs-judge-me.md` — loox vs judge me — reviews-ugc — target 2026-05-30 — **research-blocked** (Block B paste-ready prompt inside packet; one research unblocks 006 + 008)
-4. `pending/008-judge-me-review.md` — judge me review — reviews-ugc — target 2026-05-30 — **research-blocked** (shares research with 006)
+1. `pending/007-klaviyo-vs-omnisend.md` — klaviyo vs omnisend — klaviyo — target 2026-05-28 — **ready-to-write** (research linked, Klaviyo side covered; verify Omnisend pricing on visit)
+2. `pending/006-loox-vs-judge-me.md` — loox vs judge me — reviews-ugc — target 2026-05-30 — **research-blocked** (Block B paste-ready prompt inside packet; one research unblocks 006 + 008)
+3. `pending/008-judge-me-review.md` — judge me review — reviews-ugc — target 2026-05-30 — **research-blocked** (shares research with 006)
 
 ## In progress
 
@@ -33,6 +32,7 @@ _None._
 
 ## Recently done (last 10)
 
+- 005-klaviyo-pricing.md — 2026-05-28
 - 002-klaviyo-review-refresh.md — 2026-05-27
 - 004-gorgias-review-refresh.md — 2026-05-27
 - 003-klaviyo-vs-mailchimp.md — 2026-05-26
@@ -43,8 +43,8 @@ _None._
 
 ## Counts
 
-- pending: 4
-- done: 4
+- pending: 3
+- done: 5
 - archive: 0
 
 _Updated by after-publish.sh on each packet move (formerly OPS-managed; see Phase 3 finding 2026-05-26)._

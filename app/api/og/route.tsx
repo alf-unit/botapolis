@@ -199,7 +199,7 @@ export async function GET(req: NextRequest) {
         ...SIZE,
         headers: {
           "cache-control":
-            "public, max-age=2592000, s-maxage=2592000, stale-while-revalidate=86400",
+            "public, immutable, no-transform, max-age=2592000, s-maxage=2592000, stale-while-revalidate=86400",
         },
       },
     )
@@ -386,7 +386,7 @@ export async function GET(req: NextRequest) {
       // (Satori ~2s per render); long cache pins each URL to a single
       // render lifetime.
       headers: {
-        "cache-control": "public, max-age=2592000, s-maxage=2592000, stale-while-revalidate=86400",
+        "cache-control": "public, immutable, no-transform, max-age=2592000, s-maxage=2592000, stale-while-revalidate=86400",
       },
     },
   )

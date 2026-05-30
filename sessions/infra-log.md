@@ -609,3 +609,83 @@ Owner получил Vercel email: 50% free-tier Fluid Active CPU (4h/мес) с
   - OPS GPT-5.5 cost reconciliation (after first month of `agent_logs.cost_usd`)
   - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md
   - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT
+
+---
+
+## 2026-05-30 (session 2) — post-deploy Vercel observability + OG cache hot-patch + black-on-black code fence fix + validator guard
+
+### Commits
+
+- perf(og): bump /api/og edge cache 1h -> 30d
+- perf(og): add immutable + no-transform to /api/og Cache-Control
+- fix(mdx): fallback text colour for code blocks without language tag
+- chore(validator): block bare ``` code fences + author rule
+
+### Задача
+
+Сессия должна была закрыться после 5 коммитов session 1 (proxy/sitemap/webhook/og default/log). Owner открыл Vercel Observability dashboard сразу после деплоя — реальные данные за 12h показали что мой топ-suspect (middleware) был НЕ #1 по CPU, и `/api/og` сожрал больше всех остальных роутов вместе взятых. Hot-patch + расследование вылилось в session 2. Параллельно owner тыкал страницы и нашёл visual bug — невидимый текст в code-блоке на `/guides/support-automation-for-shopify-stores`. Закрыли оба + поставили guard от повтора.
+
+### Сделано
+
+- **Vercel Observability cross-check (Functions, Last 12h)**:
+  - 863 invocations, 0% errors, P75 CPU 641ms, P75 throttle 11.8%, cold start 8.3%.
+  - Top routes by Active CPU:
+    1. `/api/og` — 46s CPU on 24 invocations (~1.9s/call) ← **dominant**
+    2. `/` — 21s on 37 inv (~0.57s) ← Supabase parallel fetches
+    3. `/guides/[slug]` — 13s on 24 inv (~0.54s)
+    4. `/reviews/[slug]` — 11s on 43 inv (~0.26s)
+    5-10. tools/compare/ru-mirrors — все под 5s каждый
+  - Pattern recognition: middleware (proxy.ts) даже не в топ-10 по per-route CPU. Мой session-1 fast-path всё ещё полезен (cuts CPU на bot-traffic), но НЕ был dominant vector. **Lesson saved to memory: observability dashboard first, hypothesis second.**
+
+- **`/api/og` cache hot-patch (commit `35638fa`)**: edge cache headers подняты с `max-age=3600` (1h) на `max-age=2592000` (30d). Endpoint используется в двух местах:
+  - [lib/seo/metadata.ts:57](lib/seo/metadata.ts#L57) `DEFAULT_OG_IMAGE` — fallback social-share image на каждой странице без своего openGraph.images override. Социальные crawlers (Discord/Slack/LinkedIn/Twitter/Telegram) дёргают per URL.
+  - [components/content/ArticleCover.tsx](components/content/ArticleCover.tsx) — hero image на review-страницах рендерится через `<img src="/api/og?variant=cover&logo=...">`. Каждый посетитель = Satori-рендер из браузера, ~1.9s CPU.
+  - 30d cache pins каждый уникальный URL к ОДНОМУ рендеру за lifetime деплоя. Следующий deploy инвалидирует естественно.
+
+- **Cross-check with web Claude (sent separately by owner)**: independent diagnosis совпала — `/api/og` #1, рекомендация кеширования. Web Claude добавил два nice-to-have которые я упустил: `immutable` (запрещает revalidation requests) + `no-transform` (запрещает CDN-посредникам пережимать PNG). Применил коммитом `1e9795f`. Финальный Cache-Control: `public, immutable, no-transform, max-age=2592000, s-maxage=2592000, stale-while-revalidate=86400`. Web Claude также подсветил Next.js 15+ breaking: GET Route Handlers больше не cached by default — Cache-Control headers на response остаются единственным защитником edge cache (что у нас и сделано).
+
+- **Black-on-black code-fence visual bug (commit `d8b2e5f`)**: owner pointed at `/guides/support-automation-for-shopify-stores` где "Reply template:" code-блок рендерился чёрным текстом на тёмном фоне (#0F1115) — невидимо, но выделяется мышью. Root cause: [mdx-components.tsx:214-224](components/content/mdx-components.tsx#L214-L224) для `<pre>` задавал только background, **не задавал text colour**, полагаясь на Shiki (через rehype-pretty-code) который вставляет per-token inline styles. НО Shiki делает highlighting только если автор указал язык (` ```bash `, ` ```json `, etc.). Bare ` ``` ` без языка → нет inline styles → текст наследует page default (почти чёрный на light theme). Системно: grep нашёл 8 bare fences в 4 гайдах (2 EN + 2 RU twins). Fix: добавил `text-[#E5E7EB]` (светло-серый) к `<pre>` className. Когда язык указан — inline > class, Shiki wins. Когда не указан — fallback применяется.
+
+- **Pre-commit guard (commit `453b4e8`)**: добавил `checkCodeBlockLanguages()` в [scripts/content-validator.ts](scripts/content-validator.ts) — scan MDX body на opening ` ``` ` без language tag, exit 1 если найдено. Frontmatter-aware line numbers (через `countFrontmatterLines()` чтобы reported line = реальный raw-file line, не body-relative). Тест на текущем контенте поймал 2 нарушения (support-automation EN+RU), починил их добавлением ` ```text `. Validator стал чистый. Также добавил пункт в Quality checklist в `CONTENT-WRITING.md` со списком common language tags (text/bash/json/tsx/sh/yaml/sql/html/css/mdx). Triple defence: author instruction → validator → CSS fallback.
+
+- **Memory updated**: `reference_vercel-cpu-model.md` — добавлен Step 0 ("get observability data first, don't theorize") + раздел про `/api/og` как common dominant route + Next.js 15+ note про GET Route Handler caching default change.
+
+### Обнаружено
+
+- **Vercel Observability "Active CPU" per-route column — критичный first stop при CPU problems**. Я не сразу подумал смотреть туда — owner показал. Теперь это Step 0 в `reference_vercel-cpu-model.md`. Theorize-then-fix может ловить правильные но не dominant cost vectors → wasted deploys.
+
+- **`/api/og` имеет двойную нагрузку**: (a) social-share fallback в metadata, (b) in-page hero image на review pages. Любой сервер-сайд OG generator с этим pattern будет dominate CPU без агрессивного кеша. ImageResponse/Satori cost ~1-2s per render. Cache-Control обязателен.
+
+- **Next.js 15+ GET Route Handler default caching изменился** — больше не cached by default. Если route handler возвращает deterministic-per-URL responses, MUST set Cache-Control header ИЛИ `export const revalidate = N`. Web Claude flagged это — записал в memory. Применимо к любому новому route handler в проекте.
+
+- **Web Claude (этот же claude-opus-4-7 в Claude.ai webapp) — useful cross-check tool**. Не имеет доступа к репо, но видит ту же картину когда дать ей output из Vercel. Independent diagnosis совпала с моей по dominant vector + добавила 2 mini-polishes (`immutable`, `no-transform`) которые я упустил. Pattern worth keeping: после неочевидных perf-fixes показать ту же data web-Claude как sanity check.
+
+- **rehype-pretty-code / Shiki: highlighting только при явном языке**. `<pre>` стилизация без fallback text colour работает ровно настолько, насколько авторы дисциплинированы. Любой ` ``` ` без языка = invisible text bug. Грабли существовали в кодбазе изначально, проявились только сейчас потому что предыдущие гайды все использовали fences с языками.
+
+- **Pre-commit auto-translate перезаписал мою ручную RU правку**. Я отредактировал EN guide (добавил `text` тэг к fence) + ручную RU правку (то же самое). Pre-commit hook увидел EN-MDX в staged и запустил auto-translate EN→RU, перезаписав мою RU версию свежим автопереводом. Auto-translator увидел `text` тэг в EN, перенёс корректно. **Pattern**: если редактируешь EN + RU одновременно — финальная версия RU будет от auto-translator, не твоя ручная. Не трать время на ручный RU параллельно с EN правкой; редактируй только EN, hook сделает RU.
+
+- **content-validator теперь mandatory для всех MDX commits**. До сегодня validator падал только при schema errors. Теперь — также при bare fences. Будущие сессии в content-mode должны помнить: если pre-commit падает на `[validate] code-fence language tags missing` — это новый guard, fix добавлением языка после трёх backticks.
+
+### Fixes (что + почему)
+
+- **`/api/og` 30d cache + immutable + no-transform** — устраняет dominant CPU cost vector. ~46s/12h CPU на одном endpoint → должно упасть в десятки раз когда все уникальные URL отрисуются по одному разу.
+- **Code-fence fallback colour** — закрывает существующий visual bug на 8 блоках в 4 гайдах одним className change. Symptomatic fix; root cause guard ниже.
+- **content-validator bare-fence check** — root cause guard. Будущие MDX commits с bare ``` блокируются с конкретным line number + список common languages.
+- **CONTENT-WRITING.md Quality checklist + language list** — soft guard для authors. Validator hard, instruction soft. Triple defence.
+
+### Open follow-ups (priority order)
+
+- **#1 Re-check Vercel Observability через 12-24h**. Expect `/api/og` Active CPU collapse от 46s/12h к <5s/12h once все unique URLs отрисуются и осядут в 30d cache. Если НЕ упало — copy `ArticleCover` to use precomputed PNG from Supabase Storage instead of dynamic /api/og (~1-2h refactor). Если упало — closing this thread.
+- **#2 RU locale verification on production** (carryover from session 1). Не подтверждено что `/ru/` страницы рендерятся в русском после deploy proxy.ts fast-path. Owner сказал "вроде все исправно" но не уверен какие именно URL открывал. Quick check: open botapolis.com/ru/ в incognito → должен показать русский.
+- **#3 `/api/og` route handler — добавить `export const revalidate = 2592000`** как belt-and-suspenders с Cache-Control. Не критично, Cache-Control работает. Cosmetic.
+- **#4 Audit other ImageResponse usages** — per-slug `opengraph-image.tsx` в reviews/guides/compare имеют `revalidate = 86400` (24h). При scale up контента может стать заметно. Watch over next month.
+- **Carryovers from prior sessions (unchanged):**
+  - tools table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at)
+  - system_config.modified_by CHECK constraint rejects agent values
+  - Capture SCOUT runtime AGENTS.md to /agent-snapshots/scout/
+  - Option B refactor /compare/[slug] MDX-driven
+  - Newsletter ingestion via Beehiiv
+  - OPS GPT-5.5 cost reconciliation
+  - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md
+  - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT
+  - Tighten app/robots.ts for AI crawlers (Crawl-delay or temp Disallow) до 50+ статей (from session-1 follow-up #3)

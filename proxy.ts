@@ -50,13 +50,45 @@ function requiresAuth(localelessPath: string): boolean {
   )
 }
 
+/**
+ * Supabase cookie sniff: do we have any reason to hit the auth refresh path?
+ *
+ * `updateSession()` makes a network round-trip to Supabase on every call —
+ * cheap per-request but it adds up across bot traffic (Googlebot et al. do
+ * not carry auth cookies). We skip the refresh for visitors who clearly
+ * aren't logged in: no `sb-*-auth-token` cookie present.
+ *
+ * Auth-required paths still go through `updateSession` regardless so the
+ * gate below sees an authoritative user (and so a signed-in user landing
+ * on /dashboard via deep-link gets the proper refresh).
+ */
+function hasSupabaseAuthCookie(request: NextRequest): boolean {
+  for (const c of request.cookies.getAll()) {
+    if (c.name.startsWith("sb-") && c.name.endsWith("-auth-token")) return true
+  }
+  return false
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const locale = resolveLocale(pathname)
   const localeless = stripLocale(pathname)
+  const needsAuth = requiresAuth(localeless)
+  const maybeLoggedIn = hasSupabaseAuthCookie(request)
 
-  // Refresh Supabase auth cookies on every request. Also surfaces the user
-  // so the auth gate below doesn't have to round-trip a second time.
+  // Fast path: anonymous visitor on a public page. Skip the Supabase
+  // round-trip entirely — we only need locale + pathname headers downstream.
+  // This is the cost-saver: bot traffic + first-time visitors are the bulk
+  // of requests and they don't need an auth refresh.
+  if (!needsAuth && !maybeLoggedIn) {
+    const response = NextResponse.next({ request })
+    response.headers.set("x-locale", locale)
+    response.headers.set("x-pathname", pathname)
+    return response
+  }
+
+  // Slow path: either the route requires auth, or the visitor has Supabase
+  // cookies that may need rotating. Do the full refresh + auth gate.
   const { response, user } = await updateSession(request)
 
   // Make request context available to Server Components via headers.
@@ -68,7 +100,7 @@ export async function proxy(request: NextRequest) {
   // a `?next=` hint so we can return them to their destination after sign-in.
   // We preserve locale prefix on the redirect so RU users don't get an EN
   // login page; the `next` param keeps the original path intact.
-  if (!user && requiresAuth(localeless)) {
+  if (!user && needsAuth) {
     const loginPath = locale === "ru" ? "/ru/login" : "/login"
     const loginUrl = new URL(loginPath, request.url)
     // Preserve the original destination including any search params.

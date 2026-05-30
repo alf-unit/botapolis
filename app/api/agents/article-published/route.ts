@@ -37,6 +37,13 @@ interface FileEntry {
   path: string
   primary_keyword?: string
   slug?: string
+  /**
+   * Base64-encoded MDX body. Sent by the local post-commit hook for
+   * comparison files so the webhook can bridge into public.comparisons
+   * without an outbound raw.githubusercontent fetch. Optional for
+   * back-compat with manual webhook calls.
+   */
+  content_b64?: string
 }
 
 interface Payload {
@@ -80,9 +87,25 @@ function repoPathToPublicUrl(p: string): string | null {
    For row updates: editorial UPDATEs the row directly (Supabase Studio or
    SQL). The webhook only "touches" updated_at to nudge ISR.
 ============================================================================ */
-async function fetchMdxRawFromMain(filePath: string): Promise<string | null> {
-  // Public raw URL — no auth needed since the repo is public. Cache-bust so
-  // the webhook always sees the just-committed file.
+async function resolveMdxBody(
+  filePath: string,
+  inlineB64: string | undefined,
+): Promise<string | null> {
+  // Preferred path: caller (the post-commit hook) inlined the MDX body as
+  // base64 in the payload. Decode and return — no outbound HTTP needed.
+  // This is the CPU-friendly route added 2026-05-30 after the Vercel
+  // Active CPU audit; the GitHub raw fetch fallback below stays for
+  // manual webhook calls / scripted backfills that don't carry the body.
+  if (inlineB64) {
+    try {
+      const decoded = Buffer.from(inlineB64, "base64").toString("utf-8")
+      if (decoded.length > 0) return decoded
+    } catch {
+      // Bad base64 → fall through to raw fetch.
+    }
+  }
+  // Fallback: public raw URL — no auth needed since the repo is public.
+  // Cache-bust so the webhook always sees the just-committed file.
   const url = `https://raw.githubusercontent.com/alf-unit/botapolis/main/${filePath}`
   try {
     const res = await fetch(url, { cache: "no-store" })
@@ -115,8 +138,9 @@ async function bridgeComparison(
   language: "en" | "ru",
   slug:     string,
   supabase: ReturnType<typeof createServiceClient>,
+  inlineB64: string | undefined,
 ): Promise<BridgeResult> {
-  const raw = await fetchMdxRawFromMain(filePath)
+  const raw = await resolveMdxBody(filePath, inlineB64)
   if (!raw) return { bridged: "skipped", reason: "fetch_failed" }
 
   const parsed = matter(raw)
@@ -237,7 +261,7 @@ export async function POST(req: NextRequest) {
     const cmpMatch = f.path.match(/^content\/comparisons\/(en|ru)\/(.+)\.mdx$/)
     if (cmpMatch) {
       const [, language, slug] = cmpMatch
-      const br = await bridgeComparison(f.path, language as "en" | "ru", slug, supabase)
+      const br = await bridgeComparison(f.path, language as "en" | "ru", slug, supabase, f.content_b64)
       bridgeNote = `bridge:${br.bridged}${br.reason ? `(${br.reason})` : ""}`
       // Log bridge action explicitly so audit trail exists alongside the
       // standard task_completed entry that follows.

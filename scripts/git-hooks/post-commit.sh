@@ -67,7 +67,15 @@ while IFS= read -r f; do
   [ -z "$f" ] && continue
   kw=$(mdx_primary_keyword "$f" 2>/dev/null | sed 's/"/\\"/g')
   slug=$(slug_from_path "$f")
-  entry="{\"path\":\"$f\",\"primary_keyword\":\"$kw\",\"slug\":\"$slug\"}"
+  # Comparison files only: inline the MDX body as base64 so the webhook can
+  # bridge into public.comparisons without an outbound raw.githubusercontent
+  # fetch (Vercel CPU saver — added 2026-05-30). Other content types don't
+  # use the body server-side, so we don't pay the payload size.
+  content_b64=""
+  case "$f" in
+    content/comparisons/*) content_b64=$(base64 < "$f" | tr -d '\n') ;;
+  esac
+  entry="{\"path\":\"$f\",\"primary_keyword\":\"$kw\",\"slug\":\"$slug\",\"content_b64\":\"$content_b64\"}"
   if [ -z "$files_json" ]; then files_json="$entry"
   else files_json="$files_json,$entry"
   fi

@@ -211,12 +211,20 @@ export const mdxComponents = {
   // `inline` code is styled via the `p > code` selector above. `pre` blocks
   // here are pre-syntax-highlighted by rehype-pretty-code (Shiki under the
   // hood); we just give them a frame and let the theme's inline styles win.
+  //
+  // Fallback text colour (#E5E7EB) for code blocks WITHOUT a language tag
+  // (```text → no Shiki tokenisation → no inline colours → text inherits
+  // the page's default near-black, which is invisible on the dark pre
+  // background). Shiki's per-token inline styles still override this when
+  // a language is set, so syntax-highlighted blocks render unchanged.
+  // Bug surfaced 2026-05-30 on /guides/support-automation-for-shopify-stores
+  // where a no-language code block showed as a black-on-black void.
   pre: (props: ComponentPropsWithoutRef<"pre">) => (
     <pre
       {...props}
       className={cn(
         "my-6 overflow-x-auto rounded-xl border border-[var(--border-base)]",
-        "bg-[#0F1115] p-5 text-[13px] leading-[1.6] font-mono",
+        "bg-[#0F1115] p-5 text-[13px] leading-[1.6] font-mono text-[#E5E7EB]",
         "[&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit",
         props.className,
       )}

@@ -82,6 +82,11 @@ export async function GET(req: NextRequest) {
           mintGlow: "rgba(16,185,129,0.18)", violetGlow: "rgba(139,92,246,0.14)",
           pillBorder: "rgba(16,185,129,0.40)", pillBg: "rgba(16,185,129,0.12)",
         }
+    // Cover-variant cache: 30 days. Covers are derived from logo + eyebrow
+    // (essentially immutable per slug); a new deploy invalidates the edge
+    // cache anyway. Was 1h until 2026-05-30 — Vercel observability showed
+    // /api/og as the #1 CPU spender (Satori ~2s per render); 30d cache pins
+    // each unique URL to a single render lifetime.
     return new ImageResponse(
       (
         <div
@@ -194,7 +199,7 @@ export async function GET(req: NextRequest) {
         ...SIZE,
         headers: {
           "cache-control":
-            "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400",
+            "public, max-age=2592000, s-maxage=2592000, stale-while-revalidate=86400",
         },
       },
     )
@@ -374,10 +379,14 @@ export async function GET(req: NextRequest) {
     ),
     {
       ...SIZE,
-      // Cache for an hour at the edge; the actual image rarely changes
-      // because title/desc come from canonical static metadata.
+      // 30-day edge cache: title/desc come from canonical static metadata,
+      // covers are essentially immutable per param combo, and a new deploy
+      // invalidates the edge anyway. Was 1h until 2026-05-30 — Vercel
+      // observability showed this endpoint as the #1 Active CPU spender
+      // (Satori ~2s per render); long cache pins each URL to a single
+      // render lifetime.
       headers: {
-        "cache-control": "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400",
+        "cache-control": "public, max-age=2592000, s-maxage=2592000, stale-while-revalidate=86400",
       },
     },
   )

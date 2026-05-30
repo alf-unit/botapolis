@@ -14,8 +14,12 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { getAllMdxSlugs, getAllMdxFrontmatter } from "@/lib/content/mdx"
 import { absoluteUrl } from "@/lib/utils"
 
-// Sitemap revalidation budget: hourly is plenty for a docs-style site.
-export const revalidate = 3600
+// Sitemap revalidation budget: daily is plenty for a docs-style site.
+// Was hourly until 2026-05-30 — Vercel Active CPU audit showed sitemap
+// regen + per-request Supabase fetch was a meaningful contributor to bot-
+// driven CPU spend. Daily cadence + on-demand revalidate (Supabase webhook
+// + cron job) keeps lastmod fresh for Google without per-hour regen.
+export const revalidate = 86400
 
 /**
  * Static routes — only paths that resolve to a real page right now.

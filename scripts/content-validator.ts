@@ -120,6 +120,70 @@ async function walkContent(): Promise<FileTarget[]> {
   return out
 }
 
+/**
+ * Scan an MDX body for opening code fences without a language tag.
+ *
+ * Bare ```\n blocks render with no syntax highlighting from Shiki (which
+ * needs to know the language to tokenise), so the text inherits the page's
+ * default near-black colour against the dark `<pre>` background — invisible.
+ * mdx-components.tsx ships a fallback text colour so this no longer renders
+ * black-on-black, but missing the language tag also forfeits the actual
+ * syntax highlighting the author probably wanted. Forcing the tag closes
+ * both problems at the authoring layer instead of hiding them behind CSS.
+ *
+ * Returns one human-readable message per offending opening fence (with line
+ * number). Empty array = clean. Tilde fences and indented code blocks are
+ * not checked — authors don't use them in practice.
+ */
+function checkCodeBlockLanguages(
+  body: string,
+  rel:  string,
+  lineOffset: number,
+): string[] {
+  const lines = body.split(/\r?\n/)
+  const violations: string[] = []
+  let inFence = false
+  let i = 0
+  for (const raw of lines) {
+    i++
+    const trimmed = raw.trimStart()
+    if (!trimmed.startsWith("```")) continue
+    if (!inFence) {
+      // Opening fence. Capture the language token (non-whitespace immediately
+      // after the three backticks). Bare ``` (or ``` with only whitespace
+      // after) is the failure case. The reported line number includes
+      // lineOffset so authors see the actual file line, not body-relative.
+      const lang = trimmed.slice(3).trim().split(/\s+/)[0]
+      if (!lang) {
+        violations.push(
+          `✗ ${rel}:${i + lineOffset} code fence has no language tag. Use \`\`\`text for plain output, ` +
+          `or \`\`\`bash / \`\`\`json / \`\`\`tsx / etc. for syntax-highlighted code.`,
+        )
+      }
+      inFence = true
+    } else {
+      // Closing fence — ignore.
+      inFence = false
+    }
+  }
+  return violations
+}
+
+/**
+ * Number of lines occupied by the YAML frontmatter (including both `---`
+ * delimiters). Returns 0 for files that don't open with `---`. Used to
+ * map body-relative line numbers back to raw-file line numbers in error
+ * messages so authors land on the right line in their editor.
+ */
+function countFrontmatterLines(raw: string): number {
+  const lines = raw.split(/\r?\n/)
+  if (lines[0] !== "---") return 0
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === "---") return i + 1
+  }
+  return 0
+}
+
 function parseFileArg(arg: string): FileTarget | null {
   // Husky pre-commit invokes us with `content/reviews/en/<slug>.mdx`
   // style paths. Anything outside content/{reviews,guides}/{en,ru}/ we
@@ -157,9 +221,10 @@ async function main() {
   }
 
   // --------------------------------------------------------------------
-  // Pass 1 — schema
+  // Pass 1 — schema + code-fence language tags
   // --------------------------------------------------------------------
   const schemaErrors: string[] = []
+  const fenceErrors:  string[] = []
   // Tool-slug → rating map, populated as we go. Pass 2 reuses this.
   const reviewRatings = new Map<string, { rating: number; rel: string }>()
 
@@ -171,7 +236,11 @@ async function main() {
       schemaErrors.push(`✗ ${t.rel}: unreadable (${(err as Error).message})`)
       continue
     }
-    const { data } = matter(raw)
+    const { data, content: body } = matter(raw)
+
+    // Code-fence language check runs even for manuallyTranslated RU — a
+    // missing language tag is an authoring issue, not a translation drift.
+    fenceErrors.push(...checkCodeBlockLanguages(body, t.rel, countFrontmatterLines(raw)))
 
     if (t.locale === "ru" && isManuallyTranslatedRu(data)) {
       // Editor-locked RU — skip schema strictness. EN is still validated.
@@ -201,6 +270,16 @@ async function main() {
     for (const e of schemaErrors) console.error("  " + e)
     console.error("\n  Fix the frontmatter or add `manuallyTranslated: true` to a")
     console.error("  hand-tuned RU file. Schema lives in lib/content/mdx.ts.\n")
+    process.exit(1)
+  }
+
+  if (fenceErrors.length > 0) {
+    console.error("\n[validate] code-fence language tags missing:\n")
+    for (const e of fenceErrors) console.error("  " + e)
+    console.error(
+      "\n  Every code block needs a language tag so Shiki can highlight it.\n" +
+      "  Common choices: text, bash, json, tsx, ts, sh, mdx, yaml, sql, html, css.\n",
+    )
     process.exit(1)
   }
 

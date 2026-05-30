@@ -205,6 +205,7 @@ Plus generic AI-tells: "It's important to note that...", "It's worth mentioning 
 - [ ] Reading level acceptable (sentences не слишком длинные)
 - [ ] Mobile preview: проверь что MDX рендерится OK
 - [ ] No fake hands-on claims если их не было
+- [ ] Каждый ``` блок имеет language tag (```text для plain output, ```bash/```json/```tsx/```sh/```yaml/```sql/```html/```css/```mdx для подсветки). Bare ``` блокирует commit через `content-validator.ts` — Shiki без языка не подсвечивает синтаксис и текст рендерится невидимым на тёмном фоне.
 
 Если что-то fail — fix перед commit. Don't push broken content.
 

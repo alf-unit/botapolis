@@ -689,3 +689,85 @@ Owner получил Vercel email: 50% free-tier Fluid Active CPU (4h/мес) с
   - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md
   - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT
   - Tighten app/robots.ts for AI crawlers (Crawl-delay or temp Disallow) до 50+ статей (from session-1 follow-up #3)
+
+---
+
+## 2026-05-30 (session 3) — Phase 0 Data-First pSEO: Etap A→D полный цикл (CONTENT_WRITING_02 mode + 6 ресёрчей + БД заполнена)
+
+### Commits
+
+- docs(claude-md): add CONTENT_WRITING_02 mode + phase 0 blueprint
+- feat(supabase): phase 0 etap B — 20 tool drafts + related_tool_slugs
+- research(phase-0): research 1 — identity & positioning (34 tools, EN)
+- research(phase-0): research 2 — pricing (34 tools, EN)
+- research(phase-0): research 3 — features (34 tools, EN)
+- research(phase-0): research 4 — integrations (34 tools, EN)
+- research(phase-0): research 5 — reviews & ratings (34 tools, EN)
+- research(phase-0): research 6 — monetization (34 tools, EN) [final gate]
+- feat(phase0): etap D — apply 6 researches (30 published + 4 archived)
+
+### Задача
+
+Owner положил `PHASE-0-BLUEPRINT.md` — переход с editorial-per-page на data-first pSEO модель. Цель сессии: пройти Этап A (анализ + Blueprint как источник правды) → B (БД готова к данным) → C (6 column-wise ресёрчей owner-ом в Web Chat) → D (парсер + раскладка по 34 строкам tools). Всё за одну сессию потому что quirks каждого ресёрча копились в memory и нужны были парсеру на Этапе D.
+
+### Сделано
+
+- **Новый mode CONTENT_WRITING_02** добавлен в CLAUDE.md рядом с тремя существующими. Mapping на `PHASE-0-BLUEPRINT.md` как mandatory read; pagination protocol аналогичный FINAL-ARCHITECTURE-V4. Разделение editorial vs data-first: legacy Content writing — уникальные longreads; CONTENT_WRITING_02 — pSEO масса.
+- **Этап B** — migrations 013+014. 20 новых tool-drafts (9 HIGH + 11 MEDIUM из Blueprint 1.2) + `semantic_core_entries.related_tool_slugs text[]` с GIN индексом. Все idempotent. Applied via Studio.
+- **6 ресёрчей собраны и закоммичены последовательно** по мере прихода от owner-а:
+  - R1 (Identity): markdown table в `## Details`, DB slugs в tool col.
+  - R2 (Pricing): comma-CSV fenced, display names, 9 cols (8 + source_url).
+  - R3 (Features): comma-CSV long-shape (1 row per feature), ~377 data rows.
+  - R4 (Integrations): pipe-separated в csv-fence (label misnomer), bracket arrays.
+  - R5 (Reviews & Ratings): comma-CSV с embedded pseudo-JSON в 4 колонках (ratings_4axis с [H]/[I], top_pros/cons single-quoted arrays, operator_quotes array-of-objects).
+  - R6 (Monetization): comma-CSV wide, 7 cols. Финальный gate.
+- **Memory `project_phase-0-etap-d-plan.md`** накопительный — после каждого ресёрча добавлялись parser-expectations, schema migrations needed, fact-reconciliation flags. К Этапу D файл содержал полную картину; raw research files перечитывать не пришлось.
+- **Booth AI memory** усиливался через 4 ресёрча: R1 uncertain → R2 domain for sale May 2025 → R4 specific shutdown date Aug 5 2024 (startups.rip) → R5 Crunchbase permanently closed → R6 no affiliate → confirmed archive.
+- **Migration 015** консолидировала 10 schema changes (было 11; owner вырезал strategic_notes как content-flag — те идут в `/research/phase0-content-flags.md`, не в БД). Включает: `pricing_model` и `affiliate_partner` CHECK extensions; 8 новых колонок (integrates_with_tools, operator_quotes, external_ratings, affiliate_commission/cookie_window/program_url, pricing_source_url, shopify_native_notes); GIN index. Strict separation enforced в комментариях: `rating + rating_breakdown` = наша editorial 4-axis; `external_ratings` = raw vendor scores. Applied via Studio.
+- **`/research/phase0-content-flags.md`** создан — 24 per-tool flags из всех 6 ресёрчей, организованных по slug с типизацией (cons-must-surface, external-rating-suppression, pricing-volatility, archive-flip, ecosystem-event, content-asset, framing-correction, etc.). Glossary внизу. Читается один раз генератором Etap E/F/G; flags — guidance, не data.
+- **`scripts/apply-phase0-research.ts`** — парсер обрабатывает все 5 наблюдавшихся форматов, name→slug normalization (~40 вариантов), NOT FOUND / НЕ НАЙДЕНО marker handling, R3 structural-notes filter, carve-outs для Judge.me + Shopify Sidekick. Modes: --dry, --summary, --apply, --tools=slug1,slug2.
+- **Этап D apply**: 34/34 успешно, 0 failures. 30 published + 4 archived. Verified `scripts/verify-phase0-etap-d.ts`: status distribution ✓, archive set match {booth-ai, cogsy, pebblely, prediko} ✓, column population logical, 6 spot-checks все green.
+- **Judge.me cleanup**: NULL'd `affiliate_url` после Etap D apply для полного alignment с carve-out семантикой (one-off скрипт, удалён после запуска).
+
+### Обнаружено
+
+- **5 distinct research formats** в 6 файлах — парсер обязан detect per file (probe header). Pattern: не предполагать общий формат для будущих research-волн.
+- **Mixed marker languages**: R1+R3 silent, R4+R6 — НЕ НАЙДЕНО (Russian), R5 — NOT FOUND (English). Парсер handles both.
+- **R3 structural-notes-as-features**: 4 строки где Web Chat закодировал acquisitions/positioning в features-таблицу с `plan_availability` containing Structural/Strategic/Verify (Recharge Skio Acquisition, Loop Subs Independent Platform, Skio Recharge Ownership, Booth AI Service Status Caveat). Парсер фильтрует на источнике; equivalent narrative content живёт в content-flags.md.
+- **Cross-research fact disagreement (Skio acquisition year)**: R1 + R2 + R5 цитируют April 30, 2026 с verbatim sources (TechCrunch + PR Newswire + founder posts, $105M cash). R4 говорит 2024 без источника. Trust verbatim. Pattern: при расхождении ресёрчей — weight by source attribution depth, не majority count.
+- **Tidio Lyro deflection rate numerical discrepancy**: R3 цитирует around 67% (tidio.com/ai-agent), R5 цитирует 64% on average peaking at 90% (Tidio press release). Оба first-party. На Etap E surface как range 64-67% или pick most-current.
+- **R1 Klaviyo tagline использовал `\|` escape** внутри markdown table cell (AI Email Marketing & SMS \| B2C CRM). Первая версия парсера сплитила на каждом pipe — поломала ряд, сдвинула все поля на одну колонку. Reproducible. Fix: pre-process line replacing `\|` с multi-char marker перед split.
+- **R6 affiliate platform string включает parenthetical history**: Recharge `Lasso (moved off PartnerStack 15 Mar 2026)`. Naive `lower.includes('partnerstack')` матчил оба варианта — wrong winner. Fix: `startsWith` only.
+- **Migration 013 placeholder categories vs R1**: 18/20 confirmed, 2/20 overridden — `stay-ai: upsell → subscriptions` (owner flagged ahead, expected), `rebuy: personalization → upsell` (research-driven).
+- **Strict rating separation pattern**: критично хранить editorial 4-axis (`tools.rating_breakdown`) отдельно от raw vendor scores (новая `external_ratings`). Owner поймал до миграции. Pattern на будущее: external data + editorial judgment = parallel fields, never merge.
+- **`pricing_model` CHECK enum был too narrow** — original не покрывал R2 values. Migration 015 extended. Common pattern когда seed schema написана editorial-first и потом приходят пайплайн-данные с другими таксономиями.
+- **Idempotent client-side apply** работает для bulk data load через supabase-js: per-row UPDATE, каждая независимая, re-run безопасен. Owner просил applyй в транзакции — strict atomicity не понадобилась (failures не corrupt other rows + re-run harmless). 34/34 успешно с первого раза.
+
+### Fixes
+
+- **R1 markdown table escaped-pipe handling** — escape `\|` to multi-char marker before split, restore after.
+- **R6 affiliate platform normalization** — switch from `includes` to `startsWith` для всех платформ. Recharge `affiliate_partner` correctly landed as `lasso` в БД.
+- **`affiliate_partner` CHECK extension** для `tapfiliate, lasso, partnerportal`.
+- **`pricing_model` CHECK extension** для `tiered, usage-based, flat, custom, bundled`.
+- **Judge.me `affiliate_url` cleanup** — seed.sql value survived Etap D apply (parser не трогает поле). NULL'd manually для alignment с carve-out.
+
+### Open follow-ups
+
+- **Этап E** (next session) — генерация Эшелона 1 tool reviews из заполненной БД. Read `content-flags.md` at start; respect per-tool framing. 30 published × {en, ru} = 60 review pages (RU runtime-translation или *_ru колонки per Blueprint 5.4, отложено). Skip 4 archived. Judge.me publish but no `/go/` CTA.
+- **Этап F** — Эшелон 2 comparisons + alternatives. Cross-link via `integrates_with_tools` (25/34 имеют data — 9 с `[НЕ НАЙДЕНО]` в R4). Owner: weaker cross-linking для этих 9, дозаполним точечно если важно.
+- **Этап G** — Эшелон 3 listings. R5 включает pre-built Ranked Category Summary table — ready input для best-for-segment pages across 14 categories.
+- **Этап H** — assign sequential publication numbers, hand pool to CHIEF for капельная publication 4/day.
+- **Этап J** — добивка ключей 102-427 из combinatorics заполненной БД.
+- **Quarterly refresh cadence** для pricing/affiliate per R2/R6 caveats: Recharge moved platforms Mar 2026, ManyChat free plan slashed Mar 2026, Yotpo SMS/Email sunset Dec 2025, Klaviyo billing model changed Feb 2025. Нужен refresh ritual.
+- **Cogsy conflicting prices** ($49 vs $199 на разных vendor pages) — pricing_notes содержит оба, content-flags.md помечен verify-with-vendor. Currently archived, no immediate action.
+- **9 tools без integrates_with_tools** (Signifyd, Sidekick, Pebblely, AdCreative.ai, Flair AI, Booth AI, Inventory Planner, Prediko, Pencil) — weaker cross-linking на Этапе F. Не блокер.
+- **Carryovers from prior sessions (unchanged):**
+  - tools table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at)
+  - system_config.modified_by CHECK constraint rejects agent values
+  - Capture SCOUT runtime AGENTS.md to /agent-snapshots/scout/
+  - Option B refactor /compare/[slug] MDX-driven
+  - Newsletter ingestion via Beehiiv
+  - OPS GPT-5.5 cost reconciliation
+  - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md (now also needs Phase 0 split addressed)
+  - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT
+  - Tighten app/robots.ts for AI crawlers до 50+ статей

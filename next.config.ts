@@ -140,7 +140,44 @@ const embedHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ]
 
+// ----------------------------------------------------------------------------
+// Legacy review-slug redirects (Etap E flip 2026-06-01)
+// ----------------------------------------------------------------------------
+// 6 review tools historically lived at /reviews/{slug}-review-2026 as
+// MDX-driven editorial pages. They've been deleted; the new runtime
+// /reviews/{slug} reads from the `tools` table. These 12 redirects
+// (6 EN + 6 RU) preserve any inbound links / GSC index that pointed at
+// the old URLs.
+//
+// `permanent: true` emits 308 (method-preserving), which Google treats
+// identically to 301 for SEO equity transfer.
+// ----------------------------------------------------------------------------
+const LEGACY_REVIEW_SLUGS = [
+  "klaviyo",
+  "gorgias",
+  "mailchimp",
+  "omnisend",
+  "postscript",
+  "tidio",
+] as const
+
+const legacyReviewRedirects = LEGACY_REVIEW_SLUGS.flatMap((slug) => [
+  {
+    source: `/reviews/${slug}-review-2026`,
+    destination: `/reviews/${slug}`,
+    permanent: true,
+  },
+  {
+    source: `/ru/reviews/${slug}-review-2026`,
+    destination: `/ru/reviews/${slug}`,
+    permanent: true,
+  },
+])
+
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [...legacyReviewRedirects]
+  },
   async headers() {
     return [
       {

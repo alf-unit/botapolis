@@ -4,30 +4,63 @@ import { ArrowUpRight } from "lucide-react"
 
 import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
+import { ToolLogo } from "@/components/tools/ToolLogo"
+import { createServiceClient } from "@/lib/supabase/service"
 import { buildMetadata } from "@/lib/seo/metadata"
 import {
   generateBreadcrumbSchema,
   generateItemListSchema,
 } from "@/lib/seo/schema"
-import { getAllMdxFrontmatter } from "@/lib/content/mdx"
+import { localizeToolPartial } from "@/lib/content/tool-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl, cn } from "@/lib/utils"
+import type { ToolRow } from "@/lib/supabase/types"
 
 /* ----------------------------------------------------------------------------
    /reviews — index of long-form tool reviews
    ----------------------------------------------------------------------------
-   Reads the MDX directory at build time. ISR 6 h to pick up new files without
-   waiting for the next prod deploy. EN is authoritative; RU rows fall back
-   to EN when a translation isn't present (handled inside the loader).
+   Reads `tools` from Supabase (Etap E flip 2026-06-01 — was MDX-driven).
+   One card per published tool, linking to /reviews/[slug] runtime page.
+   Sort: Featured DESC, then rating DESC, then name ASC.
 
-   Sprint 2 (May 2026): the page intentionally renders the empty state when
-   the content directory is missing. We never want a 500 on the listing — a
-   broken /reviews on the day a content file ships malformed would tank SEO
-   crawl budget faster than the empty-state would.
+   Empty-state is preserved: if the DB is unreachable / has zero published
+   rows (preview env, fresh clone), the page renders a "subscribe" prompt
+   rather than a 500.
 ---------------------------------------------------------------------------- */
 
 export const revalidate = 21600
+
+type ReviewCard = Pick<
+  ToolRow,
+  | "slug" | "name" | "name_ru" | "tagline" | "tagline_ru" | "logo_url"
+  | "category" | "rating" | "featured" | "updated_at"
+>
+
+const CARD_SELECT =
+  "slug, name, name_ru, tagline, tagline_ru, logo_url, category, rating, featured, updated_at" as const
+
+async function fetchReviewableTools(): Promise<ReviewCard[]> {
+  try {
+    const supabase = createServiceClient()
+    const { data, error } = await supabase
+      .from("tools")
+      .select(CARD_SELECT)
+      .eq("status", "published")
+      .order("featured", { ascending: false })
+      .order("rating", { ascending: false, nullsFirst: false })
+      .order("name", { ascending: true })
+      .limit(500)
+    if (error) {
+      console.error("[/reviews] tools fetch failed:", error.message)
+      return []
+    }
+    return data ?? []
+  } catch (err) {
+    console.error("[/reviews] tools fetch threw:", err)
+    return []
+  }
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
@@ -38,8 +71,8 @@ export async function generateMetadata(): Promise<Metadata> {
         : "AI tool reviews for Shopify operators",
     description:
       locale === "ru"
-        ? "Подробные обзоры AI-инструментов, протестированных на реальных Shopify-магазинах. Цены, сильные и слабые стороны, честный вердикт."
-        : "Hands-on reviews of AI tools tested on real Shopify stores. Pricing, strengths, weaknesses, and an honest verdict.",
+        ? "Аналитические обзоры AI-инструментов для Shopify: цены, фичи, реальные плюсы и минусы, честный вердикт."
+        : "Analyst reviews of AI tools for Shopify: pricing, features, real strengths and weaknesses, honest verdict.",
     path: "/reviews",
     locale,
   })
@@ -50,31 +83,25 @@ export default async function ReviewsIndexPage() {
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 
-  // RU MDX now exists for every published review (auto-translated by the
-  // husky pre-commit hook for new commits, manually-translated for the
-  // initial 6). Reading the active locale's frontmatter means RU users
-  // see RU titles + leads instead of English ones. The per-article page
-  // at /ru/reviews/[slug] keeps its own EN fallback inside getMdxContent
-  // for any future review whose RU twin is temporarily missing.
-  const reviews = await getAllMdxFrontmatter("reviews", locale)
+  const rawReviews = await fetchReviewableTools()
+  const reviews = rawReviews.map((r) => localizeToolPartial(r, locale))
 
   const t = {
     eyebrow:
       locale === "ru" ? "Обзоры" : "Reviews",
     headline:
       locale === "ru"
-        ? "Обзоры, основанные на реальной работе магазина."
-        : "Tool reviews built from running real stores.",
+        ? "Аналитические обзоры AI-инструментов для Shopify."
+        : "Analyst reviews of AI tools for Shopify.",
     lede:
       locale === "ru"
-        ? "Каждый обзор — 60+ дней использования инструмента, реальные цены, реальные минусы. Никаких «оба хорошие»."
-        : "Every review = 60+ days using the tool on a real store, real prices, real failure modes. No \"they're all great\" filler.",
+        ? "Цены, фичи, реальные плюсы и минусы — собрано из data-первых ресёрчей и верифицированных операторских отзывов. Никаких «оба хорошие»."
+        : "Pricing, features, real strengths and weaknesses — built from column-wise research and verified operator quotes. No \"they're all great\" filler.",
     empty:
       locale === "ru"
-        ? "Скоро здесь появятся обзоры. Подпишись на рассылку, чтобы не пропустить первые."
+        ? "Скоро здесь появятся обзоры. Подпишись на рассылку, чтобы не пропустить."
         : "Reviews drop here weekly. Subscribe below so you catch the first ones.",
     readMore: locale === "ru" ? "Читать" : "Read",
-    minRead: locale === "ru" ? "мин" : "min read",
   }
 
   const breadcrumb = generateBreadcrumbSchema([
@@ -87,7 +114,7 @@ export default async function ReviewsIndexPage() {
       ? generateItemListSchema({
           name: t.eyebrow,
           items: reviews.map((r) => ({
-            name: r.frontmatter.title,
+            name: r.name ?? r.slug ?? "Tool",
             url: `${localePrefix}/reviews/${r.slug}`,
           })),
         })
@@ -154,33 +181,43 @@ export default async function ReviewsIndexPage() {
             </div>
           ) : (
             <ul role="list" className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {reviews.map(({ slug, frontmatter }) => (
-                <li key={slug}>
+              {reviews.map((r) => (
+                <li key={r.slug}>
                   <Link
-                    href={`${localePrefix}/reviews/${slug}`}
+                    href={`${localePrefix}/reviews/${r.slug}`}
                     className={cn(
                       "group relative flex h-full flex-col gap-4 overflow-hidden rounded-3xl",
                       "border border-[var(--border-base)] bg-[var(--bg-surface)] p-6",
                       "shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-shadow",
                     )}
                   >
-                    <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-                      <span>{frontmatter.publishedAt}</span>
-                      {frontmatter.rating != null && (
-                        <>
-                          <span className="opacity-50">·</span>
-                          <span className="text-[var(--brand)]">
-                            {frontmatter.rating.toFixed(1)}/10
-                          </span>
-                        </>
-                      )}
+                    <div className="flex items-start gap-3">
+                      <ToolLogo
+                        src={r.logo_url ?? null}
+                        name={r.name ?? r.slug ?? ""}
+                        size={44}
+                        className="shrink-0 rounded-xl"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-h4 font-semibold tracking-[-0.015em] text-[var(--text-primary)] line-clamp-1">
+                          {r.name}
+                        </h2>
+                        <p className="mt-1 text-[11px] font-mono uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                          {r.category}
+                          {r.rating != null && (
+                            <>
+                              <span className="mx-1 opacity-50">·</span>
+                              <span className="text-[var(--brand)]">{r.rating.toFixed(1)}/10</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
                     </div>
-                    <h2 className="text-h4 font-semibold tracking-[-0.015em] text-[var(--text-primary)]">
-                      {frontmatter.title}
-                    </h2>
-                    <p className="text-[14px] leading-[1.55] text-[var(--text-secondary)] line-clamp-3">
-                      {frontmatter.description}
-                    </p>
+                    {r.tagline && (
+                      <p className="text-[14px] leading-[1.55] text-[var(--text-secondary)] line-clamp-3">
+                        {r.tagline}
+                      </p>
+                    )}
                     <span className="mt-auto inline-flex items-center gap-1 text-[13px] font-medium text-[var(--brand)]">
                       {t.readMore}
                       <ArrowUpRight

@@ -228,7 +228,7 @@ export default async function ReviewPage({ params }: PageProps) {
     notForLabel:      locale === "ru" ? "Не подойдёт если" : "Skip if",
     prosLabel:        locale === "ru" ? "Плюсы" : "Pros",
     consLabel:        locale === "ru" ? "Минусы" : "Cons",
-    tldrHeading:      locale === "ru" ? "Кратко" : "TL;DR",
+    tldrHeading:      locale === "ru" ? "Кратко" : "At a glance",
     fitHeading:       locale === "ru" ? "Кому подойдёт" : "Who it fits",
     prosConsHeading:  locale === "ru" ? "Плюсы и минусы" : "Pros & cons",
     pricingHeading:   locale === "ru" ? "Цены" : "Pricing",

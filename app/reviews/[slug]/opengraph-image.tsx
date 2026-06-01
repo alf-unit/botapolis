@@ -1,21 +1,18 @@
 /**
  * /reviews/[slug]/opengraph-image — dynamic OG image (1200×630)
  * ----------------------------------------------------------------------------
- * Reads the MDX frontmatter directly (cheaper than re-compiling the full
- * article body just for OG generation). Generates one PNG per review at
- * build time via generateStaticParams; revalidates on the same 24-hour
- * cadence as the page so cache and HTML stay in lockstep.
+ * Etap E flip 2026-06-01: now reads the `tools` row in Supabase (was MDX
+ * frontmatter). One PNG per published tool, generated at build time via
+ * generateStaticParams; revalidates on the same 24-hour cadence as the
+ * review page so cache and HTML stay in lockstep.
  *
  * Visual: dark canvas mirroring /compare/[slug] — mint+violet glow, wordmark
- * top-left, review headline mid, "by {author} · {date} · {rating}/10" bottom.
- * Keeps the social card looking like one family.
+ * top-left, review headline mid, "{date} · {rating}/10" bottom. Keeps the
+ * social card looking like one family.
  */
-import fs from "node:fs/promises"
-import path from "node:path"
-import matter from "gray-matter"
 import { ImageResponse } from "next/og"
 
-import { getAllMdxSlugs } from "@/lib/content/mdx"
+import { createServiceClient } from "@/lib/supabase/service"
 
 export const alt = "Review · Botapolis"
 export const size = { width: 1200, height: 630 } as const
@@ -26,28 +23,43 @@ interface ImageProps {
   params: Promise<{ slug: string }>
 }
 
-export async function generateStaticParams() {
-  const slugs = await getAllMdxSlugs("reviews", "en")
-  return slugs.map((slug) => ({ slug }))
-}
-
-interface OgFrontmatter {
+interface OgTool {
   title:       string
-  author?:     string
-  publishedAt?: string
   rating?:     number
+  publishedAt?: string
 }
 
-async function readFrontmatter(slug: string): Promise<OgFrontmatter | null> {
-  const filePath = path.join(process.cwd(), "content", "reviews", "en", `${slug}.mdx`)
+export async function generateStaticParams() {
   try {
-    const raw = await fs.readFile(filePath, "utf-8")
-    const { data } = matter(raw) as { data: Record<string, unknown> }
+    const sb = createServiceClient()
+    const { data, error } = await sb
+      .from("tools")
+      .select("slug")
+      .eq("status", "published")
+      .limit(500)
+    if (error || !data) return []
+    return data.map((t) => ({ slug: t.slug }))
+  } catch {
+    return []
+  }
+}
+
+async function fetchTool(slug: string): Promise<OgTool | null> {
+  try {
+    const sb = createServiceClient()
+    const { data, error } = await sb
+      .from("tools")
+      .select("name, meta_title, rating, created_at, updated_at")
+      .eq("slug", slug)
+      .eq("status", "published")
+      .maybeSingle()
+    if (error || !data) return null
+    const title = data.meta_title ?? `${data.name} review 2026`
+    const date = (data.updated_at ?? data.created_at)?.slice(0, 10)
     return {
-      title:       typeof data.title === "string" ? data.title : "Review",
-      author:      typeof data.author === "string" ? data.author : undefined,
-      publishedAt: typeof data.publishedAt === "string" ? data.publishedAt : undefined,
-      rating:      typeof data.rating === "number" ? data.rating : undefined,
+      title,
+      rating: data.rating ?? undefined,
+      publishedAt: date,
     }
   } catch {
     return null
@@ -56,9 +68,7 @@ async function readFrontmatter(slug: string): Promise<OgFrontmatter | null> {
 
 export default async function Image({ params }: ImageProps) {
   const { slug } = await params
-  const fm = (await readFrontmatter(slug)) ?? {
-    title: "Review",
-  }
+  const fm = (await fetchTool(slug)) ?? { title: "Review" }
 
   return new ImageResponse(
     (
@@ -173,7 +183,7 @@ export default async function Image({ params }: ImageProps) {
           </div>
         </div>
 
-        {/* Bottom strip: meta + rating chip */}
+        {/* Bottom strip: date + rating chip */}
         <div
           style={{
             display:        "flex",
@@ -186,8 +196,6 @@ export default async function Image({ params }: ImageProps) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {fm.author && <span>by {fm.author}</span>}
-            {fm.author && fm.publishedAt && <span style={{ opacity: 0.4 }}>·</span>}
             {fm.publishedAt && <span>{fm.publishedAt}</span>}
           </div>
 

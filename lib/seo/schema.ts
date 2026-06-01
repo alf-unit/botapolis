@@ -297,7 +297,7 @@ export function generateArticleSchema(opts: {
   /** Article headline (frontmatter.title). */
   headline:      string
   description:   string
-  /** Path including locale prefix, e.g. "/reviews/klaviyo-review-2026". */
+  /** Path including locale prefix, e.g. "/reviews/klaviyo". */
   path:          string
   /** ISO date of first publish. */
   publishedAt:   string

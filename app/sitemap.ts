@@ -150,35 +150,49 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })
   }
 
-  // ----- Reviews + Guides (MDX, build-time slug list) -----------------------
+  // ----- Reviews (Etap E flip 2026-06-01: tools-driven runtime, no MDX) ----
+  // /reviews/[slug] now renders from `tools` rows, not from MDX. Emit one
+  // sitemap entry per published tool. RU mirror reuses the same runtime
+  // page via re-export — the page exists for every slug regardless of
+  // whether its *_ru columns have been translated yet (localizeTool falls
+  // back to EN inside the route).
+  for (const t of tools ?? []) {
+    const path = `/reviews/${t.slug}`
+    routes.push({
+      url:             absoluteUrl(path),
+      lastModified:    new Date(t.updated_at),
+      changeFrequency: "monthly",
+      priority:        0.75,
+      alternates:      alternates(path),
+    })
+  }
+
+  // ----- Guides (still MDX, build-time slug list) --------------------------
   // Reads frontmatter so we can use the article's own `updatedAt` for
   // lastModified — Google weights that signal for re-crawl priority. Falls
   // back to publishedAt if the article hasn't been edited since launch.
   // Drafts are filtered out by `getAllMdxFrontmatter`.
-  for (const type of ["reviews", "guides"] as const) {
-    const entries = await getAllMdxFrontmatter(type, "en")
-    for (const { slug, frontmatter } of entries) {
-      const path = `/${type}/${slug}`
-      routes.push({
-        url:             absoluteUrl(path),
-        lastModified:    new Date(frontmatter.updatedAt ?? frontmatter.publishedAt),
-        changeFrequency: "monthly",
-        priority:        0.75,
-        alternates:      alternates(path),
-      })
-    }
-    // RU translations land later — emit RU URLs only when a `content/{type}/ru/{slug}.mdx`
-    // file actually exists, so we don't generate sitemap rows for slugs that
-    // 404 on the RU side. This keeps GSC happy until translations exist.
-    const ruSlugs = await getAllMdxSlugs(type, "ru")
-    for (const slug of ruSlugs) {
-      routes.push({
-        url:             absoluteUrl(`/ru/${type}/${slug}`),
-        lastModified:    now,
-        changeFrequency: "monthly",
-        priority:        0.7,
-      })
-    }
+  const guideEntries = await getAllMdxFrontmatter("guides", "en")
+  for (const { slug, frontmatter } of guideEntries) {
+    const path = `/guides/${slug}`
+    routes.push({
+      url:             absoluteUrl(path),
+      lastModified:    new Date(frontmatter.updatedAt ?? frontmatter.publishedAt),
+      changeFrequency: "monthly",
+      priority:        0.75,
+      alternates:      alternates(path),
+    })
+  }
+  // RU guide translations land later — emit RU URLs only when a
+  // `content/guides/ru/{slug}.mdx` file actually exists.
+  const ruGuideSlugs = await getAllMdxSlugs("guides", "ru")
+  for (const slug of ruGuideSlugs) {
+    routes.push({
+      url:             absoluteUrl(`/ru/guides/${slug}`),
+      lastModified:    now,
+      changeFrequency: "monthly",
+      priority:        0.7,
+    })
   }
 
   return routes

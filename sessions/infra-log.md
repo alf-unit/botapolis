@@ -835,6 +835,7 @@ Owner положил `PHASE-0-BLUEPRINT.md` — переход с editorial-per-
   - `lib/content/rating.ts:getToolRatings` читает MDX как canonical; после сноса MDX → переключить на DB-only.
   - Остальные 29 published tools имеют `verdict = NULL` — секция Verdict скрыта. Массовое наполнение когда reference approved.
   - `scripts/seed-klaviyo-reference.ts` one-off — удалить после reference approval.
+  - (resolved 2026-06-01 session 3 — see below)
 
 ---
 
@@ -897,3 +898,73 @@ Owner положил `PHASE-0-BLUEPRINT.md` — переход с editorial-per-
   - `lib/content/rating.ts:getToolRatings` — переключить на DB-only после сноса MDX
   - 29 tools без verdict — массовое наполнение когда reference approved
   - `scripts/seed-klaviyo-reference.ts` — удалить после reference approval
+
+---
+
+## 2026-06-01 (session 3) — Legacy review MDX sweep (delete 12 files + redirects + catalog/sitemap/OG refactor + TL;DR rename)
+
+### Commits
+
+- chore(reviews): sweep legacy MDX — delete 6 pairs, redirects, catalog/sitemap/OG runtime, neutralise heading
+
+### Задача
+
+Owner на site walk нашёл что после Etap E flip 2026-05-31 две версии Klaviyo жили параллельно: новая `/reviews/klaviyo` (honest runtime) + старая `/reviews/klaviyo-review-2026` (legacy MDX с fake-hands-on + дырами от outbound-link sweep). И footer + внутренние линки + sitemap всё ещё ссылались на старые `-review-2026` slug'и. Плюс label "TL;DR" на runtime смотрелся технически-чуждо. Финальный sweep — закрыть всё разом.
+
+### Сделано
+
+- **Удалено 12 legacy MDX review files** (6 пар EN+RU): `klaviyo-review-2026.mdx`, `gorgias-review-2026.mdx`, `mailchimp-review-2026.mdx`, `omnisend-review-2026.mdx`, `postscript-review-2026.mdx`, `tidio-review-2026.mdx` в обеих `content/reviews/{en,ru}/`. `klaviyo-pricing.mdx` (EN+RU) сохранён per owner.
+- **12 redirects 308 (permanent)** в [next.config.ts](next.config.ts): pattern `/reviews/{slug}-review-2026 → /reviews/{slug}` для 6 slug'ов × 2 locale. Next.js `permanent: true` → 308 status code, для SEO эквивалентно 301 (preserves method).
+- **`/reviews/page.tsx` catalog refactor** — `getAllMdxFrontmatter("reviews", ...)` заменён на `fetchReviewableTools()` от `tools.where(status='published')`. Карточка теперь: ToolLogo + tool.name + category chip + rating chip + tagline + "Read →". 30 published tools показываются автоматически.
+- **`app/sitemap.ts` reviews-section refactor** — раздельная логика для `reviews` (теперь через `tools` rows, `lastModified` = `t.updated_at`) и `guides` (остался MDX-driven). Сам tools-loop был и до, но эмитировал только `/tools/[slug]` + `/alternatives/[slug]`; добавлен `/reviews/[slug]` per tool.
+- **`app/reviews/[slug]/opengraph-image.tsx` refactor** — `getAllMdxSlugs("reviews", "en")` + `readFrontmatter()` заменены на `tools.where(status='published')` + `fetchTool()` (читает name, meta_title, rating, updated_at). Без MDX весь файл стал DB-driven. Author-line убран (Botapolis editorial — известно из контекста); остались date + rating chip.
+- **TL;DR → At a glance** ([app/reviews/[slug]/page.tsx](app/reviews/[slug]/page.tsx)) — RU "Кратко" уже было ОК, EN убран "TL;DR" (программистский abbreviation посреди editorial review). Consistency с /compare/ которая давно использует "At a glance".
+- **Footer fix** — [components/nav/Footer.tsx:154](components/nav/Footer.tsx#L154) Library → Klaviyo review href с `/reviews/klaviyo-review-2026` на `/reviews/klaviyo`.
+- **Stale-doc cleanup** — обновил JSDoc example в [lib/seo/schema.ts:300](lib/seo/schema.ts#L300) (`/reviews/klaviyo-review-2026` → `/reviews/klaviyo`) и комментарий в [components/content/AffiliateButton.tsx:112](components/content/AffiliateButton.tsx#L112).
+- **Bulk MDX body refs** — sed loop по `content/**/*.mdx` для 6 slug'ов: `/reviews/{slug}-review-2026 → /reviews/{slug}`. Затронуты:
+  - `content/comparisons/en/klaviyo-vs-omnisend.mdx`
+  - `content/comparisons/en/klaviyo-vs-mailchimp.mdx`
+  - `content/guides/{en,ru}/support-automation-for-shopify-stores.mdx`
+  - `content/guides/{en,ru}/picking-the-right-sms-tool-for-shopify.mdx`
+  - `content/guides/{en,ru}/how-to-set-up-shopify-email-automation.mdx`
+  - `content/reviews/{en,ru}/klaviyo-pricing.mdx`
+  After sweep `grep -rln "review-2026" content/` returns пусто.
+- **Verify:** tsc clean, npm run build clean.
+
+### Обнаружено
+
+- **`/reviews/klaviyo-pricing` всё ещё 404 на проде.** Файл `content/reviews/{en,ru}/klaviyo-pricing.mdx` живёт, но `/reviews/[slug]` runtime — DB-driven с `dynamicParams=false`, и klaviyo-pricing не tool slug. URL не маршрутится. Per owner не трогать файл — оставил как есть, но Pagefind продолжает индексировать его (reviews:2 в search-index build). Search будет surface dead link. Нужно owner-решение: move в `/guides/`, добавить manual redirect, либо исключить из pagefind.
+- **`lib/content/rating.ts` теперь читает пустой MDX dir.** `getToolRatings` всегда сваливается на DB fallback (since `getAllMdxFrontmatter("reviews", ...)` возвращает только klaviyo-pricing — 1 entry без `toolSlug` field совпадающего с любым tool). Поведение корректное (DB-driven рейтинги на /compare/), но функция тратит FS-чтения зря. Cleanup-перфоманс задача.
+- **Build-time опасность пустого dir.** `getAllMdxFrontmatter("reviews", "en")` сейчас читает 1 файл (klaviyo-pricing) — он имеет `template: reviews` schema потому что лежит в reviews/. Если когда-нибудь его frontmatter сломается — каталог-страница /reviews показала бы только пустые карточки + warning в logs, и сайт остался бы прежним (DB-driven now). Резилиентно.
+- **Pagefind index** для review section — теперь содержит только klaviyo-pricing (2 entries). Не покрывает 30 runtime-reviews. Search не находит большую часть контента. Требуется отдельный refactor `scripts/build-search-index.ts` чтобы ингестить tool rows из БД. Большая задача, отдельная сессия.
+- **Sitemap до сегодня содержал 14 MDX-driven review URLs (7 EN + 7 RU klaviyo-pricing-style).** После refactor — 30 tool-driven URLs (with hreflang alternates). Net +16 индексируемых URL поднимется в GSC через 1-2 weeks crawl cycle.
+- **opengraph-image отсутствие author**: убрал поле потому что `tools` row не имеет explicit `author` field — для всех reviews это "Botapolis editorial". OG card стал чище.
+
+### Fixes
+
+- **Single canonical Klaviyo URL** на проде. Старые backlinks / GSC index работают через 308 redirect, в индекс попадает только `/reviews/klaviyo`. Дубликат-контент проблема решена.
+- **`/reviews` catalog показывает 30 runtime-reviews** вместо 6 legacy. Sitemap отдаёт всё 30 со свежим `lastModified` = `tool.updated_at`. Internal-link graph density выросла прямо сейчас.
+- **Footer ведёт на честный URL** — никаких 308-hop'ов от навигационных кликов.
+- **OG-card для 30 reviews** генерится автоматически из DB при следующем build/revalidate cycle. Old MDX-driven OG endpoints стали stale ghosts (`/reviews/klaviyo-review-2026/opengraph-image` ссылается на удалённый file), но и URL `/reviews/klaviyo-review-2026` 308 redirect'ит так что OG никогда не запрашивается.
+
+### Open follow-ups (приоритет)
+
+- **#1 Решение по `klaviyo-pricing.mdx`** — owner-решение:
+  - (a) move в `content/guides/klaviyo-pricing.mdx` → URL станет `/guides/klaviyo-pricing` + redirect `/reviews/klaviyo-pricing → /guides/klaviyo-pricing`. Самое правильное (это how-to, не review).
+  - (b) добавить manual redirect `/reviews/klaviyo-pricing → /reviews/klaviyo` и удалить MDX
+  - (c) keep как есть (404 на /reviews/klaviyo-pricing, mostly invisible)
+- **#2 `scripts/build-search-index.ts` refactor** — ingest tool rows из БД для review-section, не только MDX. Без этого pagefind покрывает только guides + klaviyo-pricing. Большая задача.
+- **#3 `lib/content/rating.ts:getToolRatings` cleanup** — упростить до tool.rating only (МDX path теперь dead). Перфоманс-нюанс, не блокер.
+- **#4 `scripts/seed-klaviyo-reference.ts` one-off** — удалить когда Klaviyo reference окончательно approved (на следующей итерации).
+- **#5 Carryovers from prior sessions:**
+  - tools table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at)
+  - system_config.modified_by CHECK constraint rejects agent values
+  - Capture SCOUT runtime AGENTS.md to /agent-snapshots/scout/
+  - Option B refactor /compare/[slug] MDX-driven (the bridge is MDX → DB; consider if MDX side worth retiring)
+  - Newsletter ingestion via Beehiiv
+  - OPS GPT-5.5 cost reconciliation
+  - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md
+  - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT
+  - Tighten app/robots.ts for AI crawlers до 50+ статей
+  - 29 tools без verdict — массовое наполнение когда reference approved
+

@@ -109,7 +109,7 @@ export async function AffiliateButton({
 
   // Block C — analytics dimensions. Source defaults to the campaign slug
   // when provided; that's the tightest funnel-attribution we have today
-  // (`review-klaviyo-review-2026`, `compare-klaviyo-vs-mailchimp`, etc.).
+  // (`review-klaviyo`, `compare-klaviyo-vs-mailchimp`, etc.).
   const eventLocale: "en" | "ru" = localePrefix === "/ru" ? "ru" : "en"
   const eventSource = campaign ?? `affiliate-button-${slug}`
 

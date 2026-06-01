@@ -1,120 +1,60 @@
-# Weekly Digest — 2026-W22
+# OPS Weekly Digest — 2026-W22
 
-**Generated:** 2026-05-25 17:51 America/Los_Angeles  
-**Coverage:** 2026-05-19 through 2026-05-25 (rolling 7 days)  
-**Comparison Window:** 2026-05-12 through 2026-05-18  
-**Prepared by:** OPS  
-**Status:** Ready for CHIEF review
+Generated: 2026-05-31T18:00:00-07:00  
+Coverage: current week 2026-05-25 to 2026-05-31; comparison week 2026-05-18 to 2026-05-24.
 
----
+## Executive summary
 
-## Executive Summary
+- GSC mature data is available for 5/7 current-week snapshot days (2026-05-25, 2026-05-26, 2026-05-27, 2026-05-28, 2026-05-29). 2026-05-30 and 2026-05-31 are not mature in GSC yet and are intentionally excluded from top-page movement.
+- Current-week GSC impressions: 246 vs 335 prior week (-89, -26.6%). Clicks: 0 vs 1 (-1).
+- Weighted average GSC position: 54.4 vs 43.7 prior week.
+- Affiliate clicks recorded in snapshots: 152 vs 27 prior week (+125, 463.0%). Prior-week affiliate data is partial before 2026-05-22.
+- Beehiiv total subscribers ended at 4; new subscribers in snapshots: 0. Newsletter open/click rates remain unavailable.
 
-OPS generated a rolling W22 digest because the W21 digest already exists at `agent-snapshots/ops/weekly-2026-W21.md`. Snapshot coverage is incomplete for both windows: current window has 5 performance snapshot rows; comparison window has 0. Week-over-week values from `performance_snapshots` are therefore marked unavailable where the prior baseline is missing.
+## Metric rollup
 
-Key points:
-- GSC remains at 0 impressions and 0 clicks in captured snapshots; this matches the known new-site delay pattern.
-- Performance snapshots show 41 affiliate clicks across 5 captured daily rows.
-- Raw `affiliate_clicks` table shows 61 clicks in the current rolling window vs 219 in the prior window (-72.1%). Treat this as directional only because early launch/test traffic likely affects the prior baseline.
-- Latest captured subscriber total is 1 with 0 new subscribers in captured snapshots. Subscriber totals remain inconsistent across recent runs and should be interpreted cautiously.
+|Metric|Current|Previous|WoW|
+|---|---|---|---|
+|GSC impressions|246|335|-89 (-26.6%)|
+|GSC clicks|0|1|-1 (-100.0%)|
+|GSC avg position|54.4|43.7|10.7 position points|
+|Keywords top 10|0|4|-4 (-100.0%)|
+|Keywords top 20|1|11|-10 (-90.9%)|
+|Keywords top 50|38|56|-18 (-32.1%)|
+|Affiliate clicks|152|27|+125 (463.0%)|
+|Affiliate conversions|0|0|+0 (0%)|
+|Affiliate revenue|$0|$0|$0|
+|New subscribers|0|0|+0 (0%)|
+|Ending total subscribers|4|6|-2 (-33.3%)|
 
----
+## Top page growers
 
-## Data Availability
+|Page|Current impressions|Prior impressions|Delta|Current avg pos|
+|---|---|---|---|---|
+|/tools/yotpo|30|20|+10|64.3|
+|/ru/tools/mailchimp|15|5|+10|42.3|
+|/compare/klaviyo-vs-omnisend|32|25|+7|57.6|
+|/compare/klaviyo-vs-manychat|20|17|+3|30.3|
+|/compare/manychat-vs-klaviyo|16|13|+3|57.0|
 
-| Source | Current Window | Status |
-|--------|----------------|--------|
-| performance_snapshots | 5 rows (2026-05-21, 2026-05-22, 2026-05-23, 2026-05-24, 2026-05-25) | Partial |
-| Previous baseline snapshots | 0 rows | Unavailable |
-| Affiliate clicks raw table | 61 current / 219 prior | Available |
-| Google Search Console | 0 impressions / 0 clicks | Live, no visible traffic yet |
-| Plausible | Not configured | Skipped |
-| PostHog | Not configured | Skipped |
-| Vercel API | Not configured | Health handled by separate curl/GitHub checks |
-| Recent OPS errors | 0 error/critical logs in last 24h | Clear |
-| CHIEF ops requests | 0 files | None pending |
+## Top page decliners
 
-Latest CHIEF priority files observed: `priorities-2026-W22.md`.
+|Page|Current impressions|Prior impressions|Delta|Current avg pos|
+|---|---|---|---|---|
+|/reviews/postscript-review-2026|29|63|-34|40.7|
+|/compare/klaviyo-vs-mailchimp|27|51|-24|82.3|
+|/compare/klaviyo-vs-postscript|7|23|-16|41.3|
+|/reviews/mailchimp-review-2026|15|29|-14|60.5|
+|/reviews/klaviyo-review-2026|15|24|-9|36.1|
 
----
+## Operational notes
 
-## Metrics
+- Recent OPS errors or critical logs in the last 24h: 0.
+- CHIEF ops request files visible via GitHub: 8.
+- Current-week CHIEF priorities file: present.
+- Local session context: `sessions/infra-log.md` was not present in the OPS workspace at digest time, so no recent infra-log blocks were included.
+- Plausible, PostHog, and Vercel API remain intentionally skipped where not configured; site health uses GitHub/curl checks separately.
 
-| Metric | Current Window | Prior Window | WoW |
-|--------|----------------|--------------|-----|
-| Snapshot rows | 5 | 0 | n/a |
-| GSC impressions | 0 | — | n/a |
-| GSC clicks | 0 | — | n/a |
-| Affiliate clicks (snapshots) | 41 | — | n/a |
-| Affiliate clicks (raw table) | 61 | 219 | -72.1% |
-| Affiliate conversions | 0 | — | n/a |
-| Affiliate revenue | $0.00 | — | n/a |
-| New subscribers | 0 | — | n/a |
-| Latest total subscribers | 1 | — | n/a |
+## Interpretation
 
----
-
-## Daily Breakdown
-
-| Date | Aff Clicks | New Subs | Total Subs | GSC Imp | GSC Clicks | Vercel Error Rate |
-|------|------------|----------|------------|---------|------------|-------------------|
-| 2026-05-21 | — | — | — | — | — | — |
-| 2026-05-22 | 11 | 0 | 6 | 0 | 0 | — |
-| 2026-05-23 | 9 | 0 | 6 | — | — | 0 |
-| 2026-05-24 | 7 | 0 | 6 | 0 | 0 | — |
-| 2026-05-25 | 14 | 0 | 1 | 0 | 0 | — |
-
----
-
-## Top Affiliate Tools
-
-| Rank | Tool | Raw Clicks |
-|------|------|------------|
-| 1 | Postscript (postscript) | 13 |
-| 2 | Klaviyo (klaviyo) | 12 |
-| 3 | Omnisend (omnisend) | 6 |
-| 4 | Mailchimp (mailchimp) | 6 |
-| 5 | Loop Subscriptions (loop-subscriptions) | 5 |
-| 6 | ManyChat (manychat) | 5 |
-| 7 | Gorgias (gorgias) | 4 |
-| 8 | Tidio (tidio) | 3 |
-| 9 | Judge.me (judge-me) | 3 |
-| 10 | Yotpo (yotpo) | 2 |
-
----
-
-## Movers
-
-### Top Growers
-
-| Tool | Current | Prior | Delta | Change |
-|------|---------|-------|-------|--------|
-| Loop Subscriptions (loop-subscriptions) | 5 | 0 | +5 | new |
-| Judge.me (judge-me) | 3 | 2 | +1 | +50.0% |
-
-### Top Decliners
-
-| Tool | Current | Prior | Delta | Change |
-|------|---------|-------|-------|--------|
-| Omnisend (omnisend) | 6 | 62 | -56 | -90.3% |
-| Klaviyo (klaviyo) | 12 | 61 | -49 | -80.3% |
-| Gorgias (gorgias) | 4 | 25 | -21 | -84.0% |
-| Mailchimp (mailchimp) | 6 | 23 | -17 | -73.9% |
-| Tidio (tidio) | 3 | 10 | -7 | -70.0% |
-
----
-
-## Anomalies And Notes
-
-1. Raw affiliate clicks are down -72.1% vs the previous rolling window. Because this is still launch baseline establishment and the prior window may include setup/test behavior, this is a watch item rather than an alert.
-2. Snapshot subscriber totals changed from 6 in earlier rows to 1 on 2026-05-25. This matches the known Supabase/Beehiiv count discrepancy and needs source-of-truth clarification.
-3. GSC remains at zero. Per MEMORY.md, do not alert on GSC dips or zeros until data has had 48+ hours to settle.
-4. No OPS error or critical logs were found in the last 24 hours.
-
----
-
-## Next Actions For CHIEF
-
-1. Confirm whether W22 priorities in `agent-snapshots/chief/priorities-2026-W22.md` should trigger packet generation now.
-2. Clarify subscriber source of truth: Supabase subscriber table vs Beehiiv subscription count.
-3. Continue monitoring affiliate click baseline for one more full week before treating drops as operational anomalies.
+GSC visibility is lower than the prior full mature week, mainly because current-week GSC only has five mature days and still has zero clicks. The strongest current page-level visibility remains comparison/review inventory, led by `/compare/klaviyo-vs-omnisend`, `/compare/klaviyo-vs-manychat`, `/reviews/postscript-review-2026`, and `/compare/klaviyo-vs-mailchimp`. Affiliate click volume is materially higher in snapshot data, but the comparison baseline is partial before 2026-05-22, so treat that increase as directional rather than a clean WoW signal.

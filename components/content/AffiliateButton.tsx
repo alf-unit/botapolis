@@ -48,6 +48,7 @@ type ToolPick = Pick<
   ToolRow,
   | "slug" | "name" | "name_ru" | "tagline" | "tagline_ru"
   | "logo_url" | "pricing_min" | "pricing_max" | "pricing_model"
+  | "affiliate_url"
 >
 
 async function fetchTool(slug: string): Promise<ToolPick | null> {
@@ -55,7 +56,7 @@ async function fetchTool(slug: string): Promise<ToolPick | null> {
     const supabase = createServiceClient()
     const { data, error } = await supabase
       .from("tools")
-      .select("slug, name, name_ru, tagline, tagline_ru, logo_url, pricing_min, pricing_max, pricing_model")
+      .select("slug, name, name_ru, tagline, tagline_ru, logo_url, pricing_min, pricing_max, pricing_model, affiliate_url")
       .eq("slug", slug)
       .eq("status", "published")
       .maybeSingle()
@@ -86,6 +87,12 @@ export async function AffiliateButton({
   className,
 }: AffiliateButtonProps) {
   const rawTool = await fetchTool(slug)
+  // Judge.me carve-out (content-flags.md `catalog-no-affiliate`): when a
+  // tool is published WITHOUT an affiliate_url, we render no CTA at all.
+  // The review page still ships — but never with a fake "/go/judge-me"
+  // link that 404s or redirects to the homepage. Internal-link CTAs that
+  // surface partner alternatives (Loox / Yotpo) live elsewhere on the page.
+  if (rawTool && rawTool.affiliate_url == null) return null
   // Resolve RU copy when we're rendering inside a /ru/ route so the CTA's
   // brand name + tagline match the surrounding article. EN routes get the
   // English columns untouched.

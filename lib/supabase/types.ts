@@ -49,17 +49,60 @@ export type ContentType      = "review" | "guide" | "tool" | "blog" | "best" | "
 export type FeaturedTier     = "basic" | "premium" | "sponsor"
 
 // Embedded JSONB shapes ------------------------------------------------------
+// ToolFeature — shape rewritten by the Etap D parser (migration 015 + parser
+// at `scripts/apply-phase0-research.ts`). Pre-Etap-D rows used `{name,
+// description?, included: boolean}`; Etap D rows use `{name, description?,
+// is_ai?, ai_kind?, plan_availability?}`. Both shapes kept optional so the
+// type covers archived legacy rows as well as the 30 freshly-populated ones.
 export type ToolFeature = {
   name: string
   description?: string
-  included: boolean
+  is_ai?: boolean
+  ai_kind?: string
+  plan_availability?: string
+  /** Legacy pre-Etap-D shape; not written by current parser. */
+  included?: boolean
 }
 
+// ToolRatingBreakdown — Etap D parser stores per-axis objects carrying the
+// `[H]` (hands-on) / `[I]` (inferred) source tag from R5 alongside the score.
+// Earlier seed data used flat numbers, so the axis type accepts both. Use the
+// `getRatingAxisValue` helper in render code to normalise on read.
+export type ToolRatingBreakdownAxis =
+  | number
+  | { value: number; source?: "H" | "I" }
+
 export type ToolRatingBreakdown = {
-  ease_of_use?: number
-  value?: number
-  support?: number
-  features?: number
+  ease_of_use?: ToolRatingBreakdownAxis
+  value?:       ToolRatingBreakdownAxis
+  support?:     ToolRatingBreakdownAxis
+  features?:    ToolRatingBreakdownAxis
+}
+
+// ToolExternalRatings — migration 015 jsonb shape. Holds RAW vendor-platform
+// rating snapshots (G2, Trustpilot, Shopify App Store). STRICTLY separate
+// from the editorial 4-axis score in rating + rating_breakdown — never merge.
+// Per-platform fields can be null when the source was NOT FOUND or omitted.
+export type ToolExternalRatingsPlatform = {
+  score:   number | null
+  reviews: number | null
+  /** Optional human note (e.g. "Mixed — no consolidated business profile"). */
+  note?:   string | null
+}
+export type ToolExternalRatings = {
+  g2?:             ToolExternalRatingsPlatform | null
+  trustpilot?:     ToolExternalRatingsPlatform | null
+  shopify_store?:  ToolExternalRatingsPlatform | null
+}
+
+// ToolOperatorQuote — migration 015 jsonb shape. Verbatim quotes from R5
+// (G2 / Reddit / case studies) — used as a social-proof block in Etap E
+// review pages. NEVER localised: preserves the operator's exact language.
+export type ToolOperatorQuote = {
+  quote:  string
+  source: string
+  /** Year or YYYY-MM-DD; freeform per R5 format. */
+  date?:  string
 }
 
 export type ComparisonWinnerFor = {
@@ -96,16 +139,23 @@ export type ToolRow = {
   cons: string[]
   best_for: string | null
   not_for: string | null
-  // Russian-locale columns (migration 005). Null = "not yet translated";
-  // consumers fall back to the English column. Use the localizeTool helper
-  // from @/lib/content/tool-locale so the fallback pattern is centralised
-  // and every page applies it the same way.
+  // Russian-locale columns (migration 005 + extended in 016). Null = "not
+  // yet translated"; consumers fall back to the English column. Use the
+  // localizeTool helper from @/lib/content/tool-locale so the fallback
+  // pattern is centralised and every page applies it the same way.
   name_ru: string | null
   tagline_ru: string | null
   description_ru: string | null
   pros_ru: string[] | null
   cons_ru: string[] | null
   best_for_ru: string | null
+  // Migration 016 — RU twins added for Etap E runtime review pages.
+  not_for_ru: string | null
+  pricing_notes_ru: string | null
+  features_ru: ToolFeature[] | null
+  shopify_native_notes_ru: string | null
+  meta_title_ru: string | null
+  meta_description_ru: string | null
   alternatives_to: string[]
   featured: number
   status: ToolStatus
@@ -115,6 +165,21 @@ export type ToolRow = {
   // sitemap-diff cycle. NULL until SCOUT has crawled, or for vendors whose
   // sitemap is not discoverable. Used only by SCOUT; not surfaced on the site.
   sitemap_url: string | null
+  // Migration 015 — Etap D fields written by `scripts/apply-phase0-research.ts`.
+  // Documentation and shape constraints live in 015 SQL comments.
+  integrates_with_tools:    string[] | null
+  operator_quotes:          ToolOperatorQuote[]
+  external_ratings:         ToolExternalRatings | null
+  affiliate_commission:     string | null
+  affiliate_cookie_window:  string | null
+  affiliate_program_url:    string | null
+  pricing_source_url:       string | null
+  shopify_native_notes:     string | null
+  // Migration 016 — editorial verdict (EN + RU). Honest analyst conclusion
+  // derived from aggregated R1-R6 data. NEVER fabricated hands-on narrative.
+  // NULL = Verdict section is hidden on the rendered review page.
+  verdict:    string | null
+  verdict_ru: string | null
   created_at: string
   updated_at: string
 }

@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowUpRight } from "lucide-react"
+import { ArrowUpRight, ExternalLink } from "lucide-react"
 import type { Metadata } from "next"
 
 import { Navbar } from "@/components/nav/Navbar"
@@ -10,7 +10,6 @@ import { ArticleCover, reviewOgCoverHref } from "@/components/content/ArticleCov
 import { TableOfContents } from "@/components/content/TableOfContents"
 import { ProsConsList } from "@/components/content/ProsConsList"
 import { AffiliateButton } from "@/components/content/AffiliateButton"
-import { RelatedArticles } from "@/components/content/RelatedArticles"
 import { ScrollMilestone } from "@/components/analytics/ScrollMilestone"
 import { ToolLogo } from "@/components/tools/ToolLogo"
 import { buttonVariants } from "@/components/ui/button"
@@ -20,51 +19,56 @@ import {
   generateBreadcrumbSchema,
   generateReviewSchema,
 } from "@/lib/seo/schema"
-import { getAllMdxSlugs, getMdxContent } from "@/lib/content/mdx"
 import { createServiceClient } from "@/lib/supabase/service"
+import { localizeTool } from "@/lib/content/tool-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
-import { absoluteUrl, cn } from "@/lib/utils"
-import type { ToolRow } from "@/lib/supabase/types"
+import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
+import type {
+  ToolFeature,
+  ToolOperatorQuote,
+  ToolRatingBreakdownAxis,
+  ToolRow,
+} from "@/lib/supabase/types"
+import type { TocEntry } from "@/lib/content/toc"
 
 /* ----------------------------------------------------------------------------
-   /reviews/[slug] — long-form tool review
+   /reviews/[slug] — runtime DB-driven tool review (Phase 0 Etap E)
    ----------------------------------------------------------------------------
-   The MDX file at content/reviews/{lang}/{slug}.mdx is the source of truth
-   for body copy + frontmatter (rating, pros, cons, toolSlug, ...). We
-   additionally hydrate the referenced Supabase tool row to power the
-   sidebar "Try it" card and SoftwareApplication schema.
+   Flipped from legacy MDX-first hybrid to honest runtime generation on
+   2026-05-31 (owner-locked Option A). The page now reads everything off the
+   tools row in Supabase — frontmatter is gone, MDX body is gone. Sections
+   render conditionally based on which jsonb / scalar fields are populated.
 
-   Routing note: single-segment `[slug]` (not `[...slug]`) because Next 16's
-   colocated `opengraph-image.tsx` is incompatible with catch-all routes —
-   same constraint /compare/[slug] hit. Single-segment is fine here too.
+   Source of truth: tools.where(slug = $1, status = 'published') + the
+   localizeTool helper which swaps EN → *_ru when locale='ru'. Migration 016
+   added the *_ru twins for the new long-form fields and the editorial
+   verdict pair.
+
+   Static params: union of all published tool slugs (~30 today, scales with
+   the catalog). dynamicParams = false — unknown slugs 404 cleanly.
+
+   Routing note: /ru/reviews/[slug] re-exports this module. Locale is read
+   via `getLocale()` (proxy.ts sets `x-locale` from the /ru prefix).
 ---------------------------------------------------------------------------- */
 
 export const revalidate = 86400
-export const dynamicParams = false  // MDX is build-time, unknown slugs → 404
+export const dynamicParams = false
 
 interface PageProps {
   params: Promise<{ slug: string }>
 }
 
-// Pull just enough to power the sidebar + schema; the review body lives in
-// MDX so we don't need the long-form fields from Supabase.
-type ToolPick = Pick<
-  ToolRow,
-  | "slug" | "name" | "tagline" | "description"
-  | "category" | "logo_url" | "website_url"
-  | "pricing_min" | "pricing_max" | "pricing_model"
-  | "rating" | "pros" | "cons"
->
+// ============================================================================
+// Data
+// ============================================================================
 
-async function fetchTool(slug: string): Promise<ToolPick | null> {
+async function fetchTool(slug: string): Promise<ToolRow | null> {
   try {
     const supabase = createServiceClient()
     const { data, error } = await supabase
       .from("tools")
-      .select(
-        "slug, name, tagline, description, category, logo_url, website_url, pricing_min, pricing_max, pricing_model, rating, pros, cons",
-      )
+      .select("*")
       .eq("slug", slug)
       .eq("status", "published")
       .maybeSingle()
@@ -79,134 +83,262 @@ async function fetchTool(slug: string): Promise<ToolPick | null> {
   }
 }
 
-export async function generateStaticParams() {
-  // Build all locales' slugs together — duplicates collapse to the same
-  // route param, no harm done.
-  const en = await getAllMdxSlugs("reviews", "en")
-  const ru = await getAllMdxSlugs("reviews", "ru")
-  const all = new Set([...en, ...ru])
-  return [...all].map((slug) => ({ slug }))
+/**
+ * Fetch the slug + name + logo for every tool referenced in
+ * `integrates_with_tools`. Used to render the cross-link grid in the
+ * Integrations section. Empty input → empty output, no DB hit.
+ */
+async function fetchCrossLinkedTools(
+  slugs: ReadonlyArray<string>,
+): Promise<Array<Pick<ToolRow, "slug" | "name" | "name_ru" | "logo_url" | "affiliate_url">>> {
+  if (slugs.length === 0) return []
+  try {
+    const supabase = createServiceClient()
+    const { data, error } = await supabase
+      .from("tools")
+      .select("slug, name, name_ru, logo_url, affiliate_url")
+      .eq("status", "published")
+      .in("slug", slugs as string[])
+    if (error) {
+      console.error(`[/reviews] cross-link fetch failed:`, error.message)
+      return []
+    }
+    return data ?? []
+  } catch (err) {
+    console.error(`[/reviews] cross-link fetch threw:`, err)
+    return []
+  }
 }
+
+export async function generateStaticParams() {
+  try {
+    const supabase = createServiceClient()
+    const { data, error } = await supabase
+      .from("tools")
+      .select("slug")
+      .eq("status", "published")
+      .limit(500)
+    if (error || !data) return []
+    return data.map((t) => ({ slug: t.slug }))
+  } catch {
+    // Migration may not be applied to this DB yet; without published rows the
+    // build emits zero static review URLs and the route surface is empty.
+    return []
+  }
+}
+
+// ============================================================================
+// Metadata
+// ============================================================================
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const locale = await getLocale()
-  const review = await getMdxContent("reviews", slug, locale)
+  const rawTool = await fetchTool(slug)
 
-  if (!review) {
+  if (!rawTool) {
     return buildMetadata({
-      title: "Review not found",
+      title:       "Review not found",
       description: "We couldn't find this review.",
-      path: `/reviews/${slug}`,
+      path:        `/reviews/${slug}`,
       locale,
-      noIndex: true,
+      noIndex:     true,
     })
   }
 
-  const { frontmatter } = review
+  const tool = localizeTool(rawTool, locale as "en" | "ru")
+
+  const fallbackTitle = locale === "ru"
+    ? `${tool.name} — обзор 2026 для Shopify`
+    : `${tool.name} review 2026 for Shopify`
+  const fallbackDescription = tool.tagline
+    ?? tool.description
+    ?? `${tool.name} — review.`
+
   return buildMetadata({
-    title: frontmatter.title,
-    description: frontmatter.description,
-    path: `/reviews/${slug}`,
+    title:       tool.meta_title       ?? fallbackTitle,
+    description: tool.meta_description ?? fallbackDescription,
+    path:        `/reviews/${slug}`,
     locale,
-    type: "article",
-    ogImage: frontmatter.ogImage,
+    type:        "article",
     article: {
-      publishedTime: frontmatter.publishedAt,
-      modifiedTime: frontmatter.updatedAt ?? frontmatter.publishedAt,
-      author: frontmatter.author,
-      tags: frontmatter.tags,
-      section: "review",
+      publishedTime: tool.created_at,
+      modifiedTime:  tool.updated_at,
+      author:        "Botapolis editorial",
+      section:       "review",
+      tags:          [slug, "review", "shopify", tool.category],
     },
-    keywords: [...frontmatter.tags, "review", "shopify"],
+    keywords:    [tool.name, "review", "shopify", tool.category],
   })
 }
 
+// ============================================================================
+// Helpers — render-side normalisers
+// ============================================================================
+
+/** Rating breakdown axes: accept legacy `number` and Etap-D `{value, source}`. */
+function axisValue(axis: ToolRatingBreakdownAxis | undefined): number | null {
+  if (axis == null) return null
+  return typeof axis === "number" ? axis : axis.value
+}
+function axisSource(axis: ToolRatingBreakdownAxis | undefined): "H" | "I" | null {
+  if (axis == null || typeof axis === "number") return null
+  return axis.source ?? null
+}
+
+/** Coarse reading-time estimate from concatenated long-form fields. */
+function estimateReadingTime(tool: ToolRow, locale: "en" | "ru"): string {
+  const parts = [
+    tool.description ?? "",
+    tool.pricing_notes ?? "",
+    tool.shopify_native_notes ?? "",
+    tool.verdict ?? "",
+    ...(tool.features ?? []).map((f) => `${f.name} ${f.description ?? ""}`),
+    ...(tool.operator_quotes ?? []).map((q) => q.quote),
+  ]
+  const words = parts.join(" ").split(/\s+/).filter(Boolean).length
+  const minutes = Math.max(1, Math.ceil(words / 220))
+  return locale === "ru" ? `${minutes} мин чтения` : `${minutes} min read`
+}
+
+// ============================================================================
+// Page
+// ============================================================================
+
 export default async function ReviewPage({ params }: PageProps) {
   const { slug } = await params
-  const locale = await getLocale()
-  const review = await getMdxContent("reviews", slug, locale)
-  if (!review) notFound()
+  const rawTool = await fetchTool(slug)
+  if (!rawTool) notFound()
 
+  const locale = (await getLocale()) as "en" | "ru"
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
-  const { frontmatter, content, toc, readingTime, fellBackToEn } = review
+  const tool = localizeTool(rawTool, locale)
 
-  const tool = await fetchTool(frontmatter.toolSlug)
-
-  // Schema: Article wraps the editorial frame; Review wraps a
-  // SoftwareApplication node so Google can render aggregateRating in results.
   const reviewPath = `${localePrefix}/reviews/${slug}`
+
+  // Cross-linked tools — one DB call covering the integrates_with_tools list.
+  const crossLinked = await fetchCrossLinkedTools(tool.integrates_with_tools ?? [])
+
+  // i18n strings — local until reviews earn a dict section.
+  const t = {
+    eyebrow:          locale === "ru" ? "Обзор" : "Review",
+    bestForLabel:     locale === "ru" ? "Лучше всего для" : "Best for",
+    notForLabel:      locale === "ru" ? "Не подойдёт если" : "Skip if",
+    prosLabel:        locale === "ru" ? "Плюсы" : "Pros",
+    consLabel:        locale === "ru" ? "Минусы" : "Cons",
+    tldrHeading:      locale === "ru" ? "Кратко" : "TL;DR",
+    fitHeading:       locale === "ru" ? "Кому подойдёт" : "Who it fits",
+    prosConsHeading:  locale === "ru" ? "Плюсы и минусы" : "Pros & cons",
+    pricingHeading:   locale === "ru" ? "Цены" : "Pricing",
+    featuresHeading:  locale === "ru" ? "Возможности" : "Features",
+    shopifyHeading:   locale === "ru" ? "Shopify-интеграция" : "Shopify integration",
+    integrationsHeading: locale === "ru" ? "Интеграции" : "Integrations",
+    ratingsHeading:   locale === "ru" ? "Оценка по 4 осям" : "Rating breakdown",
+    externalRatingsHeading: locale === "ru" ? "Сторонние рейтинги" : "External ratings",
+    operatorQuotesHeading: locale === "ru" ? "Что говорят операторы" : "What operators say",
+    verdictHeading:   locale === "ru" ? "Наш вывод" : "Our verdict",
+    tocLabel:         locale === "ru" ? "Содержание" : "On this page",
+    perMonth:         locale === "ru" ? "/мес" : "/mo",
+    startingPrice:    locale === "ru" ? "Старт от" : "Starting price",
+    upTo:             locale === "ru" ? "до" : "up to",
+    pricingModel:     locale === "ru" ? "Модель" : "Model",
+    pricingSource:    locale === "ru" ? "Источник цен" : "Pricing source",
+    free:             locale === "ru" ? "Бесплатно" : "Free",
+    externalPlatformsLabel: locale === "ru" ? "Внешние платформы" : "External platforms",
+    crossLinkedLabel: locale === "ru" ? "Интеграции с тулзами каталога" : "Catalog integrations",
+    visitWebsite:     locale === "ru" ? "Сайт" : "Website",
+    tryCta:           locale === "ru" ? "Открыть" : "Try",
+    ratingChip:       locale === "ru" ? "Оценка" : "Rating",
+    sourceHandsOn:    locale === "ru" ? "руки в продукте" : "hands-on",
+    sourceInferred:   locale === "ru" ? "выведено" : "inferred",
+    reviewsLabel:     locale === "ru" ? "отзывов" : "reviews",
+    axes: {
+      ease_of_use: locale === "ru" ? "Удобство" : "Ease of use",
+      features:    locale === "ru" ? "Возможности" : "Features",
+      value:       locale === "ru" ? "Цена/качество" : "Value",
+      support:     locale === "ru" ? "Поддержка" : "Support",
+    },
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Synthetic ToC — sections render conditionally; only include the IDs
+  // we actually emit. Order matches the body below.
+  // ──────────────────────────────────────────────────────────────────────
+  const hasFitChips = !!tool.best_for || !!tool.not_for
+  const hasProsCons = (tool.pros?.length ?? 0) > 0 || (tool.cons?.length ?? 0) > 0
+  const hasFeatures = (tool.features?.length ?? 0) > 0
+  const hasShopifyNotes = !!tool.shopify_native_notes
+  const hasIntegrations = (tool.integrations?.length ?? 0) > 0 || crossLinked.length > 0
+  const hasRatingBreakdown = !!tool.rating_breakdown && Object.keys(tool.rating_breakdown).length > 0
+  const hasExternalRatings = !!tool.external_ratings && Object.values(tool.external_ratings).some(
+    (p) => p != null && (p.score != null || p.reviews != null),
+  )
+  const hasOperatorQuotes = (tool.operator_quotes?.length ?? 0) > 0
+  const hasVerdict = !!tool.verdict
+
+  const tocEntries: TocEntry[] = []
+  if (tool.description) tocEntries.push({ id: "tldr", title: t.tldrHeading, level: 2 })
+  if (hasFitChips)       tocEntries.push({ id: "fit", title: t.fitHeading, level: 2 })
+  if (hasProsCons)       tocEntries.push({ id: "pros-cons", title: t.prosConsHeading, level: 2 })
+  tocEntries.push({ id: "pricing", title: t.pricingHeading, level: 2 })
+  if (hasFeatures)         tocEntries.push({ id: "features", title: t.featuresHeading, level: 2 })
+  if (hasShopifyNotes)     tocEntries.push({ id: "shopify-integration", title: t.shopifyHeading, level: 2 })
+  if (hasIntegrations)     tocEntries.push({ id: "integrations", title: t.integrationsHeading, level: 2 })
+  if (hasRatingBreakdown)  tocEntries.push({ id: "rating-breakdown", title: t.ratingsHeading, level: 2 })
+  if (hasExternalRatings)  tocEntries.push({ id: "external-ratings", title: t.externalRatingsHeading, level: 2 })
+  if (hasOperatorQuotes)   tocEntries.push({ id: "operator-quotes", title: t.operatorQuotesHeading, level: 2 })
+  if (hasVerdict)          tocEntries.push({ id: "verdict", title: t.verdictHeading, level: 2 })
+
+  // ──────────────────────────────────────────────────────────────────────
+  // JSON-LD
+  // ──────────────────────────────────────────────────────────────────────
+  const headline = tool.meta_title ?? `${tool.name} review 2026`
+  const description = tool.meta_description ?? tool.tagline ?? tool.description ?? ""
+
   const breadcrumb = generateBreadcrumbSchema([
     { name: locale === "ru" ? "Главная" : "Home", path: `${localePrefix}/` },
     { name: dict.nav.reviews, path: `${localePrefix}/reviews` },
-    { name: frontmatter.title, path: reviewPath },
+    { name: tool.name, path: reviewPath },
   ])
   const article = generateArticleSchema({
-    headline: frontmatter.title,
-    description: frontmatter.description,
+    headline,
+    description,
     path: reviewPath,
-    publishedAt: frontmatter.publishedAt,
-    updatedAt: frontmatter.updatedAt,
-    authorName: frontmatter.author,
+    publishedAt: tool.created_at,
+    updatedAt: tool.updated_at,
+    authorName: "Botapolis editorial",
     section: "review",
-    tags: frontmatter.tags,
+    tags: [slug, tool.category, "review", "shopify"],
+  })
+  const reviewSchema = generateReviewSchema({
+    tool: {
+      name: tool.name,
+      slug: tool.slug,
+      description: tool.description,
+      tagline: tool.tagline,
+      category: tool.category,
+      logo_url: tool.logo_url,
+      website_url: tool.website_url,
+      pricing_min: tool.pricing_min,
+      pricing_model: tool.pricing_model,
+      rating: tool.rating,
+      pros: tool.pros ?? [],
+      cons: tool.cons ?? [],
+    },
+    authorName: "Botapolis editorial",
+    publishedAt: tool.created_at,
+    updatedAt: tool.updated_at,
+    reviewPath,
   })
 
-  // Only emit the Review schema if we actually have a hydrated tool — without
-  // the SoftwareApplication body, Google flags an incomplete Review node.
-  const reviewSchema = tool
-    ? generateReviewSchema({
-        tool: {
-          name: tool.name,
-          slug: tool.slug,
-          description: tool.description,
-          tagline: tool.tagline,
-          category: tool.category,
-          logo_url: tool.logo_url,
-          website_url: tool.website_url,
-          pricing_min: tool.pricing_min,
-          pricing_model: tool.pricing_model,
-          rating: frontmatter.rating ?? tool.rating,
-          // Use the article's pros/cons when present (more curated), else
-          // fall back to the DB row's lists.
-          pros: frontmatter.pros.length ? frontmatter.pros : tool.pros,
-          cons: frontmatter.cons.length ? frontmatter.cons : tool.cons,
-        },
-        authorName: frontmatter.author,
-        publishedAt: frontmatter.publishedAt,
-        updatedAt: frontmatter.updatedAt ?? frontmatter.publishedAt,
-        reviewPath,
-      })
-    : null
-
-  const t = {
-    eyebrow: locale === "ru" ? "Обзор" : "Review",
-    prosLabel: locale === "ru" ? "Плюсы" : "Pros",
-    consLabel: locale === "ru" ? "Минусы" : "Cons",
-    verdictHeading: locale === "ru" ? "Итог" : "Verdict",
-    tocLabel: locale === "ru" ? "Содержание" : "On this page",
-    sidebarTry: locale === "ru" ? "Открыть" : "Try it",
-    sidebarVisit: locale === "ru" ? "Сайт" : "Website",
-    bestForLabel: locale === "ru" ? "Лучше всего для" : "Best for",
-    notForLabel: locale === "ru" ? "Не подойдёт если" : "Skip if",
-    fellBackTitle:
-      locale === "ru"
-        ? "Перевод в работе"
-        : "Translation in progress",
-    fellBackBody:
-      locale === "ru"
-        ? "Эта статья пока доступна только на английском. Мы переводим её."
-        : "This article hasn't been translated yet — you're reading the English original.",
-  }
-
-  // Programmatic brand cover: the tool's official logo on the mint→violet
-  // OG atmosphere. `coverImage` in frontmatter overrides it with a real
-  // photo; ArticleCover falls back to its gradient if neither resolves.
+  // ──────────────────────────────────────────────────────────────────────
+  // Programmatic OG cover — same recipe as legacy reviews
+  // ──────────────────────────────────────────────────────────────────────
   const ogCoverHref = reviewOgCoverHref({
-    toolName: tool?.name,
-    logoUrl: tool?.logo_url,
-    rating: frontmatter.rating ?? tool?.rating ?? null,
+    toolName: tool.name,
+    logoUrl: tool.logo_url,
+    rating: tool.rating,
     eyebrowWord: t.eyebrow,
   })
 
@@ -217,155 +349,243 @@ export default async function ReviewPage({ params }: PageProps) {
       <main>
         <ArticleHero
           eyebrow={t.eyebrow}
-          title={frontmatter.title}
-          lede={frontmatter.description}
-          publishedAt={frontmatter.publishedAt}
-          updatedAt={frontmatter.updatedAt}
-          readingTime={readingTime.text}
-          author={frontmatter.author}
+          title={headline}
+          lede={tool.tagline ?? tool.description ?? ""}
+          publishedAt={tool.created_at.slice(0, 10)}
+          updatedAt={tool.updated_at.slice(0, 10)}
+          readingTime={estimateReadingTime(tool, locale)}
+          author="Botapolis editorial"
           breadcrumbs={[
             { name: dict.nav.reviews, href: `${localePrefix}/reviews` },
-            { name: frontmatter.title, href: reviewPath },
+            { name: tool.name, href: reviewPath },
           ]}
           localePrefix={localePrefix}
           locale={locale}
-          showAffiliateNotice
-          notice={
-            fellBackToEn ? (
-              <FellBackNotice title={t.fellBackTitle} body={t.fellBackBody} />
-            ) : null
-          }
-          aside={
-            frontmatter.rating != null ? (
-              <RatingBadge value={frontmatter.rating} locale={locale} />
-            ) : null
-          }
+          showAffiliateNotice={tool.affiliate_url != null}
+          aside={tool.rating != null ? (
+            <RatingBadge value={tool.rating} locale={locale} chipLabel={t.ratingChip} />
+          ) : null}
         />
 
-        {/* Wave 5 audit alignment (design v.026): decorative 21:9
-            gradient cover sits between the hero text and the article
-            body. Variant is picked deterministically from the slug, so
-            every review has a stable colour identity across deploys. */}
-        <ArticleCover
-          slug={slug}
-          coverImage={frontmatter.coverImage}
-          ogCoverHref={ogCoverHref}
-        />
+        <ArticleCover slug={slug} ogCoverHref={ogCoverHref} />
 
-        {/* Body grid: TOC sidebar (desktop) + article column */}
         <section className="container-default py-12 lg:py-16">
           <div className="grid gap-10 lg:grid-cols-[1fr_240px] lg:gap-14">
             <article className="min-w-0">
-              {/* Authors lean on hand-written pros/cons via frontmatter; we
-                  render them before the body so the skim-reader gets the
-                  verdict without scrolling the whole article. */}
-              {(frontmatter.pros.length > 0 || frontmatter.cons.length > 0) && (
-                <ProsConsList
-                  pros={frontmatter.pros}
-                  cons={frontmatter.cons}
-                  prosLabel={t.prosLabel}
-                  consLabel={t.consLabel}
-                  className="my-0 mb-10"
-                />
+              {/* ── TL;DR ──────────────────────────────────────────────── */}
+              {tool.description && (
+                <Section id="tldr" title={t.tldrHeading} eyebrow="01">
+                  <p className="max-w-3xl text-[17px] leading-[1.7] text-[var(--text-secondary)]">
+                    {tool.description}
+                  </p>
+                </Section>
               )}
 
-              {(frontmatter.bestFor || frontmatter.notFor) && (
-                <FitChips
-                  bestFor={frontmatter.bestFor}
-                  notFor={frontmatter.notFor}
-                  bestForLabel={t.bestForLabel}
-                  notForLabel={t.notForLabel}
-                />
+              {/* ── Best for / Not for ────────────────────────────────── */}
+              {hasFitChips && (
+                <Section id="fit" title={t.fitHeading} eyebrow="02">
+                  <FitChips
+                    bestFor={tool.best_for ?? undefined}
+                    notFor={tool.not_for ?? undefined}
+                    bestForLabel={t.bestForLabel}
+                    notForLabel={t.notForLabel}
+                  />
+                </Section>
               )}
 
-              {content}
+              {/* ── Pros & Cons ────────────────────────────────────────── */}
+              {hasProsCons && (
+                <Section id="pros-cons" title={t.prosConsHeading} eyebrow="03">
+                  <ProsConsList
+                    pros={tool.pros ?? []}
+                    cons={tool.cons ?? []}
+                    prosLabel={t.prosLabel}
+                    consLabel={t.consLabel}
+                  />
+                </Section>
+              )}
 
-              {/* Block C — fires `review_scrolled_50` once when the
-                  sentinel below the article body enters the viewport.
-                  Captured before the verdict so we measure "did the reader
-                  reach the meat of the review", not "did they bounce to
-                  the verdict via the TOC". */}
-              <ScrollMilestone
-                event="review_scrolled_50"
-                properties={{ slug, locale }}
-              />
-
-              {frontmatter.verdict && (
-                <div
-                  id="verdict"
-                  className="mt-12 rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-6 lg:p-8 shadow-[var(--shadow-sm)]"
-                >
-                  <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--brand)]">
-                    {t.verdictHeading}
-                  </p>
-                  <p className="mt-3 text-[18px] leading-[1.65] text-[var(--text-primary)]">
-                    {frontmatter.verdict}
-                  </p>
+              {/* ── Pricing ────────────────────────────────────────────── */}
+              <Section id="pricing" title={t.pricingHeading} eyebrow="04">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <PriceCard tool={tool} locale={locale} t={t} />
+                  {tool.pricing_source_url && (
+                    <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6">
+                      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                        {t.pricingSource}
+                      </p>
+                      <Link
+                        href={tool.pricing_source_url}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                        className="mt-3 inline-flex items-center gap-1.5 text-[14px] text-[var(--brand)] underline-offset-4 hover:underline break-all"
+                      >
+                        {tool.pricing_source_url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                        <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+                      </Link>
+                    </div>
+                  )}
                 </div>
+                {tool.pricing_notes && (
+                  <div className="mt-6 max-w-3xl whitespace-pre-line text-[14px] leading-[1.7] text-[var(--text-secondary)]">
+                    {tool.pricing_notes}
+                  </div>
+                )}
+              </Section>
+
+              {/* ── Features ───────────────────────────────────────────── */}
+              {hasFeatures && (
+                <Section id="features" title={t.featuresHeading} eyebrow="05">
+                  <FeatureGrid features={tool.features ?? []} locale={locale} />
+                </Section>
               )}
 
-              {/* Tail CTA — always emit, even without a hydrated tool row.
-                  AffiliateButton degrades to slug-only label when DB miss. */}
+              {/* ── Shopify integration ───────────────────────────────── */}
+              {hasShopifyNotes && (
+                <Section id="shopify-integration" title={t.shopifyHeading} eyebrow="06">
+                  <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6 max-w-3xl">
+                    <p className="whitespace-pre-line text-[15px] leading-[1.7] text-[var(--text-primary)]">
+                      {tool.shopify_native_notes}
+                    </p>
+                  </div>
+                </Section>
+              )}
+
+              {/* ── Integrations ──────────────────────────────────────── */}
+              {hasIntegrations && (
+                <Section id="integrations" title={t.integrationsHeading} eyebrow="07">
+                  {tool.integrations && tool.integrations.length > 0 && (
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                        {t.externalPlatformsLabel}
+                      </p>
+                      <ul role="list" className="mt-3 flex flex-wrap gap-1.5">
+                        {tool.integrations.map((i) => (
+                          <li
+                            key={i}
+                            className="inline-flex items-center rounded-full border border-[var(--border-base)] bg-[var(--bg-base)] px-2.5 py-0.5 text-[12px] text-[var(--text-secondary)]"
+                          >
+                            {i}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {crossLinked.length > 0 && (
+                    <div className="mt-8">
+                      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                        {t.crossLinkedLabel}
+                      </p>
+                      <ul role="list" className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {crossLinked.map((c) => (
+                          <li key={c.slug}>
+                            <Link
+                              href={`${localePrefix}/reviews/${c.slug}`}
+                              className={cn(
+                                "group flex items-center gap-2.5 rounded-xl border border-[var(--border-base)]",
+                                "bg-[var(--bg-surface)] px-3 py-2 transition-colors",
+                                "hover:border-[var(--border-strong)]",
+                              )}
+                            >
+                              <ToolLogo
+                                src={c.logo_url}
+                                name={locale === "ru" ? (c.name_ru ?? c.name) : c.name}
+                                size={24}
+                                className="shrink-0 rounded-md"
+                              />
+                              <span className="text-[13px] font-medium text-[var(--text-primary)]">
+                                {locale === "ru" ? (c.name_ru ?? c.name) : c.name}
+                              </span>
+                              <ArrowUpRight className="ml-auto size-3.5 text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--brand)]" />
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </Section>
+              )}
+
+              {/* ── Rating breakdown ──────────────────────────────────── */}
+              {hasRatingBreakdown && tool.rating_breakdown && (
+                <Section id="rating-breakdown" title={t.ratingsHeading} eyebrow="08">
+                  <RatingBreakdownGrid
+                    breakdown={tool.rating_breakdown}
+                    labels={t.axes}
+                    sourceLabels={{ H: t.sourceHandsOn, I: t.sourceInferred }}
+                  />
+                </Section>
+              )}
+
+              {/* ── External ratings ──────────────────────────────────── */}
+              {hasExternalRatings && tool.external_ratings && (
+                <Section id="external-ratings" title={t.externalRatingsHeading} eyebrow="09">
+                  <ExternalRatingsList
+                    external={tool.external_ratings}
+                    reviewsLabel={t.reviewsLabel}
+                  />
+                </Section>
+              )}
+
+              {/* ── Operator quotes ───────────────────────────────────── */}
+              {hasOperatorQuotes && (
+                <Section id="operator-quotes" title={t.operatorQuotesHeading} eyebrow="10">
+                  <OperatorQuotesList quotes={tool.operator_quotes} />
+                </Section>
+              )}
+
+              <ScrollMilestone event="review_scrolled_50" properties={{ slug, locale }} />
+
+              {/* ── Verdict ───────────────────────────────────────────── */}
+              {hasVerdict && tool.verdict && (
+                <Section id="verdict" title={t.verdictHeading} eyebrow="11">
+                  <div className="relative max-w-3xl">
+                    <div
+                      aria-hidden="true"
+                      className="absolute -left-4 top-0 h-full w-1 rounded-full"
+                      style={{ background: "var(--gradient-cta)" }}
+                    />
+                    <p className="whitespace-pre-line pl-6 text-[18px] leading-[1.7] text-[var(--text-primary)]">
+                      {tool.verdict}
+                    </p>
+                  </div>
+                </Section>
+              )}
+
+              {/* ── Tail CTA (Judge.me carve-out: null when affiliate_url IS NULL) ── */}
               <div className="mt-10">
                 <AffiliateButton
-                  tool={frontmatter.toolSlug}
+                  tool={tool.slug}
                   localePrefix={localePrefix}
                   campaign={`review-${slug}`}
                 />
               </div>
             </article>
 
-            {/* Wave 3 hotfix (post-audit feedback): both TOC and
-                ToolStickyCard previously carried their own `sticky top-24`
-                rule. With two sticky siblings sharing the same `top`,
-                whichever came second in the DOM overlapped the first as the
-                page scrolled — the Try-it CTA covered the TOC entirely.
-                Now the right column is ONE sticky aside that holds both,
-                so they scroll together as a single block and remain
-                independently readable. The aside also caps its height so
-                tall TOCs scroll internally instead of bleeding below the
-                viewport. */}
+            {/* Sticky right column — ToC + try card */}
             <aside className="lg:sticky lg:top-24 self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto flex flex-col gap-8 lg:gap-10">
-              <TableOfContents entries={toc} label={t.tocLabel} sticky={false} />
-              {tool && (
-                <ToolStickyCard
-                  tool={tool}
-                  localePrefix={localePrefix}
-                  locale={locale}
-                  tryLabel={`${t.sidebarTry} ${tool.name}`}
-                  visitLabel={t.sidebarVisit}
-                  // Wave 3 (audit alignment): rating from the article's own
-                  // frontmatter takes priority over the DB row — the editorial
-                  // verdict in this review is the load-bearing number, not
-                  // the catalog rating which is averaged across all reviews
-                  // of the tool. Falls back to tool.rating when frontmatter
-                  // omits the field (older reviews pre-sync).
-                  articleRating={frontmatter.rating ?? tool.rating}
-                  ratingLabel={locale === "ru" ? "Оценка" : "Rating"}
-                  campaign={`review-${slug}`}
-                />
-              )}
+              <TableOfContents entries={tocEntries} label={t.tocLabel} sticky={false} />
+              <ToolStickyCard
+                tool={tool}
+                localePrefix={localePrefix}
+                locale={locale}
+                tryLabel={`${t.tryCta} ${tool.name}`}
+                visitLabel={t.visitWebsite}
+                ratingLabel={t.ratingChip}
+                campaign={`review-${slug}`}
+              />
             </aside>
           </div>
         </section>
-
-        {/* Wave 3 audit alignment (design v.026) — "Related reviews" row
-            below the article body. Renders only when there are other
-            published reviews to surface (auto-hidden on a brand-new locale). */}
-        <RelatedArticles
-          type="reviews"
-          currentSlug={slug}
-          locale={locale}
-          localePrefix={localePrefix}
-        />
       </main>
 
       <Footer
         strings={{
-          tagline: dict.footer.tagline,
-          copyright: dict.footer.copyright,
-          columns: dict.footer.columns,
-          links: dict.footer.links,
+          tagline:    dict.footer.tagline,
+          copyright:  dict.footer.copyright,
+          columns:    dict.footer.columns,
+          links:      dict.footer.links,
           newsletter: dict.newsletter,
         }}
         localePrefix={localePrefix}
@@ -379,12 +599,10 @@ export default async function ReviewPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(article) }}
       />
-      {reviewSchema && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(reviewSchema) }}
-        />
-      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(reviewSchema) }}
+      />
       <link rel="canonical" href={absoluteUrl(reviewPath)} />
     </>
   )
@@ -394,7 +612,44 @@ export default async function ReviewPage({ params }: PageProps) {
 // Local helpers — small enough to live with the page
 // ============================================================================
 
-function RatingBadge({ value, locale }: { value: number; locale: "en" | "ru" }) {
+function Section({
+  id,
+  title,
+  eyebrow,
+  children,
+}: {
+  id?: string
+  title: string
+  eyebrow?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      id={id}
+      className="py-10 lg:py-12 border-b border-[var(--border-subtle)] first:pt-0"
+    >
+      <div className="flex items-center gap-3">
+        {eyebrow && (
+          <span className="inline-flex h-6 items-center rounded-full border border-[var(--border-base)] bg-[var(--bg-muted)] px-2 text-[11px] font-mono text-[var(--text-tertiary)]">
+            {eyebrow}
+          </span>
+        )}
+        <h2 className="text-h3 font-semibold tracking-[-0.02em]">{title}</h2>
+      </div>
+      <div className="mt-6">{children}</div>
+    </section>
+  )
+}
+
+function RatingBadge({
+  value,
+  locale,
+  chipLabel,
+}: {
+  value: number
+  locale: "en" | "ru"
+  chipLabel: string
+}) {
   return (
     <div
       className={cn(
@@ -404,12 +659,13 @@ function RatingBadge({ value, locale }: { value: number; locale: "en" | "ru" }) 
       )}
     >
       <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
-        {locale === "ru" ? "Оценка" : "Rating"}
+        {chipLabel}
       </span>
       <span className="mt-1 font-mono text-[28px] font-semibold tracking-tight text-[var(--text-primary)]">
         {value.toFixed(1)}
         <span className="text-[var(--text-tertiary)] text-[16px] font-normal">/10</span>
       </span>
+      <span className="sr-only">{locale === "ru" ? "из 10" : "out of 10"}</span>
     </div>
   )
 }
@@ -426,7 +682,7 @@ function FitChips({
   notForLabel: string
 }) {
   return (
-    <div className="mb-8 flex flex-col gap-2 rounded-2xl border border-[var(--border-base)] bg-[var(--bg-muted)] p-4">
+    <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border-base)] bg-[var(--bg-muted)] p-4 max-w-3xl">
       {bestFor && (
         <p className="flex flex-wrap items-baseline gap-2 text-[14px] leading-[1.5] text-[var(--text-secondary)]">
           <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-700)]">
@@ -447,16 +703,218 @@ function FitChips({
   )
 }
 
-function FellBackNotice({ title, body }: { title: string; body: string }) {
+function PriceCard({
+  tool,
+  locale,
+  t,
+}: {
+  tool: ToolRow
+  locale: "en" | "ru"
+  t: {
+    startingPrice: string
+    perMonth: string
+    upTo: string
+    pricingModel: string
+    free: string
+  }
+}) {
+  const min = tool.pricing_min
+  const max = tool.pricing_max
+  const isFree = tool.pricing_model === "free" || (min === 0 && max == null)
   return (
-    <div className="rounded-xl border border-[var(--border-base)] bg-[var(--bg-muted)] px-4 py-3">
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-        {title}
+    <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6">
+      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+        {t.startingPrice}
       </p>
-      <p className="mt-1 text-[13px] leading-[1.55] text-[var(--text-secondary)]">
-        {body}
+      <p className="mt-3 font-mono text-[28px] tracking-[-0.02em] text-[var(--text-primary)] tabular-nums">
+        {isFree
+          ? t.free
+          : min != null
+            ? <>{formatPrice(min, { locale, maximumFractionDigits: 0 })}<span className="ml-1 text-[13px] text-[var(--text-tertiary)]">{t.perMonth}</span></>
+            : "—"
+        }
       </p>
+      <dl className="mt-4 space-y-1.5 text-[13px]">
+        <div className="flex justify-between gap-3">
+          <dt className="text-[var(--text-tertiary)]">{t.upTo}</dt>
+          <dd className="font-mono text-[var(--text-secondary)] tabular-nums">
+            {max != null ? formatPrice(max, { locale, maximumFractionDigits: 0 }) + t.perMonth : "—"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-[var(--text-tertiary)]">{t.pricingModel}</dt>
+          <dd className="text-[var(--text-secondary)]">{tool.pricing_model ?? "—"}</dd>
+        </div>
+      </dl>
     </div>
+  )
+}
+
+function FeatureGrid({
+  features,
+  locale,
+}: {
+  features: ToolFeature[]
+  locale: "en" | "ru"
+}) {
+  return (
+    <ul role="list" className="grid gap-3 md:grid-cols-2">
+      {features.map((f) => (
+        <li
+          key={f.name}
+          className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-4 lg:p-5"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-semibold text-[15px] tracking-[-0.005em] text-[var(--text-primary)]">
+              {f.name}
+            </p>
+            {f.is_ai && (
+              <span className="inline-flex items-center rounded-full border border-[var(--accent-300)] bg-[color-mix(in_oklch,var(--brand)_8%,transparent)] px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-[0.06em] text-[var(--brand)]">
+                AI
+              </span>
+            )}
+          </div>
+          {f.description && (
+            <p className="mt-2 text-[13px] leading-[1.55] text-[var(--text-secondary)]">
+              {f.description}
+            </p>
+          )}
+          {(f.ai_kind || f.plan_availability) && (
+            <dl className="mt-3 grid gap-1 text-[12px]">
+              {f.ai_kind && (
+                <div className="flex flex-wrap gap-1.5">
+                  <dt className="font-mono uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
+                    {locale === "ru" ? "тип AI" : "AI kind"}
+                  </dt>
+                  <dd className="text-[var(--text-secondary)]">{f.ai_kind}</dd>
+                </div>
+              )}
+              {f.plan_availability && (
+                <div className="flex flex-wrap gap-1.5">
+                  <dt className="font-mono uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
+                    {locale === "ru" ? "тариф" : "plan"}
+                  </dt>
+                  <dd className="text-[var(--text-secondary)]">{f.plan_availability}</dd>
+                </div>
+              )}
+            </dl>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function RatingBreakdownGrid({
+  breakdown,
+  labels,
+  sourceLabels,
+}: {
+  breakdown: ToolRow["rating_breakdown"]
+  labels: { ease_of_use: string; features: string; value: string; support: string }
+  sourceLabels: { H: string; I: string }
+}) {
+  if (!breakdown) return null
+  const axes: Array<{ key: "ease_of_use" | "features" | "value" | "support"; label: string }> = [
+    { key: "ease_of_use", label: labels.ease_of_use },
+    { key: "features",    label: labels.features },
+    { key: "value",       label: labels.value },
+    { key: "support",     label: labels.support },
+  ]
+  return (
+    <ul role="list" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {axes.map(({ key, label }) => {
+        const axis = breakdown[key]
+        const value = axisValue(axis)
+        const source = axisSource(axis)
+        return (
+          <li
+            key={key}
+            className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-4 lg:p-5"
+          >
+            <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+              {label}
+            </p>
+            <p className="mt-2 font-mono text-[22px] font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+              {value != null ? value.toFixed(1) : "—"}
+              {value != null && (
+                <span className="ml-1 text-[12px] font-normal text-[var(--text-tertiary)]">/10</span>
+              )}
+            </p>
+            {source && (
+              <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
+                [{source}] {source === "H" ? sourceLabels.H : sourceLabels.I}
+              </p>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function ExternalRatingsList({
+  external,
+  reviewsLabel,
+}: {
+  external: NonNullable<ToolRow["external_ratings"]>
+  reviewsLabel: string
+}) {
+  const platforms: Array<{ key: keyof typeof external; label: string }> = [
+    { key: "g2",             label: "G2" },
+    { key: "shopify_store",  label: "Shopify App Store" },
+    { key: "trustpilot",     label: "Trustpilot" },
+  ]
+  return (
+    <ul role="list" className="grid gap-3 sm:grid-cols-3">
+      {platforms.map(({ key, label }) => {
+        const p = external[key]
+        if (!p) return null
+        return (
+          <li
+            key={key}
+            className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-4 lg:p-5"
+          >
+            <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+              {label}
+            </p>
+            <p className="mt-2 font-mono text-[22px] font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+              {p.score != null ? `${p.score.toFixed(1)}/5` : "—"}
+            </p>
+            {p.reviews != null && (
+              <p className="mt-0.5 text-[12px] text-[var(--text-tertiary)] tabular-nums">
+                {p.reviews.toLocaleString()} {reviewsLabel}
+              </p>
+            )}
+            {p.note && (
+              <p className="mt-2 text-[12px] leading-[1.5] text-[var(--text-tertiary)]">
+                {p.note}
+              </p>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function OperatorQuotesList({ quotes }: { quotes: ToolOperatorQuote[] }) {
+  return (
+    <ul role="list" className="grid gap-4 md:grid-cols-2">
+      {quotes.map((q, i) => (
+        <li
+          key={i}
+          className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6"
+        >
+          <p className="text-[15px] leading-[1.6] text-[var(--text-primary)] italic">
+            &ldquo;{q.quote}&rdquo;
+          </p>
+          <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
+            {q.source}{q.date ? ` · ${q.date}` : ""}
+          </p>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -466,24 +924,22 @@ function ToolStickyCard({
   locale,
   tryLabel,
   visitLabel,
-  campaign,
-  articleRating,
   ratingLabel,
+  campaign,
 }: {
-  tool: Pick<ToolRow, "slug" | "name" | "tagline" | "logo_url" | "website_url" | "pricing_min" | "pricing_model">
+  tool: ToolRow
   localePrefix: "" | "/ru"
   locale: "en" | "ru"
   tryLabel: string
   visitLabel: string
-  campaign: string
-  /** Effective rating shown on the card — caller decides EN priority. */
-  articleRating?: number | null
   ratingLabel: string
+  campaign: string
 }) {
-  // Wave 3 (audit alignment): the design mockup's right rail surfaces both
-  // a rating chip and a pricing line below the brand row. Pricing string
-  // mirrors AffiliateButton/RecommendedTools so the language stays consistent
-  // across surfaces.
+  // Judge.me carve-out: tools without affiliate_url get a "Visit website"
+  // button only — no /go/[slug] CTA. Keeps the right rail consistent across
+  // tools while honouring the honest-framing rule from content-flags.md.
+  const showAffiliateCta = tool.affiliate_url != null
+
   const priceText =
     tool.pricing_min == null
       ? null
@@ -497,11 +953,6 @@ function ToolStickyCard({
       ? `от $${tool.pricing_min}/мес`
       : `from $${tool.pricing_min}/mo`
 
-  // Wave 3 hotfix: sticky positioning moved up to the parent aside in
-  // /reviews/[slug] so this card no longer competes with the TOC for the
-  // `top: 24px` slot. The outer <div> is kept (just a non-positioning
-  // wrapper) so any future use of this helper that doesn't have a sticky
-  // ancestor still gets a vertical spacing buffer from `mt-8 lg:mt-12`.
   return (
     <div className="mt-0">
       <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 shadow-[var(--shadow-sm)]">
@@ -524,17 +975,15 @@ function ToolStickyCard({
           </div>
         </div>
 
-        {/* Rating + pricing strip — only render when at least one value is
-            present so the card stays clean for tools we haven't fully scored. */}
-        {(articleRating != null || priceText) && (
+        {(tool.rating != null || priceText) && (
           <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-base)] bg-[var(--bg-muted)] px-3 py-2.5">
-            {articleRating != null ? (
+            {tool.rating != null ? (
               <div className="flex items-baseline gap-1.5">
                 <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
                   {ratingLabel}
                 </span>
                 <span className="font-mono text-[18px] font-semibold text-[var(--brand)] tabular-nums">
-                  {articleRating.toFixed(1)}
+                  {tool.rating.toFixed(1)}
                   <span className="text-[var(--text-tertiary)] text-[12px] font-normal">/10</span>
                 </span>
               </div>
@@ -549,25 +998,27 @@ function ToolStickyCard({
           </div>
         )}
 
-        <Link
-          href={`${localePrefix}/go/${tool.slug}?utm_campaign=${encodeURIComponent(campaign)}`}
-          rel="sponsored nofollow noopener"
-          target="_blank"
-          className={cn(
-            buttonVariants({ variant: "cta", size: "default" }),
-            "mt-4 w-full justify-between",
-          )}
-        >
-          <span>{tryLabel}</span>
-          <ArrowUpRight className="size-4" aria-hidden="true" />
-        </Link>
+        {showAffiliateCta && (
+          <Link
+            href={`${localePrefix}/go/${tool.slug}?utm_campaign=${encodeURIComponent(campaign)}`}
+            rel="sponsored nofollow noopener"
+            target="_blank"
+            className={cn(
+              buttonVariants({ variant: "cta", size: "default" }),
+              "mt-4 w-full justify-between",
+            )}
+          >
+            <span>{tryLabel}</span>
+            <ArrowUpRight className="size-4" aria-hidden="true" />
+          </Link>
+        )}
         <Link
           href={tool.website_url}
           rel="noopener noreferrer"
           target="_blank"
           className={cn(
             buttonVariants({ variant: "outline", size: "sm" }),
-            "mt-2 w-full",
+            showAffiliateCta ? "mt-2 w-full" : "mt-4 w-full",
           )}
         >
           {visitLabel}

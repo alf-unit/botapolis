@@ -554,6 +554,7 @@ export default async function ReviewPage({ params }: PageProps) {
                 currentSlug={tool.slug}
                 currentName={tool.name}
                 currentCategory={tool.category}
+                currentSubcategories={tool.subcategories ?? []}
                 locale={locale}
                 localePrefix={localePrefix}
                 emphasized={tool.affiliate_url == null}

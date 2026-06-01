@@ -435,6 +435,7 @@ export default async function ToolDetailPage({ params }: PageProps) {
           currentSlug={tool.slug}
           currentName={tool.name}
           currentCategory={tool.category}
+          currentSubcategories={tool.subcategories ?? []}
           locale={locale as "en" | "ru"}
           localePrefix={localePrefix as "" | "/ru"}
           emphasized={tool.affiliate_url == null}

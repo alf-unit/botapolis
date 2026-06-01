@@ -56,6 +56,17 @@ interface PartnerAlternativesProps {
   currentSlug: string
   currentName: string
   currentCategory: string
+  /**
+   * Subcategories of the current tool (jsonb / text[] from tools.subcategories).
+   * Used as a fallback pool when same-category partners are scarce — keeps
+   * the block from coming up empty on single-member categories like
+   * `support` (Gorgias only) or `inventory` (Inventory Planner with both
+   * other entries archived). Overlap matching is honest by-relevance:
+   * Gorgias.subcategories ⊃ "helpdesk" → matches Tidio (chat-category but
+   * subcategories include "helpdesk"). Pass [] or undefined to skip the
+   * fallback.
+   */
+  currentSubcategories?: string[]
   /** Additional slugs to exclude (e.g. both sides of a comparison page). */
   excludeSlugs?: string[]
   locale: "en" | "ru"
@@ -73,32 +84,63 @@ interface PartnerAlternativesProps {
 // Data
 // ============================================================================
 
+const CARD_SELECT =
+  "slug, name, name_ru, tagline, tagline_ru, logo_url, rating, pricing_model, pricing_min"
+
 async function fetchPartnerAlternatives(
   category: string,
+  subcategories: ReadonlyArray<string>,
   excludeSlugs: ReadonlyArray<string>,
   limit: number,
 ): Promise<AlternativeCard[]> {
   try {
     const sb = createServiceClient()
+    const excludeSet = new Set(excludeSlugs)
     // Over-fetch by excludeSlugs.length so we still hit `limit` after filtering
     // out the current tool (and on /compare/[slug] also the other side).
     const fetchLimit = limit + excludeSlugs.length
-    const { data, error } = await sb
+
+    // Pass 1 — exact category match. Highest relevance, ranked by rating.
+    const { data: same, error: sameErr } = await sb
       .from("tools")
-      .select(
-        "slug, name, name_ru, tagline, tagline_ru, logo_url, rating, pricing_model, pricing_min",
-      )
+      .select(CARD_SELECT)
       .eq("status", "published")
       .eq("category", category)
       .not("affiliate_url", "is", null)
       .order("rating", { ascending: false, nullsFirst: false })
       .limit(fetchLimit)
-    if (error) {
-      console.error("[PartnerAlternatives] tools fetch failed:", error.message)
+    if (sameErr) {
+      console.error("[PartnerAlternatives] same-category fetch failed:", sameErr.message)
       return []
     }
-    const excludeSet = new Set(excludeSlugs)
-    return (data ?? []).filter((t) => !excludeSet.has(t.slug)).slice(0, limit)
+    let pool: AlternativeCard[] = (same ?? []).filter((t) => !excludeSet.has(t.slug))
+    if (pool.length >= limit) return pool.slice(0, limit)
+
+    // Pass 2 — subcategory overlap fallback. Triggered when same-category
+    // pool is thin (single-member categories like `support`, `inventory`,
+    // `fraud`). Honest-by-relevance: a tool that shares at least one
+    // subcategory is a reasonable alternative even when its primary
+    // category differs. Example: Gorgias[support, subcat=helpdesk] →
+    // Tidio[chat, subcat=helpdesk] surfaces as a credible alt.
+    if (subcategories.length === 0) return pool
+
+    const seenSlugs = new Set([...excludeSlugs, ...pool.map((t) => t.slug)])
+    const { data: overlap, error: overlapErr } = await sb
+      .from("tools")
+      .select(CARD_SELECT)
+      .eq("status", "published")
+      .not("affiliate_url", "is", null)
+      .neq("category", category)               // already covered by pass 1
+      .overlaps("subcategories", subcategories as string[])
+      .order("rating", { ascending: false, nullsFirst: false })
+      .limit(fetchLimit)
+    if (overlapErr) {
+      console.error("[PartnerAlternatives] subcategory fetch failed:", overlapErr.message)
+      return pool.slice(0, limit)
+    }
+    const overlapFiltered = (overlap ?? []).filter((t) => !seenSlugs.has(t.slug))
+    pool = [...pool, ...overlapFiltered]
+    return pool.slice(0, limit)
   } catch (err) {
     console.error("[PartnerAlternatives] tools fetch threw:", err)
     return []
@@ -137,6 +179,7 @@ export async function PartnerAlternatives({
   currentSlug,
   currentName,
   currentCategory,
+  currentSubcategories = [],
   excludeSlugs = [],
   locale,
   localePrefix,
@@ -146,7 +189,12 @@ export async function PartnerAlternatives({
   bare = false,
 }: PartnerAlternativesProps) {
   const exclude = Array.from(new Set([currentSlug, ...excludeSlugs]))
-  const rawAlternatives = await fetchPartnerAlternatives(currentCategory, exclude, maxCount)
+  const rawAlternatives = await fetchPartnerAlternatives(
+    currentCategory,
+    currentSubcategories,
+    exclude,
+    maxCount,
+  )
   if (rawAlternatives.length === 0) return null
 
   // Compute canonical compare-pair slugs and check which actually exist as

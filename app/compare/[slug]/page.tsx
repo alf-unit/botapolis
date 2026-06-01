@@ -923,6 +923,9 @@ export default async function ComparisonPage({ params }: PageProps) {
           currentSlug={toolA.slug}
           currentName={toolA.name}
           currentCategory={toolA.category}
+          currentSubcategories={Array.from(
+            new Set([...(toolA.subcategories ?? []), ...(toolB.subcategories ?? [])]),
+          )}
           excludeSlugs={[toolB.slug]}
           locale={locale as "en" | "ru"}
           localePrefix={localePrefix}

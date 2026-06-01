@@ -1110,3 +1110,144 @@ Owner на site walk нашёл что после Etap E flip 2026-05-31 две 
 
 См. `/sessions/NEXT-SESSION-START.md` для точки входа.
 
+---
+
+## 2026-06-01 (session 5) — Этап F (Эшелон 2) ЗАКРЫТ · 23 comparisons + 7 alternatives
+
+### Commits
+
+- chore(sessions): close Etap E + NEXT-SESSION-START entry-point (operator-pre-session housekeeping)
+- fix(compare): shopify integration + support narrative use real fields
+- feat(alternatives): editorial block (migration 017 + render)
+- chore(sessions): close Etap F + NEXT-SESSION-START update + scripts cleanup (this commit)
+
+### Задача
+
+Запустить Этап F — Эшелон 2 pSEO волну: 33 vs-comparison + 7 alternatives ключей из `semantic_core_entries`. Strict whitelist — только размеченные ключи, БЕЗ открытой комбинаторики 435 пар. Excluded markup для невалидных ключей. F2-gap анализ — посчитать сколько очевидных intra-category пар отсутствует, добить если их немного.
+
+### Сделано
+
+**Сводный итог волны: 30 страниц опубликованы** (28 новых + 2 pre-existing нетронуты по решению оператора).
+
+#### Audit + prep (DB)
+
+- **audit-etap-f-keys.ts** (one-off, удалён) — pull 33 vs-comparison + 7 alternatives ключей, cross-reference со status в `tools`, derive missing slugs (parser fallback), gap-анализ.
+  - **40 ключей разобраны**: 25 OK, 14 SKIP-needs-2-tools (5 из них parser-fix, 9 missing-vendor), 1 SKIP-archived (cogsy).
+  - **F2 gap** после parser-fix коррекции: **4 очевидные intra-category пары** отсутствуют (northbeam-vs-polar-analytics, judge-me-vs-yotpo, manychat-vs-tidio, flair-ai-vs-shopify-sidekick). Cross-category subcategory-overlap: 20 пар — отложены в волну 102-427.
+- **apply-etap-f-prep.ts** (one-off, удалён) — UPDATE `related_tool_slugs` для всех 40 ключей; UPDATE `status='excluded'` для 10 невалидных (9 missing-vendor по Blueprint 1.2 + 1 archived inv-cogsy) + 2 канонических дубликата (`tidio vs gorgias` → `gorgias-vs-tidio`; `postscript shopper vs klaviyo customer agent` → `klaviyo-vs-postscript`); INSERT 4 F2 keys с cluster (attribution-ai, reviews-ugc, chat-helpdesk-ai, ai-product-photography), priority_score=60, content_angle с content-flags заметками.
+- **Финальный список 30**: 23 vs-comparison canonical + 7 alternatives. Утверждён оператором без правок.
+
+#### Sample generation + template bug fix
+
+- **generate-etap-f-samples.ts** (one-off, удалён) — 3 sample страницы для проверки: northbeam-vs-triple-whale (fresh editorial-only — оба тулза non-affiliate), klaviyo-vs-postscript (fix-thin published-but-empty row — оба тулза партнёры), gorgias-alternatives (runtime, sample 3).
+- **3 бага выявлены оператором на первом проходе** sample 2:
+  1. **Shopify integration перевёрнут** — `aHasShopify*`/`shopifyNarrative` читали `tool.integrations.includes("shopify")` (legacy поле, не заполнено у новых тулзов). Klaviyo/Postscript/Gorgias рендерились как "No native Shopify integration — middleware required" — ложь.
+  2. **Customer support показывал not_for** — `supportNarrative` строил "not the right pick when X" из `tool.not_for` под заголовком "Customer support".
+  3. **Postscript pricing $1,000 split** — corrupted data: Etap D R2 CSV parser split `$1,000 usage credit` по запятой → "...with $1\n\nVerified 000 usage credit".
+- **Все 3 фикса в одном commit (`fix(compare)…`)**:
+  - `shopifyDepth(tool)` helper читает `tool.shopify_native_notes` (текст из Etap D), derive `hasNative` по prefix Yes/Да, `hasPlus` по keyword match. Текст из notes — narrative (per-tool уникальный). Legacy fallback на integrations array сохранён.
+  - `supportNarrative` через `rating_breakdown.support` (нормализован для обоих форматов: flat number + `{value, source}`). Атрибуция "aggregated from G2 / Capterra / Shopify App Store". Если оба null — секция явно "no data".
+  - Postscript pricing UPDATE по RU-mirror (RU не был corrupted). Скан всех 30 published tools — только 1 corrupted row.
+- **Sample 1+2 после фиксов** подтверждены оператором чистыми → go на оставшиеся 27.
+
+#### Migration 017 + alternatives template extension
+
+- **Migration 017** (`017_alternatives_editorial.sql`) — `ALTER TABLE public.tools ADD COLUMN IF NOT EXISTS alternatives_editorial jsonb`. Shape: `{intro, intro_ru, perCardContext: [{slug, why, why_ru}], verdict, verdict_ru}`. Schema OPEN (без CHECK) — render code validates на чтении.
+- **`lib/supabase/types.ts`** — добавлен `ToolAlternativesEditorial` тип + поле на `ToolRow`.
+- **`app/alternatives/[slug]/page.tsx`** — три новых опциональных блока с graceful fallback на NULL:
+  - `editorialIntro` — cons-driven framing над grid
+  - `perCardWhy` — per-alternative reasoning внутри карточки (между tagline и rating/pricing footer)
+  - `editorialVerdict` — "who picks which" под grid
+  - Field-level RU fallback по convention `localizeTool` (RU twin if present, else EN).
+
+#### Bulk generation (28 страниц, 5 cluster'ов)
+
+- **generate-etap-f-wave.ts** (one-off, удалён) — единый скрипт с 21 vs-comparison + 7 alternatives editorial payloads.
+- **Cluster распределение** (по category):
+  - C1 Subscriptions: 6 пар (recharge-vs-skio, recharge-vs-stay-ai, skio-vs-stay-ai, loop-subs-vs-recharge, loop-subs-vs-stay-ai, loop-subs-vs-skio).
+  - C2 Email/SMS: 3 пары (mailchimp-vs-omnisend, attentive-vs-postscript, attentive-vs-klaviyo).
+  - C3 Reviews/Loyalty: 4 пары (judge-me-vs-loox, loox-vs-yotpo, judge-me-vs-yotpo, loyaltylion-vs-smile-io).
+  - C4 Chat/Attribution: 4 пары (gorgias-vs-tidio fix-partial, manychat-vs-tidio, northbeam-vs-polar-analytics, polar-analytics-vs-triple-whale).
+  - C5 Ads/Returns/Personalization/Product-content: 4 пары (adcreative-ai-vs-pencil, aftership-vs-loop-returns, limespot-vs-rebuy, flair-ai-vs-shopify-sidekick).
+  - C6 Alternatives editorial: 7 sources (gorgias, triple-whale, rebuy, recharge, klaviyo, smile-io, postscript).
+- **Affiliate distribution в волне vs-comparison**: 10 партнёров из 30 published tools → 3 both-aff (2 CTAs), 8 one-aff (1 CTA), 10 zero-aff (editorial-only). Honest framing — где нет /go/ кнопок, прямо проговорено в verdict.
+- **Content-flags применены per source**: klaviyo (commission-source-uncertainty + $10K/mo One pricing-gotcha), yotpo (product-discontinuation post-Dec 2025 sunset + ~34% staff cut), recharge (ecosystem-event Skio Apr 30 2026 + Lasso migration Mar 15 2026), aftership (external-rating-suppression Trustpilot=carrier), loyaltylion (external-rating-bias Trustpilot solicited), adcreative-ai (cons-must-surface €360.18 billing), pencil (framing-correction API ≠ native app), manychat (pricing-volatility Mar 2 2026 cut), tidio (numerical-reconciliation 64-67% range), triple-whale (cons-must-surface attribution accuracy), flair-ai (source-uncertainty Rewardful default cookie), shopify-sidekick (special-monetization Shopify PP), loop-subscriptions (pricing-volatility $49→$99), judge-me (catalog-no-affiliate).
+- **Tracking**: все 30 страниц `status='published'` + `published_article_path` + `published_at` в semantic_core_entries. Excluded — `status='excluded'` + notes с rationale. Между сессиями не теряется.
+
+### Обнаружено
+
+- **`integrations` массив у новых Etap D тулзов не заполнен** — `shopify_native_notes` (text) единственный источник истины для Shopify-integration depth. Любой код, читающий `integrations` для shopify-detection, был бы инвертированным — фикс в /compare/ template распространяется на любые будущие routes использующие тот же signal.
+- **`rating_breakdown.support`** union type (`number | {value, source}`) не имел helper для normalize-on-read (комментарий в `types.ts:70` упоминал `getRatingAxisValue`, но функция не существовала). Inline normalize в /compare/ — следует вынести в helper если третья consumer-точка появится.
+- **Etap D R2 CSV parser bug** — split на запятую в `$1,000` поломал ровно 1 row (postscript). Скан всех 30 published tools показал что остальные нетронуты. Если будет волна повторных R2 ресёрчей — парсер нужно прокачать на quoted-string handling (RFC 4180) до apply.
+- **`tool.integrations` legacy field** — пред-Etap-D тулзы (klaviyo, gorgias, mailchimp, omnisend и т.д.) имели его, новые тулзы (loop-returns, stay-ai, attentive, manychat и т.д.) — нет. Долгосрочно: либо backfill для всех 30 (data migration), либо депрекать поле и переключить все consumers на `integrates_with_tools` + `shopify_native_notes`.
+- **PartnerAlts subcat-fallback иногда тащит слабо-релевантное** — например Recharge как partner alternative на reviews-странице через `retention` subcategory overlap. Не критично, но при унификации subcategory-тегов (canonical vocabulary) фильтр станет точнее. Owner отметил как новый хвост.
+- **`integrates_with_tools` у triple-whale пустой по affiliate_url** — affiliate_partner='partnerstack' но `affiliate_url` NULL. То есть partner-marker есть, URL отсутствует. PartnerAlternatives для attribution-категории не вытягивает Triple Whale потому что фильтр по `affiliate_url IS NOT NULL`. Cleanup: либо заполнить URL после получения, либо `affiliate_partner` тоже NULL чтобы сигнал был consistent.
+- **Canonical-pair dedup** работает на уровне `canonicalCompareSlug` (alphabetical) — два semantic_core ключа коннятся в одну страницу (`postscript shopper vs klaviyo customer agent` + `postscript vs klaviyo sms` → `/compare/klaviyo-vs-postscript`). Это correct behavior, оба ключа покрываются одной страницей; second key помечается `status='excluded'` с canonical pointer в notes.
+- **Vercel push race с CHIEF agent** — за время этой сессии CHIEF agent запушил 4 коммита (weekly strategy, monthly audit, OPS priorities, daily writer queue refill). `git pull --rebase` сработал чисто (нет conflict по файлам). Pattern для будущих long-running сессий — periodic rebase before push.
+
+### Fixes
+
+- **3 шаблонных/дата-бага в /compare/** (commit `fix(compare)…`) — описано выше. Single commit, переходит на все 30 страниц одним deploy.
+- **`postscript.pricing_notes`** data UPDATE — reconstructed по RU mirror.
+- **`gorgias-vs-tidio` fix-partial** — был verdict-only, доинъекция `custom_intro` + `comparison_data` (quickStats/pricing/useCases) в UPDATE; EN + RU оба полные.
+- **`klaviyo-vs-postscript` fix-thin** — был `status='published'` без verdict/intro/jsonb (битая страница в проде). Заполнено полностью EN + RU; покрывает 2 ключа ядра (postscript-vs-klaviyo-sms и shopper-vs-customer-agent angle).
+
+### Open follow-ups (приоритет)
+
+**Новые из этой сессии:**
+
+- **#1 PartnerAlts слабо-релевантные через subcat-fallback** (owner-flagged) — Recharge на reviews-странице через `retention` subcategory overlap, и аналогичные cross-category matches. Унификация subcategory-тегов (canonical vocabulary) → точнее фильтр. Связано с **(a)** прежним хвостом `sms ≠ sms-marketing`.
+- **#2 `getRatingAxisValue` helper** не существует, inline в /compare/. Вынести в `lib/content/rating.ts` или `lib/utils/rating.ts` если третий consumer появится. Низкий приоритет.
+- **#3 `tool.integrations` legacy field** — backfill для 20 новых Etap D tools ИЛИ deprecate field + переключить consumers на `integrates_with_tools` + `shopify_native_notes` exclusively. Низкий приоритет до 50-tool catalog.
+- **#4 Triple Whale `affiliate_url` NULL + `affiliate_partner='partnerstack'`** — signal inconsistency, PartnerAlts не вытягивает. Cleanup: заполнить URL или NULL `affiliate_partner`.
+- **#5 R2 CSV parser hardening** — RFC 4180 quoted-string handling до следующей R2 волны (если будет refresh всех tools).
+
+**Carryovers from prior sessions (unchanged):**
+- (a) Subcategory string-mismatch unification (теперь связан с PartnerAlts хвостом #1)
+- (b) `/reviews/klaviyo-pricing` decision (move to /guides/ or redirect or keep)
+- (c) Pagefind не индексирует 30 runtime-reviews (большая задача)
+- (d) RU auto-обновление в проде не реализовано
+- (e) `lib/content/rating.ts:getToolRatings` dead-path cleanup после MDX sweep
+- tools table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at)
+- system_config.modified_by CHECK constraint
+- Capture SCOUT runtime AGENTS.md to /agent-snapshots/scout/
+- Option B refactor /compare/[slug] MDX-driven
+- Newsletter ingestion via Beehiiv
+- OPS GPT-5.5 cost reconciliation
+- Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md (теперь больше drift — Этапы D/E/F + migrations 015-017 + alternatives_editorial template extension)
+- TOOLS.md ↔ AGENTS.md drift prevention для CHIEF + SCOUT
+- Tighten app/robots.ts для AI crawlers до 50+ страниц
+
+### Следующий этап — Этап G (Эшелон 3)
+
+См. `/sessions/NEXT-SESSION-START.md` для точки входа. Этап G — 10 best-for-segment листингов из ядра. Не начинается автоматически — operator решит когда (возможно новая сессия).
+
+### Что работает в проде сейчас (после Etap F close)
+
+**База данных + контент (Phase 0 Этап A-F полный цикл):**
+- 30 published tools в `public.tools` (Etap D-E фундамент сохранён).
+- **23 vs-comparison в `public.comparisons`** (EN + RU rows для каждого) — 21 свежих + 2 ранее опубликованных (`klaviyo-vs-mailchimp`, `klaviyo-vs-omnisend`) не тронуты по explicit operator decision.
+- **7 tools имеют `alternatives_editorial` jsonb** (gorgias, triple-whale, rebuy, recharge, klaviyo, smile-io, postscript) — editorial intro + perCardContext + verdict в EN + RU. Остальные 23 tools — generic-template render.
+- Migration 017 applied; `lib/supabase/types.ts` обновлён.
+
+**Routes (runtime DB-driven):**
+- `/compare/[slug]` + `/ru/compare/[slug]` — после 3 шаблонных фиксов (shopify через `shopify_native_notes`, support через `rating_breakdown.support`, normalize axis-value). Все 23 vs-pair URL'ы работают.
+- `/alternatives/[slug]` + `/ru/alternatives/[slug]` — после migration 017 + template extension. 7 sources с editorial; 23 generic.
+- `/reviews/[slug]`, catalog, sitemap, OG — нетронуты с Etap E close.
+- Outbound-link sweep + PartnerAlternatives + Judge.me carve-out — нетронуты.
+
+**Tracking в semantic_core_entries:**
+- 30 страниц волны F: `status='published'`, `published_article_path`, `published_at`.
+- 12 excluded ключей: `status='excluded'` + notes с rationale (Blueprint 1.2 rejection / archived participant / canonical-duplicate merged).
+- 4 F2 new ключа INSERTED (cluster + content_angle + notes).
+
+### Final commit chain (session 5)
+
+- `fix(compare): shopify integration + support narrative use real fields` — 3 template/data fixes
+- `feat(alternatives): editorial block (migration 017 + render)` — migration + types + template extension
+- `chore(sessions): close Etap F + NEXT-SESSION-START update + scripts cleanup` (this commit)
+
+### One-off artifacts cleaned
+
+Удалены 4 session-5 artifact'а: `scripts/apply-etap-f-prep.ts`, `scripts/audit-etap-f-keys.ts`, `scripts/generate-etap-f-samples.ts`, `scripts/generate-etap-f-wave.ts`. Контент жив в БД + log. Не оставлено. `scripts/audit-db-snapshot.ts` + `scripts/audit-semantic-core.ts` (operator-pre-session) оставлены untracked — owner artefacts, не моё ведение.
+

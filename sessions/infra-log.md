@@ -1047,3 +1047,66 @@ Owner на site walk нашёл что после Etap E flip 2026-05-31 две 
   - `scripts/build-search-index.ts` refactor — ingest tools для review-section (currently pagefind покрывает только guides + klaviyo-pricing)
   - `lib/content/rating.ts:getToolRatings` cleanup — переключить на DB-only после сноса MDX
 
+---
+
+## 2026-06-01 (session close) — Этап E (Эшелон 1) ЗАКРЫТ
+
+### Что работает в проде сейчас
+
+**База данных + контент (Phase 0 Etap A-E полный цикл):**
+- 30 published tools в `public.tools` с полным комплектом полей:
+  - 6 column-wise ресёрчей (R1-R6) применены парсером `scripts/apply-phase0-research.ts`
+  - Migration 015 (Etap D schema: integrates_with_tools / operator_quotes / external_ratings / affiliate_* / pricing_source_url / shopify_native_notes)
+  - Migration 016 (Etap E *_ru twins + verdict + verdict_ru)
+  - 30/30 `verdict` (EN) + 30/30 `verdict_ru` заполнены — honest analyst voice, content-flags surfaced, NO fabricated hands-on
+  - 30/30 полный `name_ru` / `tagline_ru` / `description_ru` / `pros_ru` / `cons_ru` / `best_for_ru` / `not_for_ru` / `pricing_notes_ru` / `features_ru` / `shopify_native_notes_ru` / `meta_title_ru` / `meta_description_ru`
+  - 10/30 EN `meta_description` переписаны на honest analyst voice (sweep fake-hands-on legacy)
+- 4 archived tools (booth-ai, cogsy, pebblely, prediko) — entity-only, без review-страниц
+
+**Routes (runtime DB-driven):**
+- `/reviews/[slug]` + `/ru/reviews/[slug]` — DB-driven через `tools.where(status='published')`, dynamicParams=false, generateStaticParams возвращает 30 slugs. `localizeTool(row, locale)` swaps EN↔RU полей.
+- `/reviews` (catalog) + `/ru/reviews` — catalog читает tools, не MDX. 30 card-страниц.
+- `/sitemap.xml` — reviews-section через tools (lastModified = updated_at); guides остаётся MDX.
+- `/reviews/[slug]/opengraph-image` — DB-driven OG для всех 30.
+- Legacy MDX 6 review-2026 файлов снесены; 12 redirect-правил (6 EN + 6 RU) в next.config.ts `permanent: true` (308) для старых URL.
+- `klaviyo-pricing.mdx` (EN+RU) сохранён, но не маршрутизуется (open follow-up).
+
+**Монетизационные дыры закрыты (outbound-link sweep + fail-closed):**
+- Единственный кликабельный путь к вендору — `/go/[slug]` редиректор.
+- `/go/[slug]` route fail-closed: если `affiliate_url IS NULL` → редирект на `/reviews/[slug]`, никаких `website_url` fallback.
+- `AffiliateButton` возвращает null при `affiliate_url IS NULL` (Judge.me carve-out + любой будущий catalog-no-affiliate).
+- "Website" secondary кнопки убраны во всех шаблонах (ToolStickyCard, ToolCardSide, tools/[slug] hero) — single "Try" CTA gated by affiliate_url.
+- `MdxLink` whitelist (g2.com / trustpilot.com / capterra.com / apps.shopify.com / own domain) — остальные external → grey non-clickable span. Latent door закрыта до использования.
+- `pricing_source_url` рендерится как серый `<span>`, не Link.
+- JSON-LD `website_url` сохранён для Google-сигнала (не для click).
+
+**PartnerAlternatives блок:**
+- Two-pass query: same-category partners → subcategory-overlap fallback. Identical framed card chrome (rounded-3xl + gradient + shadow-md + h2) на всех режимах. Insert в reviews/[slug], tools/[slug], compare/[slug] + /alternatives/[slug] partner-first sort.
+- Распределение карточек по 30 tools: 11×0 / 5×1 / 8×2 / 6×3 (диагностировано в session 4 summary).
+- 0-cards случаи legitimate per gate-логике (нет partner-альтернатив в категории + subcat overlap нулевой).
+
+**Editorial label tone:**
+- TL;DR → "At a glance" / "Кратко" (consistency с /compare/).
+
+### Final commit chain (session 4)
+
+- `82c3a08` feat(phase0): etap D — apply 6 researches (30 published + 4 archived)  [yesterday]
+- `517f88a` feat(phase0): etap E — flip /reviews/[slug] to runtime DB + Klaviyo reference
+- `3b96e25` fix(reviews): demote pricing_source to one-line footnote
+- `af2ce10` fix(site): outbound-link sweep — single monetised exit + fail-closed /go/
+- `7fbfd8a` feat(monetization): PartnerAlternatives block — route dead-ends to partner reviews
+- `92173ef` fix(monetization): PartnerAlternatives — add subcategory-overlap fallback
+- `9bf9942` fix(monetization): PartnerAlternatives — unify framed card across both modes
+- `116b476` fix(monetization): PartnerAlternatives — identical chrome across all surfaces
+- `838c09b` chore(reviews): sweep legacy MDX — delete 6 pairs, redirects, runtime catalog/sitemap/OG
+- `8138c88` chore(reviews): seed-rollout-27 — fill verdict + *_ru for remaining 27 published tools
+- `[session-close]` chore(sessions): close Etap E + NEXT-SESSION-START + log
+
+### One-off artifacts cleaned
+
+Все session-4 артефакты удалены: `scripts/seed-klaviyo-reference.ts` (git rm), `scripts/seed-controls-reference.ts`, `scripts/seed-rollout-27.ts`, `scripts/dump-27.ts`, `scripts/tmp-27-dump.json`, `scripts/diag-rollout-summary.ts`, `scripts/diag-partner-alt-query.ts`, `scripts/dump-control-rows.ts`. Контент seed-скриптов жив в БД + log. Не оставлено.
+
+### Что НЕ покрыто на закрытии (передаётся в Этап F)
+
+См. `/sessions/NEXT-SESSION-START.md` для точки входа.
+

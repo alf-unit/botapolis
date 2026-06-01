@@ -320,38 +320,30 @@ export async function PartnerAlternatives({
   )
 
   const heading = (
-    <h2
-      className={cn(
-        "font-semibold tracking-[-0.02em]",
-        emphasized ? "text-h2" : "text-h3",
-      )}
-    >
+    <h2 className="text-h2 font-semibold tracking-[-0.02em]">
       {t.title}
     </h2>
   )
 
   // ────────────────────────────────────────────────────────────────────
-  // Render — single framed card across both modes (owner-locked 2026-06-01:
-  // visual consistency on every surface). emphasis = atmospheric gradient
-  // overlay + slightly stronger shadow; otherwise identical chrome.
+  // Render — identical framed card on every surface (owner-locked
+  // 2026-06-01 third pass: no visual divergence between emphasized and
+  // normal modes). emphasized prop is kept for callers but render path
+  // ignores it — both paths produce the same chrome:
+  //   rounded-3xl + border + bg-surface + atmospheric mint overlay +
+  //   shadow-md + p-6 lg:p-10 + h2 heading.
   // ────────────────────────────────────────────────────────────────────
+  void emphasized
   const card = (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)]",
-        emphasized ? "p-6 lg:p-10 shadow-[var(--shadow-md)]" : "p-6 lg:p-8 shadow-[var(--shadow-sm)]",
-      )}
-    >
-      {emphasized && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 -top-1/2 h-[200%] opacity-50"
-          style={{
-            background:
-              "radial-gradient(ellipse at top, rgba(16,185,129,0.12), transparent 60%)",
-          }}
-        />
-      )}
+    <div className="relative overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-6 lg:p-10 shadow-[var(--shadow-md)]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 -top-1/2 h-[200%] opacity-50"
+        style={{
+          background:
+            "radial-gradient(ellipse at top, rgba(16,185,129,0.12), transparent 60%)",
+        }}
+      />
       <div className="relative">
         {heading}
         {cards}

@@ -84,18 +84,35 @@ async function fetchAlternatives(source: ToolRow, limit = 8): Promise<AltCard[]>
   const select =
     "id, slug, name, name_ru, tagline, tagline_ru, logo_url, category, rating, pricing_model, pricing_min, pricing_max"
 
-  // First pass — same category, exclude self. Most users land here from
-  // category-intent searches ("klaviyo alternatives" → email tools).
-  const { data: sameCategory } = await supabase
-    .from("tools")
-    .select(select)
-    .eq("status", "published")
-    .eq("category", source.category)
-    .neq("slug", source.slug)
-    .order("rating", { ascending: false, nullsFirst: false })
-    .limit(limit)
+  // Partner-first ordering (2026-06-01): inside the same category, surface
+  // tools WITH affiliate_url before those without. Two parallel queries
+  // beat a single rating-only sort because the alternative-listicle is the
+  // commercial-intent surface — partner tools deserve top placement when
+  // they're plausible alternatives, non-partners stay as fillers below.
+  const [partnerRes, nonPartnerRes] = await Promise.all([
+    supabase
+      .from("tools")
+      .select(select)
+      .eq("status", "published")
+      .eq("category", source.category)
+      .neq("slug", source.slug)
+      .not("affiliate_url", "is", null)
+      .order("rating", { ascending: false, nullsFirst: false })
+      .limit(limit),
+    supabase
+      .from("tools")
+      .select(select)
+      .eq("status", "published")
+      .eq("category", source.category)
+      .neq("slug", source.slug)
+      .is("affiliate_url", null)
+      .order("rating", { ascending: false, nullsFirst: false })
+      .limit(limit),
+  ])
 
-  const pool: AltCard[] = sameCategory ?? []
+  const partners = partnerRes.data ?? []
+  const nonPartners = nonPartnerRes.data ?? []
+  const pool: AltCard[] = [...partners, ...nonPartners].slice(0, limit)
   if (pool.length >= 2) return pool
 
   // Fallback — small categories (today: chat = ManyChat alone). Widen the

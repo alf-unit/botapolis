@@ -8,6 +8,7 @@ import { Footer } from "@/components/nav/Footer"
 import { PageViewEvent } from "@/components/analytics/PageViewEvent"
 import { TableOfContents } from "@/components/content/TableOfContents"
 import { ToolLogo } from "@/components/tools/ToolLogo"
+import { PartnerAlternatives } from "@/components/tools/PartnerAlternatives"
 import { ProsConsList } from "@/components/tools/ProsConsList"
 import {
   ComparisonTable,
@@ -911,6 +912,24 @@ export default async function ComparisonPage({ params }: PageProps) {
           </div>
         </div>
         {/* /Body grid */}
+
+        {/* ==================================================================
+            Partner alternatives — surface 2 partner tools from the same
+            category. emphasized when either side has no affiliate_url
+            (one of the tools in the pair is a dead end for monetisation).
+            showCompareLinks=false because this page IS a comparison.
+            ================================================================== */}
+        <PartnerAlternatives
+          currentSlug={toolA.slug}
+          currentName={toolA.name}
+          currentCategory={toolA.category}
+          excludeSlugs={[toolB.slug]}
+          locale={locale as "en" | "ru"}
+          localePrefix={localePrefix}
+          emphasized={toolA.affiliate_url == null || toolB.affiliate_url == null}
+          maxCount={2}
+          showCompareLinks={false}
+        />
 
         {/* ==================================================================
             CTA TAIL — two-tool side-by-side

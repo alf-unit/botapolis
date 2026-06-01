@@ -17,6 +17,7 @@ import { RatingStars } from "@/components/tools/RatingStars"
 import { PricingBadge } from "@/components/tools/PricingBadge"
 import { ProsConsList } from "@/components/tools/ProsConsList"
 import { FeaturesList } from "@/components/tools/FeaturesList"
+import { PartnerAlternatives } from "@/components/tools/PartnerAlternatives"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import type { ToolRow } from "@/lib/supabase/types"
@@ -424,6 +425,21 @@ export default async function ToolDetailPage({ params }: PageProps) {
             </div>
           </Section>
         )}
+
+        {/* =========================================================
+            Partner alternatives — emphasized when this tool has no
+            affiliate_url so the block is the page's monetised exit.
+            Compare-links inside per-card when /compare/[X-vs-Y] exists.
+           ========================================================= */}
+        <PartnerAlternatives
+          currentSlug={tool.slug}
+          currentName={tool.name}
+          currentCategory={tool.category}
+          locale={locale as "en" | "ru"}
+          localePrefix={localePrefix as "" | "/ru"}
+          emphasized={tool.affiliate_url == null}
+          maxCount={3}
+        />
 
         {/* =========================================================
             CTA tail — hidden for Judge.me / catalog-no-affiliate tools

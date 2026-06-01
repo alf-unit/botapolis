@@ -835,3 +835,65 @@ Owner положил `PHASE-0-BLUEPRINT.md` — переход с editorial-per-
   - `lib/content/rating.ts:getToolRatings` читает MDX как canonical; после сноса MDX → переключить на DB-only.
   - Остальные 29 published tools имеют `verdict = NULL` — секция Verdict скрыта. Массовое наполнение когда reference approved.
   - `scripts/seed-klaviyo-reference.ts` one-off — удалить после reference approval.
+
+---
+
+## 2026-06-01 (session 2) — PartnerAlternatives block (закрытие тупиков на non-affiliate тулзах)
+
+### Commits
+
+- feat(monetization): PartnerAlternatives block — route dead-ends to partner reviews
+
+### Задача
+
+После outbound-link sweep Judge.me (и любая будущая `affiliate_url IS NULL` тулза) стала чистым тупиком: ноль кнопок наружу. Owner поставил задачу — увести таких visitor'ов ВНУТРЬ сайта на монетизируемые reviews альтернатив. Системно для всех типов страниц где есть tool detail (reviews / tools / compare).
+
+### Сделано
+
+- **`components/tools/PartnerAlternatives.tsx`** — один shared server component с двумя блоками:
+  - **Блок А (карточки)** всегда: 2-3 партнёрских тулза (`affiliate_url IS NOT NULL`) той же category, отсортированы по rating DESC NULLS LAST, исключают current + excludeSlugs. Карточка → `/reviews/[alt-slug]`. Returns `null` если категория без партнёрских кандидатов.
+  - **Блок Б (compare-ссылки)** условно: per-card мелкая ссылка `Compare {currentName} vs {alt}` появляется ТОЛЬКО если `/compare/[canonical-pair-slug]` существует среди `comparisons.where(status='published', language=locale)`. Используется существующий `canonicalCompareSlug` из `lib/content/slug.ts`. Один лукап `IN (...)` для всех кандидатов сразу.
+  - **emphasized mode** для тулзов БЕЗ affiliate_url: gradient-card обёртка + text-h2 heading, поднятая визуальная важность (это их главный CTA, единственный путь к деньгам).
+  - **normal mode** для тулзов С affiliate_url: plain section с border-top, text-h3 heading, бонусный охват тех кому current тулз не подошёл.
+  - **bare prop** — `true` когда caller уже предоставил `container-default` (для /reviews/[slug] inside article column); `false` (default) — component сам оборачивает в `container-default`.
+  - **Title нейтральный** — "Similar tools worth comparing" / "Похожие инструменты". Owner explicit: не "isn't a fit" — мы держим Judge.me как сильный магнит (5.0/37k), нельзя его принижать после того как хвалили.
+- **Вставка в 3 шаблона** по таблице из плана:
+  - [app/reviews/[slug]/page.tsx](app/reviews/[slug]/page.tsx) — после Verdict, перед tail AffiliateButton. `bare=true`, `emphasized=tool.affiliate_url == null`, `maxCount=3`, `showCompareLinks=true`.
+  - [app/tools/[slug]/page.tsx](app/tools/[slug]/page.tsx) — после "Best for / Not for", перед tail CTA. `bare=false`, `emphasized=tool.affiliate_url == null`, `maxCount=3`, `showCompareLinks=true`.
+  - [app/compare/[slug]/page.tsx](app/compare/[slug]/page.tsx) — между body grid и CTA tail. `bare=false`, `emphasized=toolA.affiliate_url == null || toolB.affiliate_url == null`, `maxCount=2`, `excludeSlugs=[toolB.slug]`, `showCompareLinks=false` (страница сама про сравнение, ссылка избыточна).
+  - RU-зеркала наследуют через re-export, отдельной правки не потребовалось.
+- **`/alternatives/[slug]` partner-first sort** — `fetchAlternatives()` теперь делает 2 параллельных SELECT через `Promise.all` (партнёрские + непартнёрские), конкатенирует partnersFirst, slice до limit. Партнёрские тулзы поднимаются в верх листинга — commercial-intent surface должен показывать монетизируемые варианты первыми. Fallback "any-category" path оставлен как был.
+- **Verify:** `npx tsc --noEmit` exit 0, `npm run build` clean.
+
+### Обнаружено
+
+- **`bare` prop был необходим из-за неоднородности контейнеров.** /reviews/[slug] кладёт PartnerAlternatives внутрь `<article>` column 2-колоночного grid'а — там container-default уже у parent'а. /tools/[slug] и /compare/[slug] вставляют блок как top-level section — там нужен собственный container. Единый компонент с переключателем чище двух близнецов.
+- **`canonicalCompareSlug` ожидает строку "a-vs-b"**, не пару. Конструируем через `canonicalCompareSlug(\`${currentSlug}-vs-${altSlug}\`)`, helper нормализует порядок alphabetically. Один lookup-set покрывает все per-card проверки.
+- **Compare-links — natural rollout.** Сейчас Этап F не построил comparison-страницы для большинства тулзов, Блок Б почти всегда пустой. Когда Этап F построит — ссылки появятся автоматически (фильтр в БД), без правки кода.
+- **AltCard type в /alternatives/ не несёт affiliate_url** — fetchAlternatives возвращает Pick без него. Партнёр-первая сортировка делается ВНУТРИ fetchAlternatives через 2 раздельных query, наружу проброшен уже отсортированный pool. AltCard остался узким, JSX не знает про сортировочный признак — это правильное разделение.
+- **PostgREST `.not("affiliate_url", "is", null)` синтаксис** — chain работает напрямую через supabase-js builder. `.is("affiliate_url", null)` для NULL. Сохранил как идиому для двух query.
+
+### Fixes
+
+- **Дед-энд на Judge.me и любых будущих non-affiliate тулзах закрыт** — readers получают 2-3 партнёрских альтернативы внутри сайта вместо exit-without-conversion. Emphasis-mode делает блок неминуемой частью UX на этих страницах.
+- **Партнёрские тулзы получили дополнительный internal-link inbound** — каждая partner-страница теперь линкуется минимум из 1 review (любая категорно-родственная non-partner страница) + потенциально из /compare/* surfaces. SEO graph density растёт.
+- **/alternatives/[slug] коммерческая релевантность** — партнёрские варианты сверху листинга. Reader landing с "klaviyo alternatives" intent видит Omnisend/Mailchimp/etc. (партнёры) первыми вместо ранкинга по чистому rating.
+
+### Open follow-ups (приоритет)
+
+- **#1 Verify production after deploy** — открыть `/reviews/judge-me` (должен показать emphasized-блок с Loox/Yotpo альтернативами, без compare-ссылок т.к. /compare/judge-me-vs-* не построены), `/reviews/klaviyo` (normal-mode блок внизу с другими email-партнёрами), `/compare/klaviyo-vs-omnisend` (блок между body и tail с 2 email-партнёрами, без compare-ссылок).
+- **#2 После Этапа F (comparisons)** — compare-ссылки Блока Б автоматически появятся. Если массовая partial publication — могут быть ситуации "alt существует, compare published, но через 2 шага попадает в other partner который не имеет compare". Норм.
+- **#3 Carryovers from prior sessions (unchanged):**
+  - tools table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at)
+  - system_config.modified_by CHECK constraint rejects agent values
+  - Capture SCOUT runtime AGENTS.md to /agent-snapshots/scout/
+  - Option B refactor /compare/[slug] MDX-driven
+  - Newsletter ingestion via Beehiiv
+  - OPS GPT-5.5 cost reconciliation
+  - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md
+  - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT
+  - Tighten app/robots.ts for AI crawlers до 50+ статей
+  - 6 legacy MDX review files + klaviyo-pricing.mdx — снос + редиректы после reference approval
+  - `lib/content/rating.ts:getToolRatings` — переключить на DB-only после сноса MDX
+  - 29 tools без verdict — массовое наполнение когда reference approved
+  - `scripts/seed-klaviyo-reference.ts` — удалить после reference approval

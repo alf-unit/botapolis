@@ -10,6 +10,7 @@ import { ArticleCover, reviewOgCoverHref } from "@/components/content/ArticleCov
 import { TableOfContents } from "@/components/content/TableOfContents"
 import { ProsConsList } from "@/components/content/ProsConsList"
 import { AffiliateButton } from "@/components/content/AffiliateButton"
+import { PartnerAlternatives } from "@/components/tools/PartnerAlternatives"
 import { ScrollMilestone } from "@/components/analytics/ScrollMilestone"
 import { ToolLogo } from "@/components/tools/ToolLogo"
 import { buttonVariants } from "@/components/ui/button"
@@ -543,6 +544,22 @@ export default async function ReviewPage({ params }: PageProps) {
                   </div>
                 </Section>
               )}
+
+              {/* ── Partner alternatives — emphasized when this tool has no
+                  affiliate_url so the block is the page's primary monetised
+                  exit. Otherwise it's a bonus discovery surface below the
+                  verdict. Compare-links rendered per-card when an existing
+                  /compare/[X-vs-Y] page is published. */}
+              <PartnerAlternatives
+                currentSlug={tool.slug}
+                currentName={tool.name}
+                currentCategory={tool.category}
+                locale={locale}
+                localePrefix={localePrefix}
+                emphasized={tool.affiliate_url == null}
+                maxCount={3}
+                bare
+              />
 
               {/* ── Tail CTA (Judge.me carve-out: null when affiliate_url IS NULL) ── */}
               <div className="mt-10">

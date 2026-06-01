@@ -232,6 +232,8 @@ export default async function AlternativesPage({ params }: PageProps) {
           ratingLabel:         "Оценка",
           pricingLabel:        "Цена",
           empty:               "Пока не нашли подходящих альтернатив в каталоге. Загляни в общий каталог инструментов.",
+          introHeading:        `Почему ищут альтернативы ${source.name}`,
+          verdictHeading:      "Кому что подходит",
         }
       : {
           home:        "Home",
@@ -246,7 +248,35 @@ export default async function AlternativesPage({ params }: PageProps) {
           ratingLabel:         "Rating",
           pricingLabel:        "Pricing",
           empty:               "We don't have credible alternatives in the catalog yet. Browse the full tools catalog instead.",
+          introHeading:        `Why operators look for ${source.name} alternatives`,
+          verdictHeading:      "Who picks which",
         }
+
+  // ── Etap F editorial (migration 017) ──────────────────────────────
+  // alternatives_editorial is jsonb on the SOURCE tool row. We pick the
+  // EN or RU field per locale with field-level fallback (EN value used
+  // when RU twin is missing — consistent with localizeTool() convention).
+  // Each section renders independently — intro, per-card why, verdict
+  // are all optional. NULL field == section skipped; this keeps the page
+  // valid for any source tool that hasn't been populated yet.
+  const editorial = rawSource.alternatives_editorial ?? null
+  const editorialIntro =
+    locale === "ru"
+      ? editorial?.intro_ru ?? editorial?.intro ?? null
+      : editorial?.intro ?? null
+  const editorialVerdict =
+    locale === "ru"
+      ? editorial?.verdict_ru ?? editorial?.verdict ?? null
+      : editorial?.verdict ?? null
+  const perCardWhy = new Map<string, string>()
+  for (const c of editorial?.perCardContext ?? []) {
+    if (typeof c.slug !== "string") continue
+    const why =
+      locale === "ru"
+        ? c.why_ru ?? c.why ?? null
+        : c.why ?? null
+    if (why) perCardWhy.set(c.slug, why)
+  }
 
   const breadcrumb = generateBreadcrumbSchema([
     { name: t.home,    path: `${localePrefix}/` },
@@ -348,6 +378,20 @@ export default async function AlternativesPage({ params }: PageProps) {
           </div>
         </section>
 
+        {/* Editorial intro (migration 017) — cons-driven framing of why
+            operators search for alternatives. Renders only when populated;
+            null falls back silently to the generic hero + grid below. */}
+        {editorialIntro && (
+          <section className="container-default py-10 lg:py-12 border-b border-[var(--border-subtle)]">
+            <h2 className="text-h2 font-semibold tracking-[-0.02em]">
+              {t.introHeading}
+            </h2>
+            <p className="mt-5 max-w-3xl text-[17px] leading-[1.7] text-[var(--text-secondary)]">
+              {editorialIntro}
+            </p>
+          </section>
+        )}
+
         {/* Alternatives grid */}
         <section className="container-default py-12 lg:py-16">
           <div className="flex items-center gap-3">
@@ -366,7 +410,9 @@ export default async function AlternativesPage({ params }: PageProps) {
             </div>
           ) : (
             <ul role="list" className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {alternatives.map((a) => (
+              {alternatives.map((a) => {
+                const why = perCardWhy.get(a.slug)
+                return (
                 <li key={a.slug}>
                   <Link
                     href={`${localePrefix}/tools/${a.slug}`}
@@ -395,6 +441,15 @@ export default async function AlternativesPage({ params }: PageProps) {
                       </div>
                     </div>
 
+                    {/* Editorial per-card reasoning (migration 017) —
+                        renders only when the source tool's editorial
+                        carries a why for this specific alt slug. */}
+                    {why && (
+                      <p className="text-[13.5px] leading-[1.6] text-[var(--text-primary)]">
+                        {why}
+                      </p>
+                    )}
+
                     <div className="mt-auto flex items-center justify-between gap-3 pt-2 border-t border-[var(--border-subtle)]">
                       <div className="flex flex-col gap-1">
                         {a.rating != null && (
@@ -419,10 +474,27 @@ export default async function AlternativesPage({ params }: PageProps) {
                     </div>
                   </Link>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           )}
         </section>
+
+        {/* Editorial verdict (migration 017) — "who picks which" closer.
+            Renders only when populated; the page degrades gracefully when
+            this source tool hasn't been editorialised yet. */}
+        {editorialVerdict && (
+          <section className="container-default pb-12 lg:pb-16">
+            <div className="rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-6 lg:p-8 shadow-[var(--shadow-sm)]">
+              <h2 className="text-h2 font-semibold tracking-[-0.02em]">
+                {t.verdictHeading}
+              </h2>
+              <p className="mt-5 max-w-3xl text-[17px] leading-[1.7] text-[var(--text-primary)]">
+                {editorialVerdict}
+              </p>
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer

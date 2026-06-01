@@ -180,8 +180,28 @@ export type ToolRow = {
   // NULL = Verdict section is hidden on the rendered review page.
   verdict:    string | null
   verdict_ru: string | null
+  // Migration 017 — Etap F /alternatives/[slug] editorial block. Honest
+  // analyst voice; intro is cons-driven; perCardContext is per partner-
+  // alternative reasoning; verdict is "who picks which". NULL means the
+  // page renders the generic hero + grid template without editorial copy.
+  alternatives_editorial: ToolAlternativesEditorial | null
   created_at: string
   updated_at: string
+}
+
+// ToolAlternativesEditorial — migration 017 jsonb. Shape stays OPEN at the DB
+// layer (no CHECK) so wave 2 can add per-source headlines without a follow-up
+// migration; render code defensively validates each field on read.
+export type ToolAlternativesEditorial = {
+  intro?:           string | null
+  intro_ru?:        string | null
+  perCardContext?:  Array<{
+    slug:   string
+    why?:   string | null
+    why_ru?: string | null
+  }> | null
+  verdict?:    string | null
+  verdict_ru?: string | null
 }
 
 export type ToolInsert = Omit<ToolRow, "id" | "created_at" | "updated_at"> & {

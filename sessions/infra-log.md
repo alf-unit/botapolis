@@ -968,3 +968,82 @@ Owner на site walk нашёл что после Etap E flip 2026-05-31 две 
   - Tighten app/robots.ts for AI crawlers до 50+ статей
   - 29 tools без verdict — массовое наполнение когда reference approved
 
+---
+
+## 2026-06-01 (session 4) — Etap E final rollout · 27 published tools verdict + *_ru + revalidate
+
+### Commits
+
+- chore(reviews): seed-rollout-27 — fill verdict + *_ru for remaining 27 published tools
+
+### Задача
+
+После одобрения Klaviyo reference (klaviyo + gorgias + inventory-planner — три контрольных, на трёх разных профилях: rich+affiliate, rich+affiliate, problematic+no-affiliate), оператор дал go на массовый rollout оставшихся 27. Etap E финал.
+
+### Сделано
+
+- **`scripts/seed-rollout-27.ts`** — единый seed-скрипт с 27 payloads + apply + revalidate runner. Каждый payload пишет:
+  - **verdict (EN)** — честный аналитический вывод из R1-R6 агрегированных данных + verified operator quotes; surface content-flag negatives (где есть) upfront. Никакого fake-hands-on.
+  - **verdict_ru** — параллельный RU перевод.
+  - Недостающие *_ru поля (для тулзов без базового *_ru — полный комплект; для тех у кого база была от ранних seed-passes — только добор: not_for_ru, pricing_notes_ru, features_ru jsonb, shopify_native_notes_ru, meta_title_ru, meta_description_ru).
+  - Rewrite EN `meta_description` на тулзах, где старая версия имела fake-hands-on framing ("we ran X 60/90 days on a real store $XX/mo"). Затронуты: tidio, manychat, omnisend, mailchimp, smile-io, judge-me, loox, yotpo, postscript, recharge.
+- **27/27 applied, 0 failed.** Verdict-длина: EN среднее ~1,400 chars, RU среднее ~1,350 chars. Total = ~76K chars новой editorial-prose в БД.
+- **Revalidate** — 54 path-cache invalidate (27 × {EN, RU} + /reviews + /ru/reviews индексы) через `/api/revalidate?secret=...` в 3 батча по 20 paths каждый. Все 200 OK.
+- **Cleanup**: удалил `scripts/dump-27.ts`, `scripts/seed-controls-reference.ts`, `scripts/tmp-27-dump.json` (untracked one-offs) + `git rm scripts/seed-klaviyo-reference.ts` (tracked from earlier reference build, отслужил). `scripts/seed-rollout-27.ts` оставил untracked — traceability артефакт.
+
+### Content-flags applied
+
+- **adcreative-ai** — cons-must-surface (€360.18 trial-conversion billing pattern), verdict выводит upfront.
+- **aftership** — external-rating-suppression context (Trustpilot 1.5/671 ≠ merchant-сентимент); verdict явно различает carrier-complaint shape Trustpilot от G2/Shopify Store операторских.
+- **flair-ai** — source-uncertainty (cookie window — Rewardful platform default); verdict не propagating «60-day Flair-specific».
+- **limespot** — source-uncertainty (commission unconfirmed); verdict не пропагандирует rate.
+- **loyaltylion** — external-rating-bias (Trustpilot 5.0/53 — post-onboarding solicited); verdict weights G2 4.6/500 как load-bearing.
+- **manychat** — pricing-volatility (free plan slashed Mar 2 2026 — 1000 → 25 active contacts); verdict называет дату и оригинальный contact-limit.
+- **pencil** — framing-correction (Shopify «partnership» = API/account linking, NOT native app); verdict так и описывает.
+- **recharge** — ecosystem-event (Skio acquisition Apr 30 2026 $105M cash) + affiliate-platform-change (PartnerStack → Lasso Mar 15 2026); verdict surface обе верифицированные даты + источники.
+- **skio** — ecosystem-event (acquired by Recharge); verdict называет ARR-on-sale ($32M), price ($105M cash), only $8M raised, parent-company-roadmap question для новых развёртываний.
+- **stay-ai** — content-asset (OLIPOP 26% churn reduction + 35% subscription-revenue growth case study); verdict использует конкретные цифры как proof point.
+- **tidio** — numerical-reconciliation (Lyro deflection 64-67% range); verdict даёт диапазон с обоими first-party источниками вместо одного числа.
+- **triple-whale** — cons-must-surface (attribution accuracy + support complaints); verdict даёт verbatim G2 цитаты как операторский signal не как marketing-инверсия.
+- **yotpo** — product-discontinuation (SMS/Email sunset Dec 31 2025 + ~34% staff cut); verdict явно фиксирует sunset и переориентирует анализ на Reviews + Loyalty.
+
+### Carve-outs applied (no outbound CTA)
+
+- **judge-me** — catalog-no-affiliate flag. Verdict открыто упоминает: «Judge.me does not run an affiliate program (confirmed publicly on their feedback portal). We hold this review on botapolis specifically because of Judge.me's dominant category position — the catalog entry is here without a 'Try' CTA, and partner alternatives (Loox, Yotpo) live in the alternatives surface for readers who outgrow it.» Прозрачность операторскому намерению.
+- **shopify-sidekick** — special-monetization flag. Verdict фрейм: «every Shopify merchant already has Sidekick — bundled free in every plan. The economic question isn't 'should we pay for Sidekick' — there's no separate charge — it's 'where does it replace another tool and where do we still need that tool'.»
+
+### Обнаружено
+
+- **Тулзы с *_ru-base от ранних seed-passes** (tidio, manychat, omnisend, mailchimp, smile-io, judge-me, loox, yotpo, recharge, postscript) уже имели name_ru / tagline_ru / description_ru / pros_ru / cons_ru / best_for_ru. Seed только добавил недостающие (не перезаписывал базу). Pattern: incremental rollout позволяет накапливать editorial-data, не теряя предыдущие правки.
+- **Fake-hands-on в meta_description** обнаружен на 10 тулзах от ранних editorial-passes. Переписаны во время этого rollout одним скриптом — теперь все 30 review meta-description в honest analyst voice. Один общий проход дешевле, чем 10 локальных правок.
+- **Content-flags применяются на verdict-уровне, не сегрегированы.** Negatives упоминаются с источником, верифицируемым timestamp/URL и operator-quote где есть. Никакой sandwich-критики («великая платформа, но...»); negatives surface там, где данные их размещают (upfront для cons-must-surface; в pricing-секции для pricing-gotcha; в caveat-абзаце для source-uncertainty).
+- **Revalidate batch-size 20 paths** — лимит на безопасность; `/api/revalidate` route handle JSON body любого размера, но 20 — sane batch для логирования / rate-limit safety.
+- **Empty operator_quotes / sparse external_ratings** не блокировали verdict-композицию. Pencil G2 14 reviews, Flair AI G2 15 reviews, Northbeam G2 16 reviews — все verdict явно flag «thin third-party signal» и опираются на named-customer roster / first-party platform-claims. Прозрачно операторскому намерению (signal-strength info).
+
+### Fixes
+
+- **Etap E фундамент закрыт** — все 30 published tools (klaviyo + gorgias + inventory-planner + 27) имеют verdict + полный *_ru комплект. /reviews/[slug] runtime теперь даёт reader unique editorial verdict + полный 2-language stack.
+- **Fake-hands-on EN meta_description sweep** — 10 тулзов переписаны на honest analyst voice; единственный остаточный fake-hands-on в meta-описаниях по всем reviews нулевой.
+
+### Open follow-ups
+
+- **#1 Сделай pass по live URL** — открыть произвольные 4-5 reviews (mix affiliate / no-affiliate / content-flag-heavy / clean) → проверить:
+  - Verdict читаемый, не повторяющийся структурно (риск: все начинаются «The data points to a... profile» — паттерн я сохранял для consistency, но мог получиться монотонным).
+  - PartnerAlternatives корректно работает на каждой (subcategory-overlap fallback).
+  - meta_description в источнике страницы не fake-hands-on.
+- **#2 Sitemap должен заполнится через 24h ISR cycle** — все 30 reviews в `/sitemap.xml` уже включены после Etap E flip (sitemap читает tools); ничего делать не нужно, GSC подхватит.
+- **#3 Этап F (comparisons) — следующий шаг Blueprint.** Cross-link через `integrates_with_tools` уже у всех 30 tools проставлен (включая 9 пустых на edge-case тулзах). Можно строить comparison-страницы по Этапу 2 паттерну.
+- **#4 Carryovers from prior sessions:**
+  - tools table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at) — SCOUT-write track cancelled, low-priority cleanup
+  - system_config.modified_by CHECK constraint
+  - Capture SCOUT runtime AGENTS.md to /agent-snapshots/scout/
+  - Option B refactor /compare/[slug] MDX-driven
+  - Newsletter ingestion via Beehiiv
+  - OPS GPT-5.5 cost reconciliation
+  - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md
+  - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT
+  - Tighten app/robots.ts for AI crawlers до 50+ статей
+  - `klaviyo-pricing.mdx` decision (currently 404 — move to /guides/ or add manual redirect)
+  - `scripts/build-search-index.ts` refactor — ingest tools для review-section (currently pagefind покрывает только guides + klaviyo-pricing)
+  - `lib/content/rating.ts:getToolRatings` cleanup — переключить на DB-only после сноса MDX
+

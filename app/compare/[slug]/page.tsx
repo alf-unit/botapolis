@@ -387,10 +387,6 @@ export default async function ComparisonPage({ params }: PageProps) {
   // before editorial fills out comparison_data.
   const related = await fetchRelatedComparisons(slug, toolA.id, toolB.id, 6, locale as "en" | "ru")
   const integrations = diffIntegrations(toolA, toolB)
-  const aHasShopifyPlus = toolA.integrations?.includes("shopify-plus") ?? false
-  const bHasShopifyPlus = toolB.integrations?.includes("shopify-plus") ?? false
-  const aHasShopify     = toolA.integrations?.includes("shopify")      ?? false
-  const bHasShopify     = toolB.integrations?.includes("shopify")      ?? false
 
   // i18n strings — local until comparisons earn a dict section.
   const t = {
@@ -459,20 +455,85 @@ export default async function ComparisonPage({ params }: PageProps) {
   const pricingNarrative = generatePricingNarrative(toolA, toolB, locale as "en" | "ru")
   const verdictBody = comparison.verdict ?? generateVerdictFallback(toolA, toolB, locale as "en" | "ru")
 
-  // Tiny support summary: pulls from `not_for` so the section says
-  // something concrete instead of a stock "both are responsive" line.
-  const supportNarrative =
-    locale === "ru"
-      ? `${toolA.name}: ${toolA.not_for ? `не подходит, когда ${toolA.not_for.toLowerCase()}.` : "стандартная email/chat поддержка по тарифу."} ${toolB.name}: ${toolB.not_for ? `не подходит, когда ${toolB.not_for.toLowerCase()}.` : "стандартная email/chat поддержка по тарифу."}`
-      : `${toolA.name}: ${toolA.not_for ? `not the right pick when ${toolA.not_for.toLowerCase()}.` : "standard email/chat support per plan."} ${toolB.name}: ${toolB.not_for ? `not the right pick when ${toolB.not_for.toLowerCase()}.` : "standard email/chat support per plan."}`
+  // Support summary uses rating_breakdown.support — an aggregated 4-axis
+  // score derived in Etap E from independent review platforms. Pulling
+  // not_for here was a bug (TZ-fix 2026-06-01): it surfaced "kому не
+  // подходит" content under the Customer support heading, which lied
+  // about both tools. If neither tool has a support score yet, the
+  // section says so explicitly rather than inventing prose.
+  const supportNarrative = (() => {
+    // rating_breakdown.support is either a flat number (legacy seed) or
+    // { value, source } (Etap D parser). Normalise on read.
+    const axisVal = (axis: unknown): number | null => {
+      if (axis == null) return null
+      if (typeof axis === "number") return axis
+      if (typeof axis === "object" && "value" in axis) {
+        const v = (axis as { value: unknown }).value
+        return typeof v === "number" ? v : null
+      }
+      return null
+    }
+    const aScore = axisVal(toolA.rating_breakdown?.support)
+    const bScore = axisVal(toolB.rating_breakdown?.support)
+    if (locale === "ru") {
+      if (aScore != null && bScore != null) {
+        return `Оценка поддержки (агрегация независимых отзывов на платформах вроде G2, Capterra, Shopify App Store): ${toolA.name} — ${aScore}/10, ${toolB.name} — ${bScore}/10. Это редакционная сводка по доступности каналов, скорости ответа и качеству решения — подробности по каждому смотри в обзорах ниже.`
+      }
+      if (aScore != null) {
+        return `Оценка поддержки ${toolA.name}: ${aScore}/10 (агрегация независимых отзывов). По ${toolB.name} агрегированных данных пока недостаточно — смотри обзор отдельно.`
+      }
+      if (bScore != null) {
+        return `Оценка поддержки ${toolB.name}: ${bScore}/10 (агрегация независимых отзывов). По ${toolA.name} агрегированных данных пока недостаточно — смотри обзор отдельно.`
+      }
+      return `Агрегированных оценок поддержки по обоим тулзам пока нет — детали по каналам и скорости ответа смотри в отдельных обзорах.`
+    }
+    if (aScore != null && bScore != null) {
+      return `Support rating (aggregated from independent review platforms like G2, Capterra, Shopify App Store): ${toolA.name} ${aScore}/10, ${toolB.name} ${bScore}/10. This is an editorial composite of channel availability, response speed, and resolution quality — see the individual reviews below for specifics.`
+    }
+    if (aScore != null) {
+      return `Support rating for ${toolA.name}: ${aScore}/10 (aggregated from independent reviews). Not enough aggregated data for ${toolB.name} — see the individual review for specifics.`
+    }
+    if (bScore != null) {
+      return `Support rating for ${toolB.name}: ${bScore}/10 (aggregated from independent reviews). Not enough aggregated data for ${toolA.name} — see the individual review for specifics.`
+    }
+    return `Aggregated support ratings aren't available for either tool yet — see each review for channel and response-time specifics.`
+  })()
 
-  const shopifyNarrative = (tool: ToolRow): string => {
-    const hasPlus  = tool.integrations?.includes("shopify-plus")
-    const hasCore  = tool.integrations?.includes("shopify")
-    if (hasPlus) return t.shopifyDeep
-    if (hasCore) return t.shopifyBasic
-    return t.shopifyNone
+  // Shopify integration depth derives from `shopify_native_notes` (the
+  // text field populated in Etap D from Research 4). Prior version read
+  // a `integrations` array that the new tools never had populated,
+  // producing a false "No native Shopify integration" claim for
+  // platforms (Klaviyo, Postscript, Gorgias, …) that are deeply native.
+  // Fall back to the legacy integrations array only when notes are absent.
+  const shopifyDepth = (tool: ToolRow): {
+    hasNative: boolean
+    hasPlus:   boolean
+    narrative: string
+  } => {
+    const notes = tool.shopify_native_notes?.trim()
+    if (notes) {
+      // "Yes — ..." or "Да — ..." prefix signals native integration.
+      const isYes = /^(yes|да|yes,)\b/i.test(notes)
+      const hasPlus =
+        /(shopify plus|plus[\s-]?certified|built[\s-]?for[\s-]?shopify)/i.test(
+          notes,
+        )
+      const cleaned = notes.replace(/^(yes|да)\s*[—\-–,:]\s*/i, "")
+      const narrative =
+        cleaned.length > 0
+          ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+          : notes
+      return { hasNative: isYes, hasPlus, narrative }
+    }
+    // Legacy fallback: integrations array (pre-Etap-D tools).
+    const hasPlus = tool.integrations?.includes("shopify-plus") ?? false
+    const hasCore = tool.integrations?.includes("shopify") ?? false
+    if (hasPlus) return { hasNative: true,  hasPlus: true,  narrative: t.shopifyDeep }
+    if (hasCore) return { hasNative: true,  hasPlus: false, narrative: t.shopifyBasic }
+    return { hasNative: false, hasPlus: false, narrative: t.shopifyNone }
   }
+  const shopifyA = shopifyDepth(toolA)
+  const shopifyB = shopifyDepth(toolB)
 
   // Wave 3 audit alignment (design v.026): synthetic TOC entries that
   // mirror the in-page section IDs. We don't extract from MDX (this page
@@ -769,15 +830,15 @@ export default async function ComparisonPage({ params }: PageProps) {
           <div className="grid gap-4 md:grid-cols-2">
             <ShopifyCard
               toolName={toolA.name}
-              hasShopify={aHasShopify}
-              hasShopifyPlus={aHasShopifyPlus}
-              narrative={shopifyNarrative(toolA)}
+              hasShopify={shopifyA.hasNative}
+              hasShopifyPlus={shopifyA.hasPlus}
+              narrative={shopifyA.narrative}
             />
             <ShopifyCard
               toolName={toolB.name}
-              hasShopify={bHasShopify}
-              hasShopifyPlus={bHasShopifyPlus}
-              narrative={shopifyNarrative(toolB)}
+              hasShopify={shopifyB.hasNative}
+              hasShopifyPlus={shopifyB.hasPlus}
+              narrative={shopifyB.narrative}
             />
           </div>
         </Section>

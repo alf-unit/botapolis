@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowUpRight, ExternalLink, Layers, Tag } from "lucide-react"
+import { ArrowUpRight, Layers, Tag } from "lucide-react"
 import type { Metadata } from "next"
 
 import { cn, absoluteUrl } from "@/lib/utils"
@@ -163,7 +163,6 @@ export default async function ToolDetailPage({ params }: PageProps) {
   // with every section heading. Move to dictionaries once RU is real.
   const t = {
     tryTool:        locale === "ru" ? `Открыть ${tool.name}` : `Try ${tool.name}`,
-    visitWebsite:   locale === "ru" ? "Сайт"              : "Website",
     overview:       locale === "ru" ? "О продукте"         : "Overview",
     pros:           locale === "ru" ? "Плюсы"              : "Pros",
     cons:           locale === "ru" ? "Минусы"             : "Cons",
@@ -294,42 +293,34 @@ export default async function ToolDetailPage({ params }: PageProps) {
                 </div>
               </div>
 
-              {/* CTA column */}
-              <div className="flex flex-col gap-3 lg:min-w-[220px]">
-                <Link
-                  href={`${localePrefix}/go/${tool.slug}`}
-                  rel="sponsored nofollow noopener"
-                  target="_blank"
-                  className={cn(
-                    buttonVariants({ variant: "cta", size: "lg" }),
-                    "h-12 px-5 text-base",
-                  )}
-                >
-                  {t.tryTool}
-                  <ArrowUpRight className="size-4" />
-                </Link>
-                <Link
-                  href={tool.website_url}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "lg" }),
-                    "h-12 px-5 text-base",
-                  )}
-                >
-                  {t.visitWebsite}
-                  <ExternalLink className="size-4" />
-                </Link>
-                <p className="text-[11px] text-[var(--text-tertiary)] leading-[1.5]">
-                  {t.affiliateNote}{" "}
+              {/* CTA column — outbound-link sweep (2026-06-01): single
+                  monetised exit via /go/. Tools without affiliate_url
+                  (Judge.me carve-out) render no outbound CTA at all. */}
+              {tool.affiliate_url != null && (
+                <div className="flex flex-col gap-3 lg:min-w-[220px]">
                   <Link
-                    href={`${localePrefix}/legal/affiliate-disclosure`}
-                    className="underline-offset-4 hover:underline"
+                    href={`${localePrefix}/go/${tool.slug}`}
+                    rel="sponsored nofollow noopener"
+                    target="_blank"
+                    className={cn(
+                      buttonVariants({ variant: "cta", size: "lg" }),
+                      "h-12 px-5 text-base",
+                    )}
                   >
-                    {locale === "ru" ? "подробнее" : "details"}
+                    {t.tryTool}
+                    <ArrowUpRight className="size-4" />
                   </Link>
-                </p>
-              </div>
+                  <p className="text-[11px] text-[var(--text-tertiary)] leading-[1.5]">
+                    {t.affiliateNote}{" "}
+                    <Link
+                      href={`${localePrefix}/legal/affiliate-disclosure`}
+                      className="underline-offset-4 hover:underline"
+                    >
+                      {locale === "ru" ? "подробнее" : "details"}
+                    </Link>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -435,49 +426,53 @@ export default async function ToolDetailPage({ params }: PageProps) {
         )}
 
         {/* =========================================================
-            CTA tail
+            CTA tail — hidden for Judge.me / catalog-no-affiliate tools
+            (outbound-link sweep 2026-06-01). A "Ready to try?" hero
+            without an affiliate destination would be a misleading promise.
            ========================================================= */}
-        <section className="container-default pb-20">
-          <div
-            className={cn(
-              "relative overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)]",
-              "p-8 lg:p-10 shadow-[var(--shadow-md)]",
-            )}
-          >
+        {tool.affiliate_url != null && (
+          <section className="container-default pb-20">
             <div
-              aria-hidden="true"
-              className="absolute inset-x-0 -top-1/2 h-[200%] pointer-events-none opacity-50"
-              style={{
-                background:
-                  "radial-gradient(ellipse at top, rgba(16,185,129,0.12), transparent 60%)",
-              }}
-            />
-            <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div>
-                <p className="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--brand)]">
-                  {locale === "ru" ? "Готовы начать?" : "Ready to try it?"}
-                </p>
-                <h3 className="mt-2 text-h3 font-semibold tracking-[-0.02em]">
-                  {locale === "ru"
-                    ? `Откройте ${tool.name} и проверьте на своём магазине.`
-                    : `Open ${tool.name} and try it on your own store.`}
-                </h3>
+              className={cn(
+                "relative overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)]",
+                "p-8 lg:p-10 shadow-[var(--shadow-md)]",
+              )}
+            >
+              <div
+                aria-hidden="true"
+                className="absolute inset-x-0 -top-1/2 h-[200%] pointer-events-none opacity-50"
+                style={{
+                  background:
+                    "radial-gradient(ellipse at top, rgba(16,185,129,0.12), transparent 60%)",
+                }}
+              />
+              <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div>
+                  <p className="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--brand)]">
+                    {locale === "ru" ? "Готовы начать?" : "Ready to try it?"}
+                  </p>
+                  <h3 className="mt-2 text-h3 font-semibold tracking-[-0.02em]">
+                    {locale === "ru"
+                      ? `Откройте ${tool.name} и проверьте на своём магазине.`
+                      : `Open ${tool.name} and try it on your own store.`}
+                  </h3>
+                </div>
+                <Link
+                  href={`${localePrefix}/go/${tool.slug}`}
+                  rel="sponsored nofollow noopener"
+                  target="_blank"
+                  className={cn(
+                    buttonVariants({ variant: "cta", size: "lg" }),
+                    "h-12 px-6 text-base",
+                  )}
+                >
+                  {t.tryTool}
+                  <ArrowUpRight className="size-4" />
+                </Link>
               </div>
-              <Link
-                href={`${localePrefix}/go/${tool.slug}`}
-                rel="sponsored nofollow noopener"
-                target="_blank"
-                className={cn(
-                  buttonVariants({ variant: "cta", size: "lg" }),
-                  "h-12 px-6 text-base",
-                )}
-              >
-                {t.tryTool}
-                <ArrowUpRight className="size-4" />
-              </Link>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
 
       <Footer

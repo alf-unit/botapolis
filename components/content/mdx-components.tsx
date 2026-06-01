@@ -29,15 +29,85 @@ import { AffiliateButton } from "./AffiliateButton"
 
 type AnchorProps = ComponentPropsWithoutRef<"a">
 
+/**
+ * Domains where outbound links stay clickable (rel="nofollow noopener").
+ * Owner rule 2026-06-01: rating platforms aren't vendors — they don't take
+ * commission and they earn the user's trust by being verifiable, so they
+ * survive the outbound-link sweep. Everything else external is rendered as
+ * a non-clickable grey span so the only paid path off-site stays /go/[slug].
+ */
+const ALLOWED_EXTERNAL_DOMAINS = [
+  "g2.com",
+  "trustpilot.com",
+  "capterra.com",
+  "apps.shopify.com",
+] as const
+
+const OWN_DOMAIN = "botapolis.com"
+
+function isOwnDomain(host: string): boolean {
+  return host === OWN_DOMAIN || host.endsWith(`.${OWN_DOMAIN}`)
+}
+
+function isAllowedExternal(host: string): boolean {
+  return ALLOWED_EXTERNAL_DOMAINS.some(
+    (d) => host === d || host.endsWith(`.${d}`),
+  )
+}
+
 function MdxLink({ href = "", children, className, ...rest }: AnchorProps) {
   const isExternal = /^https?:\/\//.test(href)
-  if (isExternal) {
+
+  // Internal path (`/...`, `#anchor`, relative) → Next Link, no special policy.
+  if (!isExternal) {
+    return (
+      <Link
+        href={href}
+        className={cn(
+          "text-[var(--brand)] underline underline-offset-[3px] decoration-[1.5px] decoration-[var(--accent-300)]",
+          "hover:decoration-[var(--brand)] transition-colors",
+          className,
+        )}
+      >
+        {children}
+      </Link>
+    )
+  }
+
+  // External URL — gate by domain whitelist.
+  let host = ""
+  try {
+    host = new URL(href).hostname.toLowerCase().replace(/^www\./, "")
+  } catch {
+    // Malformed URL → fall through to the grey-span branch below.
+  }
+
+  // Our own absolute URL (e.g. `https://botapolis.com/...`) — treat as
+  // internal navigation through Next Link. No nofollow on our own pages.
+  if (host && isOwnDomain(host)) {
+    return (
+      <Link
+        href={href}
+        className={cn(
+          "text-[var(--brand)] underline underline-offset-[3px] decoration-[1.5px] decoration-[var(--accent-300)]",
+          "hover:decoration-[var(--brand)] transition-colors",
+          className,
+        )}
+      >
+        {children}
+      </Link>
+    )
+  }
+
+  // Whitelisted rating platforms — keep clickable, mark nofollow because
+  // these aren't paid placements but they're outbound.
+  if (host && isAllowedExternal(host)) {
     return (
       <a
         {...rest}
         href={href}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="nofollow noopener"
         className={cn(
           "text-[var(--brand)] underline underline-offset-[3px] decoration-[1.5px] decoration-[var(--accent-300)]",
           "hover:decoration-[var(--brand)] transition-colors",
@@ -48,17 +118,19 @@ function MdxLink({ href = "", children, className, ...rest }: AnchorProps) {
       </a>
     )
   }
+
+  // Everything else (vendor URLs, miscellaneous external sites, malformed
+  // hrefs) → non-clickable grey text. Owner rule: the only monetised exit
+  // is /go/[slug]; raw vendor anchors in MDX would silently bypass it.
   return (
-    <Link
-      href={href}
+    <span
       className={cn(
-        "text-[var(--brand)] underline underline-offset-[3px] decoration-[1.5px] decoration-[var(--accent-300)]",
-        "hover:decoration-[var(--brand)] transition-colors",
+        "text-[var(--text-tertiary)]",
         className,
       )}
     >
       {children}
-    </Link>
+    </span>
   )
 }
 

@@ -1,8 +1,15 @@
 /**
- * /go/[slug] — affiliate redirector
+ * /go/[slug] — affiliate redirector (fail-closed)
  * ----------------------------------------------------------------------------
  * Reads the tool by slug, logs a click row, and 302-redirects to the
- * partner URL (or the brand site if no affiliate URL is set).
+ * monetized partner URL. If the tool has no `affiliate_url` (e.g. Judge.me
+ * catalog-no-affiliate carve-out), this route refuses to send the visitor
+ * to the vendor for free — instead it redirects to the internal review.
+ *
+ * Owner-locked 2026-06-01: monetisation is single-channel. The /go/ route
+ * is the ONLY way out to a vendor and it must never fall through to a
+ * vendor's site without affiliate attribution. JSON-LD still uses the raw
+ * `website_url` for SoftwareApplication.url (Google signal, no click).
  *
  * - Rate-limited to 10 hits per IP per hour (TZ § 5.3 + § 15.2).
  * - Click logging is fire-and-forget so the redirect doesn't wait on the DB.
@@ -49,10 +56,13 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   }
 
   // ----- Lookup tool ---------------------------------------------------------
+  // website_url intentionally NOT selected here — fix #6 (2026-06-01) makes
+  // the redirector fail-closed when affiliate_url is missing, so the vendor
+  // site is never the fallback target.
   const supabase = createServiceClient()
   const { data: tool, error } = await supabase
     .from("tools")
-    .select("id, affiliate_url, website_url, status")
+    .select("id, affiliate_url, status")
     .eq("slug", slug)
     .maybeSingle()
 
@@ -60,18 +70,20 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     return NextResponse.redirect(new URL("/tools", req.url))
   }
 
-  const target = tool.affiliate_url ?? tool.website_url
-  if (!target) {
-    return NextResponse.redirect(new URL(`/tools/${slug}`, req.url))
+  // Fail-closed: no affiliate_url → never send visitor out to vendor. Land
+  // them on the internal review page (where ToolStickyCard etc. already
+  // know to hide CTAs for this tool). Judge.me lives here.
+  if (!tool.affiliate_url) {
+    return NextResponse.redirect(new URL(`/reviews/${slug}`, req.url))
   }
 
   // ----- Build outbound URL with UTM overlay --------------------------------
   let outbound: URL
   try {
-    outbound = new URL(target)
+    outbound = new URL(tool.affiliate_url)
   } catch {
-    // Stored URL is malformed — fall back to safe internal route.
-    return NextResponse.redirect(new URL(`/tools/${slug}`, req.url))
+    // Stored affiliate_url is malformed — fall back to safe internal route.
+    return NextResponse.redirect(new URL(`/reviews/${slug}`, req.url))
   }
 
   const incoming = new URL(req.url)

@@ -771,3 +771,67 @@ Owner положил `PHASE-0-BLUEPRINT.md` — переход с editorial-per-
   - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md (now also needs Phase 0 split addressed)
   - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT
   - Tighten app/robots.ts for AI crawlers до 50+ статей
+
+---
+
+## 2026-06-01 — Outbound-link sweep + fail-closed /go/ redirector
+
+### Commits
+
+- feat(phase0): etap E — flip /reviews/[slug] to runtime DB + Klaviyo reference
+- fix(reviews): demote pricing_source to one-line footnote
+- fix(site): outbound-link sweep — single monetised exit + fail-closed /go/
+
+### Задача
+
+После Klaviyo reference (2026-05-31) и vendor-link demotion в Pricing-секции owner поставил сквозное правило: монетизация = ОДНА точка — `/go/[slug]`. Все остальные кликабельные пути к вендору закрыть везде (reviews, compare, tools, alternatives, listings, guides). Audit + единый pass.
+
+### Сделано
+
+- **Audit всех шаблонов** — нашёл 4 visible-leak (reviews ToolStickyCard "Website", compare ToolCardSide "Website", tools/[slug] hero "Visit website", pricing_source_url clickable footnote) + 1 латентный (`MdxLink` авто-кликает любой `https://`) + 1 серверный (`/go/` fallback на `website_url` молча обходил монетизацию). Подал owner-у с file:line.
+- **#1 pricing_source_url** → `<span>` серого цвета вместо `<Link>`. URL виден как verifiability метка, перехода нет.
+- **#2-3 ToolStickyCard + ToolCardSide** — удалил secondary "Website" кнопки полностью. Single "Try" CTA остаётся, gated by `affiliate_url != null`. Для Judge.me (catalog-no-affiliate) — НЕТ кнопок вообще.
+- **#4 tools/[slug] hero + tail** — same pattern. Hero CTA column целиком скрыт при `affiliate_url IS NULL`. Tail "Ready to try?" section гейтится тем же чеком.
+- **compare/[slug] CtaCard** — добавил early-return null при NULL affiliate_url. Раньше тулзы без affiliate в compare-tail показывали призывную карточку которая ведёт в /go/-фоллбек.
+- **#5 MdxLink whitelist** ([components/content/mdx-components.tsx](components/content/mdx-components.tsx#L32-L110)) — внешние `https://` идут через `URL().hostname` парсинг:
+  - own domain (`botapolis.com`, `*.botapolis.com`) → Next `Link` (internal nav)
+  - rating-платформы (g2.com, trustpilot.com, capterra.com, apps.shopify.com — включая subdomain суффиксы) → `<a target="_blank" rel="nofollow noopener">` (clickable, не sponsored — они не платят комиссию)
+  - всё остальное (vendor URLs, misc external) → `<span className="text-tertiary">` некликабельный grey text. Дверь закрыта до того как любой guide-MDX автор пропустит `https://klaviyo.com/...` в текст.
+  - Малформованные href тоже падают в grey span.
+- **#6 /go/[slug] route hardening** ([app/go/[slug]/route.ts](app/go/[slug]/route.ts)) — убрал `website_url` из SELECT, убрал `?? tool.website_url` fallback. При `affiliate_url IS NULL` → 302 redirect на `/reviews/${slug}`. Fail-closed: если accidental `/go/judge-me` ссылка где-то всплывёт, visitor попадёт на нашу review-страницу, а не на vendor сайт без монетизации. JSON-LD `website_url` в `lib/seo/schema.ts` остаётся как было (Google signal, не click).
+- **Cleanup:** удалил мёртвые `visitLabel`/`visitWebsite`/`visitA`/`visitB` строки + unused `ExternalLink` icon imports из reviews/compare/tools `[slug]` страниц. `ToolStickyCard` сигнатура урезана.
+- **Verify:** `npx tsc --noEmit` exit 0, `npm run build` clean.
+
+### Обнаружено
+
+- **`/go/` route был fail-open.** Изначально `target = tool.affiliate_url ?? tool.website_url`. Любой `/go/{tool-без-affiliate}` молча редиректил на vendor — отдавая трафик без комиссии. Это худший вид leak: невидимый в коде сайта (никаких HTML ссылок), активируется только если внешний линк на `/go/X` где X без affiliate появится в email/Slack/третьей-стороне. После fix — fail-closed на internal `/reviews/X`.
+- **`MdxLink` авто-кликал ЛЮБОЙ `https://`** — раньше grep по 30+ vendor доменам в `*.mdx` показывал 0 хитов (guide-авторы пока не успели проставить vendor-URL в текст), но дверь была открыта. Закрыли превентивно whitelist'ом.
+- **"Website" secondary кнопки везде дублировали "Try"** на тот же `/go/` target — обе вели к одной странице (через redirect), но "Website" обходил pricing redirect / utm-overlay / click logging. Двойная кнопка была не "выбор", а второй бесплатный путь. Удаление = упрощение UI + закрытие leak.
+- **rel="nofollow" vs "sponsored"** для рейтинговых платформ — G2/Trustpilot/Capterra не affiliate (мы им комиссии не платим), но external и могут передавать PageRank. `rel="nofollow noopener"` без `sponsored` — корректная сигнализация. /go/ через `TrackedAffiliateLink` использует `rel="sponsored nofollow noopener"` — это affiliate-specific.
+- **"Не оставляем мёртвых props"** — `visitLabel: string` остался бы валидным TS если бы я только удалил Link внутри ToolStickyCard. Чистил всё включая call-sites + сигнатуры компонентов + dict-строки + lucide-react импорты. tsc не ловит "проп получен но не использован" (это eslint rule, не tsc), нужна ручная аккуратность.
+
+### Fixes
+
+- **Single-channel monetisation** во всех шаблонах. Reviews / compare / tools (все 3 [slug]-роута + 2 ru-зеркала через re-export) ведут на vendor ТОЛЬКО через `/go/[slug]`. Visible HTML `tool.website_url` ссылки удалены везде.
+- **MdxLink whitelist** — закрытие латентной двери до её использования.
+- **`/go/` fail-closed** — defense-in-depth, защита от accidental `/go/judge-me`-link в любом месте кодовой базы / email / external.
+- **Judge.me carve-out completed** — после flip на runtime + outbound sweep, /reviews/judge-me получит: logo + name + tagline + rating + price + description + cross-links + verdict, БЕЗ outbound CTA. Самый чистый честный editorial-only режим.
+
+### Open follow-ups (приоритет)
+
+- **#1 Verify production after deploy** — открыть https://botapolis.com/reviews/klaviyo + любой /compare/klaviyo-vs-*. Убедиться: pricing source = серый текст (не клик), "Website" кнопок нет, single "Try" CTA. Также проверить /tools/klaviyo (directory tool-page) — там тот же sweep применён.
+- **#2 Judge.me page render check** — `/reviews/judge-me` должна теперь рендериться без всех outbound CTAs. Owner ещё не наполнял Judge.me verdict — секция Verdict скрыта пока NULL. Это OK.
+- **#3 Carryovers from prior session (unchanged):**
+  - tools table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at)
+  - system_config.modified_by CHECK constraint rejects agent values
+  - Capture SCOUT runtime AGENTS.md to /agent-snapshots/scout/
+  - Option B refactor /compare/[slug] MDX-driven
+  - Newsletter ingestion via Beehiiv
+  - OPS GPT-5.5 cost reconciliation
+  - Single-pass spec rewrite FINAL-ARCHITECTURE-V4.md
+  - TOOLS.md ↔ AGENTS.md drift prevention for CHIEF + SCOUT
+  - Tighten app/robots.ts for AI crawlers до 50+ статей
+  - 6 legacy MDX review files (klaviyo/gorgias/mailchimp/omnisend/postscript/tidio + klaviyo-pricing) всё ещё в репо; URLs 404 после Etap E flip. После owner approves Klaviyo reference — снос + 6 редиректов (`*-review-2026 → klaviyo`).
+  - `lib/content/rating.ts:getToolRatings` читает MDX как canonical; после сноса MDX → переключить на DB-only.
+  - Остальные 29 published tools имеют `verdict = NULL` — секция Verdict скрыта. Массовое наполнение когда reference approved.
+  - `scripts/seed-klaviyo-reference.ts` one-off — удалить после reference approval.

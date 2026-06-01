@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { ArrowUpRight, Check, ExternalLink, Minus } from "lucide-react"
+import { ArrowUpRight, Check, Minus } from "lucide-react"
 import type { Metadata } from "next"
 
 import { Navbar } from "@/components/nav/Navbar"
@@ -410,8 +410,6 @@ export default async function ComparisonPage({ params }: PageProps) {
     tocLabel:        locale === "ru" ? "Содержание"           : "On this page",
     tryA:           locale === "ru" ? `Открыть ${toolA.name}` : `Try ${toolA.name}`,
     tryB:           locale === "ru" ? `Открыть ${toolB.name}` : `Try ${toolB.name}`,
-    visitA:         locale === "ru" ? "Сайт"  : "Website",
-    visitB:         locale === "ru" ? "Сайт"  : "Website",
     affiliateNote:  locale === "ru"
       ? "Партнёрская ссылка. Цены и условия определяет вендор."
       : "Affiliate link. Pricing and terms are set by the vendor.",
@@ -571,7 +569,6 @@ export default async function ComparisonPage({ params }: PageProps) {
                 tool={toolA}
                 localePrefix={localePrefix}
                 tryLabel={t.tryA}
-                visitLabel={t.visitA}
               />
 
               {/* Vertical "VS" divider — pure CSS so we stay in the server tree */}
@@ -600,7 +597,6 @@ export default async function ComparisonPage({ params }: PageProps) {
                 tool={toolB}
                 localePrefix={localePrefix}
                 tryLabel={t.tryB}
-                visitLabel={t.visitB}
               />
             </div>
 
@@ -1294,13 +1290,16 @@ function ToolCardSide({
   tool,
   localePrefix,
   tryLabel,
-  visitLabel,
 }: {
   tool: ToolRow
   localePrefix: "" | "/ru"
   tryLabel: string
-  visitLabel: string
 }) {
+  // Outbound-link sweep (2026-06-01): only one CTA, gated by affiliate_url.
+  // Tools without affiliate_url (Judge.me carve-out) render with no outbound
+  // button at all — header info only. Owner rule: monetised /go/ is the
+  // single exit channel.
+  const showAffiliateCta = tool.affiliate_url != null
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6 shadow-[var(--shadow-sm)]">
       <div className="flex items-start gap-3">
@@ -1317,32 +1316,22 @@ function ToolCardSide({
         </div>
       </div>
 
-      <div className="mt-auto flex flex-col gap-2">
-        <Link
-          href={`${localePrefix}/go/${tool.slug}`}
-          rel="sponsored nofollow noopener"
-          target="_blank"
-          className={cn(
-            buttonVariants({ variant: "cta", size: "lg" }),
-            "h-11 px-4 text-[14px] justify-between",
-          )}
-        >
-          <span>{tryLabel}</span>
-          <ArrowUpRight className="size-4" />
-        </Link>
-        <Link
-          href={tool.website_url}
-          rel="noopener noreferrer"
-          target="_blank"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "lg" }),
-            "h-10 px-4 text-[13px] justify-between",
-          )}
-        >
-          <span>{visitLabel}</span>
-          <ExternalLink className="size-3.5" />
-        </Link>
-      </div>
+      {showAffiliateCta && (
+        <div className="mt-auto">
+          <Link
+            href={`${localePrefix}/go/${tool.slug}`}
+            rel="sponsored nofollow noopener"
+            target="_blank"
+            className={cn(
+              buttonVariants({ variant: "cta", size: "lg" }),
+              "h-11 px-4 text-[14px] justify-between w-full",
+            )}
+          >
+            <span>{tryLabel}</span>
+            <ArrowUpRight className="size-4" />
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
@@ -1362,6 +1351,10 @@ function CtaCard({
   localePrefix: "" | "/ru"
   label: string
 }) {
+  // Outbound-link sweep (2026-06-01): hide CTA card entirely for tools
+  // without affiliate_url. The /go/ route would fail-closed redirect anyway,
+  // so the card would be a misleading promise.
+  if (tool.affiliate_url == null) return null
   return (
     <div
       className={cn(

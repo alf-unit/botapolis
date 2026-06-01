@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowUpRight, ExternalLink } from "lucide-react"
+import { ArrowUpRight } from "lucide-react"
 import type { Metadata } from "next"
 
 import { Navbar } from "@/components/nav/Navbar"
@@ -247,7 +247,6 @@ export default async function ReviewPage({ params }: PageProps) {
     free:             locale === "ru" ? "Бесплатно" : "Free",
     externalPlatformsLabel: locale === "ru" ? "Внешние платформы" : "External platforms",
     crossLinkedLabel: locale === "ru" ? "Интеграции с тулзами каталога" : "Catalog integrations",
-    visitWebsite:     locale === "ru" ? "Сайт" : "Website",
     tryCta:           locale === "ru" ? "Открыть" : "Try",
     ratingChip:       locale === "ru" ? "Оценка" : "Rating",
     sourceHandsOn:    locale === "ru" ? "руки в продукте" : "hands-on",
@@ -418,15 +417,9 @@ export default async function ReviewPage({ params }: PageProps) {
                 {tool.pricing_source_url && (
                   <p className="mt-4 text-[12px] text-[var(--text-tertiary)] leading-[1.5]">
                     {t.pricingSource}:{" "}
-                    <Link
-                      href={tool.pricing_source_url}
-                      rel="noopener noreferrer"
-                      target="_blank"
-                      className="inline-flex items-baseline gap-1 text-[var(--text-secondary)] underline-offset-4 hover:underline hover:text-[var(--brand)] transition-colors break-all"
-                    >
+                    <span className="text-[var(--text-secondary)] break-all">
                       {tool.pricing_source_url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-                      <ExternalLink className="size-3 translate-y-[1px] shrink-0" aria-hidden="true" />
-                    </Link>
+                    </span>
                   </p>
                 )}
               </Section>
@@ -569,7 +562,6 @@ export default async function ReviewPage({ params }: PageProps) {
                 localePrefix={localePrefix}
                 locale={locale}
                 tryLabel={`${t.tryCta} ${tool.name}`}
-                visitLabel={t.visitWebsite}
                 ratingLabel={t.ratingChip}
                 campaign={`review-${slug}`}
               />
@@ -921,7 +913,6 @@ function ToolStickyCard({
   localePrefix,
   locale,
   tryLabel,
-  visitLabel,
   ratingLabel,
   campaign,
 }: {
@@ -929,7 +920,6 @@ function ToolStickyCard({
   localePrefix: "" | "/ru"
   locale: "en" | "ru"
   tryLabel: string
-  visitLabel: string
   ratingLabel: string
   campaign: string
 }) {
@@ -1010,17 +1000,12 @@ function ToolStickyCard({
             <ArrowUpRight className="size-4" aria-hidden="true" />
           </Link>
         )}
-        <Link
-          href={tool.website_url}
-          rel="noopener noreferrer"
-          target="_blank"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            showAffiliateCta ? "mt-2 w-full" : "mt-4 w-full",
-          )}
-        >
-          {visitLabel}
-        </Link>
+        {/* "Website" secondary button removed 2026-06-01 outbound-link sweep:
+            it duplicated the /go/ primary on the same vendor URL, so it
+            offered a free non-monetised escape hatch around /go/. Owner
+            rule: single monetised exit. Tools without affiliate_url
+            (Judge.me) now show no outbound CTA at all — logo + name +
+            rating + price only. */}
       </div>
     </div>
   )

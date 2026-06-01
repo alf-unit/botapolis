@@ -407,29 +407,27 @@ export default async function ReviewPage({ params }: PageProps) {
 
               {/* ── Pricing ────────────────────────────────────────────── */}
               <Section id="pricing" title={t.pricingHeading} eyebrow="04">
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="max-w-md">
                   <PriceCard tool={tool} locale={locale} t={t} />
-                  {tool.pricing_source_url && (
-                    <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6">
-                      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-                        {t.pricingSource}
-                      </p>
-                      <Link
-                        href={tool.pricing_source_url}
-                        rel="noopener noreferrer"
-                        target="_blank"
-                        className="mt-3 inline-flex items-center gap-1.5 text-[14px] text-[var(--brand)] underline-offset-4 hover:underline break-all"
-                      >
-                        {tool.pricing_source_url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-                        <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
-                      </Link>
-                    </div>
-                  )}
                 </div>
                 {tool.pricing_notes && (
                   <div className="mt-6 max-w-3xl whitespace-pre-line text-[14px] leading-[1.7] text-[var(--text-secondary)]">
                     {tool.pricing_notes}
                   </div>
+                )}
+                {tool.pricing_source_url && (
+                  <p className="mt-4 text-[12px] text-[var(--text-tertiary)] leading-[1.5]">
+                    {t.pricingSource}:{" "}
+                    <Link
+                      href={tool.pricing_source_url}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                      className="inline-flex items-baseline gap-1 text-[var(--text-secondary)] underline-offset-4 hover:underline hover:text-[var(--brand)] transition-colors break-all"
+                    >
+                      {tool.pricing_source_url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                      <ExternalLink className="size-3 translate-y-[1px] shrink-0" aria-hidden="true" />
+                    </Link>
+                  </p>
                 )}
               </Section>
 

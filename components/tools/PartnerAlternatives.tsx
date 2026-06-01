@@ -331,11 +331,18 @@ export async function PartnerAlternatives({
   )
 
   // ────────────────────────────────────────────────────────────────────
-  // Render
+  // Render — single framed card across both modes (owner-locked 2026-06-01:
+  // visual consistency on every surface). emphasis = atmospheric gradient
+  // overlay + slightly stronger shadow; otherwise identical chrome.
   // ────────────────────────────────────────────────────────────────────
-  if (emphasized) {
-    const innerEmphasized = (
-      <div className="relative overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-6 lg:p-10 shadow-[var(--shadow-md)]">
+  const card = (
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-3xl border border-[var(--border-base)] bg-[var(--bg-surface)]",
+        emphasized ? "p-6 lg:p-10 shadow-[var(--shadow-md)]" : "p-6 lg:p-8 shadow-[var(--shadow-sm)]",
+      )}
+    >
+      {emphasized && (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 -top-1/2 h-[200%] opacity-50"
@@ -344,39 +351,18 @@ export async function PartnerAlternatives({
               "radial-gradient(ellipse at top, rgba(16,185,129,0.12), transparent 60%)",
           }}
         />
-        <div className="relative">
-          {heading}
-          {cards}
-        </div>
+      )}
+      <div className="relative">
+        {heading}
+        {cards}
       </div>
-    )
-
-    if (bare) {
-      return <div className="mt-10 lg:mt-12">{innerEmphasized}</div>
-    }
-    return (
-      <section className="container-default py-12 lg:py-16">{innerEmphasized}</section>
-    )
-  }
-
-  // Normal mode — plain section with top border for separation.
-  const innerNormal = (
-    <>
-      {heading}
-      {cards}
-    </>
+    </div>
   )
 
   if (bare) {
-    return (
-      <div className="mt-10 lg:mt-12 border-t border-[var(--border-subtle)] pt-10 lg:pt-12">
-        {innerNormal}
-      </div>
-    )
+    return <div className="mt-10 lg:mt-12">{card}</div>
   }
   return (
-    <section className="container-default py-12 lg:py-16 border-t border-[var(--border-subtle)]">
-      {innerNormal}
-    </section>
+    <section className="container-default py-12 lg:py-16">{card}</section>
   )
 }

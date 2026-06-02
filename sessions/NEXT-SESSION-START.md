@@ -1,168 +1,165 @@
 # Next session — entry point
 
-**Created:** 2026-06-01 (session 5 close)
+**Created:** 2026-06-01 (session 6 close)
 **Mode for next session:** CONTENT_WRITING_02 (Phase 0 Blueprint data-first pSEO)
 
 ---
 
 ## Текущее состояние — что работает в проде
 
-**Phase 0 Этапы A-F полный цикл ЗАКРЫТ.** Эшелон 1 (reviews) + Эшелон 2 (comparisons + alternatives).
+**Первая волна Phase 0 (101 ключ) — ЗАКРЫТА.** Эшелон 1 + 2 + 3 (best-for-segment) первой волны опубликованы.
 
-### Эшелон 1 (Etap E) — 30 reviews
+### Этапы A-G полный цикл закрыт
 
-- 30 published tools в `public.tools` с полным комплектом полей включая `verdict` + все *_ru. 4 archived (booth-ai / cogsy / pebblely / prediko) — entity-only.
-- `/reviews/[slug]` + `/ru/reviews/[slug]` runtime DB-driven; `/reviews` catalog + `/sitemap.xml` + OG — DB-driven.
-- Legacy MDX (6 review-2026 файлов) снесены, 12 redirect 308 в `next.config.ts`.
-- Outbound-link sweep + Judge.me carve-out + PartnerAlternatives — нетронуты.
+| Эшелон | Что | Кол-во live | Session |
+|---|---|---|---|
+| 1 — Tool reviews | `/reviews/[slug]` runtime DB-driven, 30 published tools с verdict + *_ru | 30 EN + 30 RU | Etap E (s4) |
+| 2 — Comparisons | `/compare/[slug]` runtime DB-driven, 23 canonical pairs с verdict + intro + jsonb | 23 EN + 23 RU | Etap F (s5) |
+| 2 — Alternatives editorial | `/alternatives/[slug]` runtime DB-driven, 7 sources с `alternatives_editorial` jsonb (migration 017) | 7 EN + 7 RU + 23 generic | Etap F (s5) |
+| 3 — Best-for-segment | `/best/[slug]` MDX+DB hybrid (lib/content/mdx.ts расширен) | 8 EN + 8 RU | Etap G (s6) |
 
-### Эшелон 2 (Etap F) — 23 comparisons + 7 alternatives
-
-- **23 vs-comparison в `public.comparisons`** (EN + RU rows для каждого): 21 свежих в волне F + 2 ранее опубликованных (`klaviyo-vs-mailchimp`, `klaviyo-vs-omnisend`) не тронуты по explicit operator decision.
-- **7 tools имеют `alternatives_editorial` jsonb** (gorgias, triple-whale, rebuy, recharge, klaviyo, smile-io, postscript) — editorial intro + perCardContext + verdict в EN + RU.
-- Остальные 23 tools имеют `/alternatives/[slug]` URL который рендерится в generic-template (без editorial) — degrades gracefully.
-- Migration 017 (`alternatives_editorial jsonb`) applied.
-- 3 шаблонных бага в `/compare/[slug]` фикшены: shopify через `shopify_native_notes`, support через `rating_breakdown.support`, axisVal normalize helper.
-- Постскрипт `pricing_notes` data-corruption (R2 CSV parser split на `$1,000`) починена.
-- 10 excluded ключей + 2 canonical-dup-merged помечены в `semantic_core_entries.status='excluded'` с rationale в notes.
-- 4 F2 intra-category gap ключа INSERTED (northbeam-vs-polar-analytics, judge-me-vs-yotpo, manychat-vs-tidio, flair-ai-vs-shopify-sidekick) с cluster + content_angle.
+### Из 101 ключа первой волны
+- **68 ключей** покрыты live-страницами
+- **12 excluded/merged** в `semantic_core_entries` с notes (Blueprint 1.2 rejection / archived participant / canonical dup)
+- **21 ключ** ждут отдельных мини-волн: `how-to` (9), `pricing` (3), `guide` (19, + 2 reclassified из best-for-segment). Многие уже частично существуют в `/guides/` через Phase 1 scaffolding.
 
 ---
 
-## Следующая задача — Этап G (Эшелон 3: best-for-segment листинги)
+## Следующая задача — Этап J (раскладка 220 ключей 2-й волны)
 
-**Из Blueprint раздел 2 (Эшелон 3):**
+**Owner предоставит файл `botapolis_core_REMAINING.csv`** (220 ключей дедуплицированных против первой волны, с SEMrush метриками: volume, kd, cpc, intent, priority_score).
 
-Pure pSEO listings агрегирующие Эшелоны 1-2. Три формата:
-- **best-for-segment** — "Best [category] for [segment]" из tools отфильтрованных по subcategories + best_for
-- **by-integration** — "Best Shopify apps that integrate with [X]" из tools.integrations
-- **by-pricing** — "Best [category] under $[N]/mo" из tools.pricing_min/max
+Owner предложил выбрать как принять файл:
+1. **В репо** (`/semantic-core/botapolis_core_REMAINING.csv` или подобный путь) — naturально для CSV размера ~220 строк
+2. **Paste содержимого** в сообщение — быстро если ~50KB-100KB
 
-Шаблон листинга: интро + ранжированный список тулзов (мини-карточки) + сравнительная таблица + verdict кому что. Internal links на reviews + comparisons. Длина: 2000-3000 слов.
+Спросить у owner при старте сессии что удобнее.
 
-**Из ядра (semantic_core_entries):** ~10 best-for-segment ключей. Точное число и формулировки — пуллим из БД на старте сессии. Owner просил **именно 10 best-for-segment листингов** в первой волне Этапа G (не by-integration / by-pricing — те позже).
+### Действия в Этапе J
 
-### Подход — повторяет Etap F pattern
+**Это РАСКЛАДКА в базу, НЕ генерация страниц.** Owner explicit: "не генерь страницы — только раскладка ключей в базу."
 
-1. Audit-скрипт — pull всех `template='best-for-segment'` ключей со status, related_tool_slugs, content_angle. Сверка с tools (published / нужное subcategory + best_for покрытие).
-2. Slug derivation для пустых `related_tool_slugs`.
-3. Excluded markup для невалидных.
-4. Финальный список → approval оператора.
-5. Template extension если нужен — `/best/[slug]` route или `/guides/[slug]` если уже есть подходящий.
-6. Bulk-script с EN + RU + ranked tool list + verdict.
-7. Status flip + revalidate + summary.
+1. **Финальная дедупликация против ВСЕЙ `semantic_core_entries`** — не только published. Pull всех keywords из всей таблицы, сверить с 220 ключами файла. Покажи owner-у дубли если найдутся сверх ожидаемых.
 
-**КРИТИЧНО — НЕ начинать сразу.** Owner explicitly попросил решать когда стартовать (возможно новая сессия). Спросить через `AskUserQuestion` перед действиями: "Этап G старт сейчас или ждём?"
+2. **Миграция: новые колонки на `semantic_core_entries`** для SEMrush метрик. SQL owner approves в Studio:
+   ```sql
+   ALTER TABLE public.semantic_core_entries
+     ADD COLUMN IF NOT EXISTS volume INTEGER,
+     ADD COLUMN IF NOT EXISTS kd INTEGER,
+     ADD COLUMN IF NOT EXISTS cpc NUMERIC(8,2),
+     ADD COLUMN IF NOT EXISTS intent TEXT;
+   ```
+   `priority_score` уже есть в schema. `intent` — TEXT без CHECK (Blueprint convention OPEN schemas).
 
-### Open вопросы для Этапа G (решить с оператором)
+3. **Загрузка 220 ключей** с `status='second_wave'`, template = page_type из CSV. Mapping для CSV column "page_type" → semantic_core_entries.template:
+   - `review` → 'review'
+   - `vs-comparison` → 'vs-comparison'
+   - `alternatives` → 'alternatives'
+   - `how-to` → 'how-to'
+   - `guide` → 'guide'
+   - `best-for-segment` → 'best-for-segment'
+   - `pricing` → 'pricing'
+   - **`offer` → 'discount' или 'deal'** (новый template type для 44 discount-ключей; ЛОГИКА НЕ ГЕНЕРИРУЕТСЯ ПОКА — коды публикуются после партнёрок)
+   - **`other` → разобрать с owner-ом** перед загрузкой (35 ключей; показать список + content_angle если есть, разметить template)
 
-- **Где живёт `/best/[slug]` route?** Сейчас в репо есть `content/best/{en,ru}/` (MDX path из Etap E setup), но не DB-driven. Решить: создавать MDX-driven или extend `/guides/` + cluster=best-for, или новый DB-driven runtime route.
-- **Ranking-algorithm для tool-listing внутри листинга** — простой по `rating DESC`, или с фильтром по subcategories + best_for match, или с manual editorial override (как Etap F PartnerAlts partner-first)?
-- **Покрытие категорий ≤3 published tools** — если в категории всего 2-3 тулза published (например chat: tidio + manychat), листинг "Best [chat] for Shopify" будет тонким. Либо консолидировать кластеры, либо те листинги пишутся differently.
+4. **`offer` (44 discount-ключей)** — пометить отдельным template (`discount` или `deal`), НЕ генерить страницы. Окно публикации откроется после получения активных промо-кодов от партнёров.
+
+5. **`other` (35 ключей)** — показать owner-у, разобрать template вместе.
+
+### Сводка после загрузки (обязательно)
+
+- Сколько ключей легло
+- Разбивка по template
+- Сколько отсеял (дубли)
+- Что в `other` + предложенный template для каждого
+- Сколько discount-ключей помечено как pending партнёрок
+
+### Что НЕ делать в Этапе J
+
+- **НЕ генерить страницы.** Только раскладка ключей в базу.
+- **НЕ публиковать reviews/comparisons/etc.** Это будущие отдельные мини-волны после раскладки.
 
 ---
 
-## Этап H (после G) — нумерация пула для CHIEF
+## Этап H (после J + всех мини-волн) — нумерация пула для CHIEF
 
-После завершения Этапа G:
-1. Claude Code присваивает сквозные номера всем страницам Phase 0 в порядке эшелонов:
-   - 1-30: tool reviews
-   - 31-53: vs-comparisons (23)
-   - 54-60: alternatives (7)
-   - 61-70: best-for-segment listings (10)
-2. Список (с slug + URL + краткое summary) → CHIEF
-3. CHIEF берёт пул и начинает капельную публикацию по `system_config.publishing_rate_daily` (4/день в месяце 1).
+Когда первая волна (101) + вторая волна (220) обе будут покрыты live-страницами или явно queued/excluded/discount-pending, Claude Code присваивает сквозные номера всем страницам Phase 0 в порядке эшелонов → передача пула CHIEF для капельной publication.
 
-**Pre-CHIEF check:** все 70 страниц уже в проде (опубликованы). H это просто organizational handoff — присвоение porядка для CHIEF traffic-monitoring и refresh-cadence. Это не релизный gate.
-
----
-
-## Этап J (параллельно с I) — добивка ключей 102-427
-
-После H Claude Code может начать программный вывод ключей 102-427:
-- Все пары published tools одной category = vs-keys (комбинаторика minus уже размеченные)
-- Все 30 published tools = alternatives-keys (уже все 30 покрыты)
-- Все category × segment matches = best-for-keys
-- INSERT в `semantic_core_entries` со `status='second_wave'`
-
-Лежат готовые. **Через ~2 месяца GSC-статистика → решаем идти по второй волне как есть или скорректировать курс по данным.**
+H не запускается до завершения второй волны generation passes.
 
 ---
 
 ## Что прочитать на старте новой сессии
 
-После выбора CONTENT_WRITING_02 mode (через AskUserQuestion как первое действие):
-1. **`PHASE-0-BLUEPRINT.md`** ПОЛНОСТЬЮ (mandatory read protocol; pagination если token-limit). Особое внимание — раздел 2 (Эшелон 3 шаблоны) + раздел 6 (последовательность исполнения, конкретно этап G).
-2. **`research/phase0-content-flags.md`** — per-tool framing rules. Применяй на best-for-listings так же как на reviews + comparisons.
-3. **`sessions/infra-log.md`** — последние 2-3 блока (2026-06-01 sessions 4-5). Особенно session 5 close-block для полного контекста Этапа F + новые open follow-ups.
-4. **`CONTENT-WRITING.md`** — quality gates (banned phrases, JSON-LD, honest framing).
+После выбора CONTENT_WRITING_02 mode (через AskUserQuestion):
+1. **`PHASE-0-BLUEPRINT.md`** ПОЛНОСТЬЮ (mandatory read protocol; pagination если token-limit). Особое внимание раздел 6 (последовательность), Этап J описан в общих чертах.
+2. **`research/phase0-content-flags.md`** — per-tool framing rules (применяется если/когда будут генерироваться страницы 2-й волны).
+3. **`sessions/infra-log.md`** — последние 2-3 блока (sessions 5-6). Особенно session 6 close-block для контекста первой волны.
+4. **`CONTENT-WRITING.md`** — quality gates (если решим что часть 2-й волны генерится через editorial workflow).
 
 ---
 
-## Открытые хвосты (передаются в Этап G или позднее)
+## Открытые хвосты (передаются в Этап J или позднее)
 
-### Новые из Этапа F (session 5)
+### Новые из Этапа G (session 6)
 
-**(a-new) PartnerAlternatives subcat-fallback слабо-релевантное.** Recharge на reviews-странице через `retention` subcategory overlap, и аналогичные cross-category matches. Унификация subcategory-тегов (canonical vocabulary) → точнее фильтр. Связан с (a) ниже про string-mismatch.
+**(a-new-G) isoDate schema hardening** — coerce Date object в ISO string в `baseFrontmatterSchema` через `z.preprocess` или custom transform. Низкий приоритет — convention "wrap в кавычки" достаточно.
 
-**(b-new) `getRatingAxisValue` helper** не существует, inline normalize в `/compare/[slug]/page.tsx`. Вынести в `lib/content/rating.ts` или `lib/utils/rating.ts` если третий consumer появится. Низкий приоритет.
+**(b-new-G) 2 reclassified ключа в `guide`** (`shopify operator tool stack` + `ai product description 10000 skus`) — нуждаются в отдельной мини-волне guide-генерации. Формат уже работает (`/guides/[slug]`).
 
-**(c-new) `tool.integrations` legacy field** — backfill для 20 новых Etap D tools ИЛИ deprecate field + переключить consumers на `integrates_with_tools` + `shopify_native_notes` exclusively. Низкий приоритет до 50-tool catalog.
+**(c-new-G) 6 best-of listings без партнёров** (attribution, inventory, photography, product-description, ad-creative editorial) — стратегически: подобрать partner для attribution-категории (Triple Whale partnerstack — но affiliate_url пока NULL), либо принять editorial-only как стратегию для thin категорий. Owner decision.
 
-**(d-new) Triple Whale `affiliate_url` NULL + `affiliate_partner='partnerstack'`** — signal inconsistency. Cleanup: заполнить URL после получения, либо NULL `affiliate_partner`.
+**(d-new-G) Pagefind: добавить best-of section в build-search-index** — связан с (c-carryover) ниже про 30 reviews + теперь 8 best-of.
 
-**(e-new) R2 CSV parser hardening** — RFC 4180 quoted-string handling до следующей R2 волны (если будет refresh всех tools).
+### Новые из Этапа F (session 5) — unchanged
 
-### Carryovers из Etap E (session 4)
+**(a) PartnerAlternatives subcat-fallback слабо-релевантное** (Recharge на reviews-странице через retention overlap).
+**(b) `getRatingAxisValue` helper** не вынесен, inline в /compare/.
+**(c) `tool.integrations` legacy field** — backfill или deprecate.
+**(d) Triple Whale `affiliate_url` NULL** + `affiliate_partner='partnerstack'` signal mismatch.
+**(e) R2 CSV parser hardening** (RFC 4180).
 
-**(a) Subcategory string-mismatch.** `sms` ≠ `sms-marketing`, `email` ≠ `email-marketing` в subcategory-tags. Унифицировать теги (canonical vocabulary) или добавить equivalence-map в PartnerAlternatives fetch. **Связан с (a-new) выше.** Решать комбинированно.
+### Carryovers из Etap E (session 4) и ранее
 
-**(b) `/reviews/klaviyo-pricing` 404.** `content/reviews/{en,ru}/klaviyo-pricing.mdx` живёт, но не маршрутизуется. Owner-решение:
-- (i) Move → `content/guides/klaviyo-pricing.mdx`, URL `/guides/klaviyo-pricing` + redirect.
-- (ii) Manual redirect `/reviews/klaviyo-pricing → /reviews/klaviyo` + удалить MDX.
-
-**(c) Pagefind search не индексирует 30 runtime-reviews.** `scripts/build-search-index.ts` — большая задача отдельной сессии.
-
-**(d) RU auto-обновление в проде не реализовано.** SCOUT в `tools` не пишет (explicit owner decision). Owner-driven RU refresh через Opus / новый seed-script при значимых изменениях.
-
-**(e) `lib/content/rating.ts:getToolRatings` dead path.** Cleanup: упростить до DB-only.
-
-### Carryovers более ранние (unchanged)
-
-- `tools` table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at) — SCOUT-write track cancelled, low-priority cleanup.
-- `system_config.modified_by` CHECK constraint rejects agent values.
-- Capture SCOUT runtime AGENTS.md to `/agent-snapshots/scout/`.
-- Option B refactor `/compare/[slug]` MDX-driven (bridge papers over) — менее актуально после Etap F.
+- (a) Subcategory string-mismatch (`sms` ≠ `sms-marketing`) — связан с PartnerAlts.
+- (b) `/reviews/klaviyo-pricing` 404 (owner decision).
+- (c) Pagefind не индексирует 30 runtime-reviews + 8 best-of (related to d-new-G).
+- (d) RU auto-обновление не реализовано.
+- (e) `getToolRatings` dead-path cleanup.
+- `tools` table missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at).
+- `system_config.modified_by` CHECK constraint.
+- Capture SCOUT runtime AGENTS.md.
 - Newsletter ingestion via Beehiiv.
 - OPS GPT-5.5 cost reconciliation.
-- **Single-pass spec rewrite `FINAL-ARCHITECTURE-V4.md`.** Накопленный drift: Этапы D/E/F + migrations 015-017 + alternatives_editorial template extension + 3 compare-template фикса.
+- **Single-pass spec rewrite `FINAL-ARCHITECTURE-V4.md`** — накопленный drift: Этапы D/E/F/G + migrations 015-017 + alternatives_editorial extension + 3 compare-template фикса + /best/ route + bestFrontmatterSchema.
 - TOOLS.md ↔ AGENTS.md drift prevention для CHIEF + SCOUT.
-- Tighten `app/robots.ts` для AI crawlers до 50+ страниц.
+- Tighten `app/robots.ts` для AI crawlers.
 
 ---
 
 ## Тулзовые шаблоны и компоненты — уже готовы
 
-Не нужно создавать с нуля для Этапа G (после решения по `/best/` route):
+Не нужно создавать с нуля для Этапа J (раскладка ключей не требует UI). Для будущих generation-passes 2-й волны:
 
-- **`app/compare/[slug]/page.tsx`** — DB-driven runtime с editorial + jsonb override. Используется для cross-link из best-for-listings.
-- **`app/alternatives/[slug]/page.tsx`** — DB-driven с migration 017 editorial. Используется для cross-link.
-- **`app/reviews/[slug]/page.tsx`** — DB-driven (Etap E). Используется как primary internal-link target.
-- **`components/tools/PartnerAlternatives.tsx`** — works (две-pass query: same-category → subcategory overlap).
-- **Webhook bridge** `/api/agents/article-published` — MDX→DB для comparisons; пригодится если решим что best-for-listings идут через MDX.
+- **`app/reviews/[slug]/page.tsx`** — DB-driven runtime (Etap E).
+- **`app/compare/[slug]/page.tsx`** — DB-driven runtime + jsonb editorial (Etap F, 3 фикса в session 5).
+- **`app/alternatives/[slug]/page.tsx`** — DB-driven runtime + editorial из tools.alternatives_editorial (Etap F + migration 017).
+- **`app/best/[slug]/page.tsx`** — MDX + DB hybrid (Etap G + lib/content/mdx.ts расширен).
+- **`app/guides/[slug]/page.tsx`** — MDX-only (existing с Phase 1).
+- **`/api/agents/article-published`** webhook — MDX→DB bridge для comparisons (если потребуется снова).
 
 ---
 
-## Финальное состояние session 5
+## Финальное состояние session 6
 
-- **Финальный commit:** `chore(sessions): close Etap F + NEXT-SESSION-START update + scripts cleanup` (этот файл + session-log update + script cleanup в одном коммите).
+- **Финальный commit:** `chore(sessions): close Etap G + first-wave (101 keys) close-block` (session-log + этот файл в одном коммите).
 - **Рабочее дерево:** чисто (кроме owner-pre-session-modifications `.claude/settings.local.json` + `PHASE-0-BLUEPRINT.md` и owner-untracked файлов).
-- **Vercel deploy:** production reflects latest commit; 30 reviews + 23 comparisons + 7 editorialized alternatives + 23 generic alternatives live.
+- **Vercel deploy:** production reflects latest commit; 30 reviews + 23 comparisons + 7 editorialized alternatives + 23 generic alternatives + 8 best-of live (EN + RU).
 
 ---
 
 ## В начале новой сессии — обязательный protocol
 
-1. **AskUserQuestion** — выбор mode. Для Этапа G → CONTENT_WRITING_02.
-2. **Параллельные reads:** PHASE-0-BLUEPRINT.md (full) + последние блоки writer-log.md (или infra-log.md если оператор выбирает Infrastructure).
-3. **Только после** обоих чтений — спрашивать "Этап G старт сейчас или ждём?". Если owner отвечает "старт" → audit-скрипт по best-for-segment ключам → финальный список 10 → approval → bulk-script + template-decision → apply.
+1. **AskUserQuestion** — выбор mode. Для Этапа J → CONTENT_WRITING_02.
+2. **Параллельные reads:** PHASE-0-BLUEPRINT.md (full) + последние блоки writer-log.md / infra-log.md.
+3. **Только после** обоих чтений — спрашивать "Этап J старт сейчас или ждём?" + "CSV в репо или paste?". Если owner отвечает "старт" — принять CSV → audit dedup + миграция SQL → apply + load + сводка. **НЕ генерировать страницы в этом этапе.**

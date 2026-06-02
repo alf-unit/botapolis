@@ -1251,3 +1251,140 @@ Owner на site walk нашёл что после Etap E flip 2026-05-31 две 
 
 Удалены 4 session-5 artifact'а: `scripts/apply-etap-f-prep.ts`, `scripts/audit-etap-f-keys.ts`, `scripts/generate-etap-f-samples.ts`, `scripts/generate-etap-f-wave.ts`. Контент жив в БД + log. Не оставлено. `scripts/audit-db-snapshot.ts` + `scripts/audit-semantic-core.ts` (operator-pre-session) оставлены untracked — owner artefacts, не моё ведение.
 
+---
+
+## 2026-06-01 (session 6) — Этап G (Эшелон 3, первая волна) ЗАКРЫТ · 8 best-of listings + 1 wave 101 ЗАКРЫТА
+
+### Commits
+
+- feat(best): /best/[slug] route + 2 sample listings for Etap G
+- fix(best): YAML date quoting + RU mirror route
+- feat(best): Etap G remaining 6 listings (4 group A + B + reformulated)
+- chore(sessions): close Etap G + first-wave (101 keys) close-block (this commit)
+
+### Задача
+
+Запустить Этап G — Эшелон 3 первой волны: 10 best-for-segment ключей из `semantic_core_entries` (`template='best-for-segment'`, status='queued'). Audit на покрытие per ключ. Honest discipline на тонкие категории (single-tool / archived-heavy). 2 контрольных samples → approval → bulk 6. Закрытие первой волны (101 ключ суммарно).
+
+### Сделано
+
+**Сводный итог Этапа G: 8 best-of листингов опубликовано** + 2 ключа reclassified в `template='guide'` (отдельная мини-волна позже).
+
+#### Audit + классификация (без one-off скрипта — inline JS-eval)
+
+- **10 ключей `best-for-segment`**: 4 chunky (3-tool группа A), 4 thin (single-tool группа B), 1 stack-формат, 1 scale-deep-dive.
+- **2 reclassified в `template='guide'`** через прямой UPDATE с notes (rationale: stack/scale-формат не вписывается в best-of шаблон):
+  - `shopify operator tool stack` — $700/mo stack-recommendation для $50k-500k MRR; multi-tool affiliate-rich guide.
+  - `ai product description 10000 skus` — scale-deep-dive workflow guide (Magic + Brand Voice + API workaround).
+
+#### Hybrid MDX + DB route
+
+- **`app/best/[slug]/page.tsx`** — новый route (адаптация guides pattern + DB hydration для ranked tools). MDX body несёт editorial copy; `frontmatter.tools` (slug array, ranked) гидрируется из `public.tools` на render-time → rating/pricing/affiliate всегда live. RankedToolGrid рендерится между ArticleHero и MDX content.
+- **`app/ru/best/[slug]/page.tsx`** — RU mirror re-export (mirror `/ru/guides/[slug]` pattern).
+- **`lib/content/mdx.ts`**:
+  - `ContentType` union расширен `"best"`
+  - `bestFrontmatterSchema` добавлен (extends base + `segment: string` + `tools: string[]` + `summary?: string`)
+  - `FrontmatterFor<T>` switch учитывает все 3 type'а
+  - schema-selection в `getMdxContent` обновлён под switch
+
+#### 2 контрольных samples (sample 1 = группа A, sample 2 = группа B single-tool)
+
+- **`best-ai-email-tool-shopify`** — Klaviyo/Omnisend/Mailchimp ranked. Content-flags применены (Klaviyo $10K One trigger, commission-source-uncertainty; Mailchimp Classic deprecation + free-tier cut).
+- **`best-ai-support-tool-shopify`** — Gorgias only published в support. **Honest pattern эталон**: "Why this listing is short" intro объясняет почему не падим non-Shopify-native generic helpdesks; Gorgias #1 + Try CTA; adjacent (Tidio chat-led, Klaviyo Customer Agent CRM-add-on) разобраны по job-to-be-done; closer "we are not listing a fifth option."
+
+#### YAML date bug + RU mirror fix
+
+- Sample 1+2 на первом deploy дали 500. Local `next start -p 3001` показал: `[mdx] frontmatter invalid for best/...: publishedAt: Invalid input: expected string, received Date`. YAML auto-parsed `2026-06-01` (bare) в Date object; isoDate схема ожидает string `^\d{4}-\d{2}-\d{2}$`. Existing guides + reviews используют кавычки `"2026-06-01"` — convention. Wrap в кавычки в 4 sample MDX.
+- `/ru/best/best-ai-email-tool-shopify` дал 404 после YAML fix → создал `app/ru/best/[slug]/page.tsx` re-export. После — все 4 URL 200.
+
+#### Bulk генерация 6 листингов (после approval sample)
+
+- **Группа A (2)**: `best-ai-attribution-tool-shopify` (northbeam/polar-analytics/triple-whale, editorial-only — никто не партнёр в категории, явно сказано в intro), `best-ai-sms-tool-shopify` (postscript/klaviyo/attentive, 2 партнёра + Attentive enterprise editorial; content-flags применены).
+- **Группа B single-tool / thin (3)** — все следуют honest pattern Sample 2:
+  - `best-ai-inventory-tool-shopify` — inventory-planner only, Sage-acquisition price hikes + late-2025 sync outage caveats, explicit refusal "Triple Whale + Northbeam — different job", "<100 SKU не бери платный тулз — Shopify built-in хватит".
+  - `best-ai-product-photography-shopify` — flair-ai only, Booth AI/Pebblely archived (с конкретикой shutdown dates), generic image AI отброшен как не category-fit, Rewardful default cookie caveat применён.
+  - `best-ai-product-description-tool-shopify` — shopify-sidekick + flair-ai, 2-tool honest (Sidekick bundled-free default, Flair для visual+description combined workflow), generic LLM wrappers отброшены.
+- **Reformulated (1)**: `best-ai-ad-creative-tools-shopify` — original angle с adlibrary/AdManage отброшен (не в каталоге), реформулировано под adcreative-ai (с billing-controversy caveat) + pencil (с framing-correction "Shopify partnership = API/account linking, не native") + flair-ai (visual-content workflow).
+
+#### Tracking
+
+- 8 best-of: `status='published'`, `published_article_path`, `published_at`, `related_tool_slugs` заполнены.
+- 2 reclassified: `template='guide'` + notes rationale; `status='queued'` (отдельная мини-волна позже).
+
+### Обнаружено
+
+- **YAML auto-Date trap**. `publishedAt: 2026-06-01` без кавычек получает Date object от gray-matter; isoDate-string schema rejects → 500. Existing guides/reviews convention использует кавычки. Стоит ужесточить schema чтобы accept Date и coerce в ISO string, либо документировать convention в `bestFrontmatterSchema` JSDoc. Низкий приоритет — convention достаточно.
+- **`dynamicParams = false` + новые routes без слугов в build = 500/404 surprise.** Когда добавлял `/best/` без existing MDX, build бы вернул empty params + 404. Поскольку я добавил MDX в том же commit как route, slug'и были там при build. Но при partial work это была бы surprise. Стоит вспомнить для будущих новых routes.
+- **`app/ru/best/[slug]/page.tsx`** забыл создать первоначально — RU mirror requires explicit re-export потому что Next 16 route-segment constants must be declared literally per file. Pattern явный в `/ru/guides/`, `/ru/reviews/` и т.д.
+- **Honest pattern на single-tool best-of эталонный**, owner approved именно эту дисциплину. "Why this listing is short" + конкретика про archived (с shutdown dates) + явный refusal "не падим X потому что different job" + closer "we are not listing a fifth option". Применять буквально на любых single-tool / thin категориях впредь.
+- **Editorial-only листинги (attribution: 3 non-partner)** работают как SEO surface — внутренние cross-links на /reviews/ + /compare/ покрывают monetization где она есть, листинг сам без CTA не теряет ценность (Google ranking + reader trust + cross-link discovery).
+- **2 reclassified ключа** показывают что Этап G semantic-core не all-best-of: stack-recommendation и scale-deep-dive прилетели как `best-for-segment` но это другие форматы. Pattern stretching schema через notes (`[Etap G prep] RECLASSIFIED ...`) сохраняет audit trail.
+
+### Fixes
+
+- **YAML date quoting** во всех 4 sample MDX + 12 bulk MDX (нативный convention enforced).
+- **`app/ru/best/[slug]/page.tsx`** re-export route добавлен.
+- **`lib/content/mdx.ts`** ContentType + schema switch расширен (без breaking changes на reviews/guides).
+
+### Open follow-ups
+
+**Новые из этой сессии:**
+
+- **#1 isoDate schema hardening** — coerce Date object в ISO string в `baseFrontmatterSchema` (через `z.preprocess` или custom transform). Низкий приоритет, convention достаточно.
+- **#2 2 reclassified ключа в `guide`** — нуждаются в отдельной мини-волне guide-генерации (stack + 10k SKU deep-dive). Формат уже существует (`/guides/[slug]`), можно сделать в любой следующей сессии.
+- **#3 6 best-of listings без партнёров (editorial-only)** — attribution полностью, inventory, photography, product-description, ad-creative editorial. Стратегически: либо подобрать partner для attribution (Triple Whale partnerstack? — пока affiliate_url NULL), либо принять editorial-only как стратегию для thin категорий. Owner decision.
+
+**Carryovers из Etap F (session 5) — unchanged:**
+- PartnerAlternatives subcat-fallback слабо-релевантное (Recharge на reviews-странице через retention)
+- `getRatingAxisValue` helper не вынесен (inline в /compare/[slug])
+- `tool.integrations` legacy field — backfill или deprecate
+- Triple Whale affiliate_url NULL + affiliate_partner='partnerstack' signal mismatch
+- R2 CSV parser RFC 4180 hardening
+- Subcategory string-mismatch (`sms` ≠ `sms-marketing`) — связан с PartnerAlts
+- `/reviews/klaviyo-pricing` 404
+- Pagefind не индексирует 30 runtime-reviews + теперь 8 best-of
+- RU auto-обновление не реализовано
+- `getToolRatings` dead-path cleanup
+- Pagefind: добавить best-of section в build-search-index
+- Other carryovers from prior sessions...
+
+### Первая волна (101 ключ) — ЗАКРЫТА
+
+Состояние по всем 101 ключам ядра первой волны:
+
+| Эшелон | Этап | Status |
+|---|---|---|
+| Эшелон 1 — Tool reviews (30) | Etap E (session 4) | published ✓ |
+| Эшелон 2 — Comparisons (23 canonical) | Etap F (session 5) | published ✓ |
+| Эшелон 2 — Alternatives (7 sources w/ editorial) | Etap F (session 5) | published ✓ |
+| Эшелон 3 — Best-for-segment (8) | Etap G (session 6) | published ✓ |
+| Эшелон 3 reclassified (2) | session 6 | template='guide', queued для guide-волны |
+| Excluded (10 от Etap F prep) | session 5 | status='excluded' + notes |
+| Merged dups (2 от Etap F prep) | session 5 | status='excluded' + canonical pointer |
+| Other queued (`review` 20 — already exist через tools rows, `how-to` 9 — будущая guide-волна, `pricing` 3 — будущая guide-волна, `guide` 19 + 2 reclassified — partial existing in /guides/) | — | queued / partial |
+
+Из 101 ключа — 68 ключей покрыты live-страницами (30 reviews + 23 comparisons + 7 alternatives editorial + 8 best-of), 12 excluded/merged, 21 ждут отдельной guide/how-to/pricing мини-волны (template values уже подкорректированы где было нужно).
+
+### Следующий этап — Этап J (раскладка 220 ключей 2-й волны)
+
+См. `/sessions/NEXT-SESSION-START.md` для точки входа. Этап J — owner-driven CSV load (`botapolis_core_REMAINING.csv`, 220 ключей дедуплицированных против первой волны, с SEMrush volume/kd/cpc/intent/priority_score). Действия:
+1. Финальная дедупликация против ВСЕЙ `semantic_core_entries` (вся таблица, не только published).
+2. Миграция для добавления колонок `volume`, `kd`, `cpc`, `intent` в `semantic_core_entries` (priority_score уже есть). SQL owner approves в Studio.
+3. Загрузка 220 ключей с `status='second_wave'`, template=page_type, сохранением метрик.
+4. `offer` (44 discount-ключа) — пометить типом `discount/deal`, **не генерить** (коды позже после партнёрок).
+5. `other` (35 ключей) — показать owner-у, разобрать template.
+6. Сводка после загрузки: разбивка по template, отсеяные дубли, что в `other`.
+
+**НЕ ГЕНЕРИТЬ страницы на J — только раскладка ключей в базу.**
+
+### Final commit chain (session 6)
+
+- `feat(best): /best/[slug] route + 2 sample listings for Etap G`
+- `fix(best): YAML date quoting + RU mirror route`
+- `feat(best): Etap G remaining 6 listings (4 group A + B + reformulated)`
+- `chore(sessions): close Etap G + first-wave (101 keys) close-block` (this commit)
+
+### One-off artifacts
+
+В этой сессии one-off скрипты НЕ создавались (audit + DB updates делал inline через `node --eval`). Удалять нечего.
+

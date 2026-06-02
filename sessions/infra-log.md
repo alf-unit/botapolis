@@ -1388,3 +1388,105 @@ Owner на site walk нашёл что после Etap E flip 2026-05-31 две 
 
 В этой сессии one-off скрипты НЕ создавались (audit + DB updates делал inline через `node --eval`). Удалять нечего.
 
+---
+
+## 2026-06-01 (session 7) — Этап J (2-я волна, 220 ключей) ЗАКРЫТ · 212 загружено + 6 refresh/skip + 2 excluded
+
+### Commits
+
+- feat(etap-j): load 220 2nd-wave keys + migrations 018 + 019
+- chore(sessions): close Etap J + NEXT-SESSION-START update + load-script cleanup (this commit)
+
+### Задача
+
+Принять `botapolis_core_REMAINING.csv` от оператора (220 ключей 2-й волны с SEMrush метриками: tool, affiliate_strength, page_type, keyword, volume, kd, cpc, intent, source_count, priority_score). Дедуплицировать против ВСЕЙ `semantic_core_entries` (не только published). Загрузить с `status='second_wave'` + template mapping. **НЕ генерировать страницы** — только раскладка в БД для трекинга.
+
+### Сделано
+
+**Сводный итог Этапа J: 220 CSV rows полностью обработаны** = 3 refresh + 3 skip + 2 excluded + 212 inserted (status='second_wave'). 0 errors.
+
+#### Audit + decisions (CSV-уровень)
+
+- **Распределение**: pricing 53, offer 44, other 35, comparison 32, listing 29, alternatives 20, review 6, howto 1.
+- **affiliate_strength**: strong 106, weak 89, none 25.
+- **intent**: commercial 120, informational 52, transactional 48.
+- **Top tools по объёму ключей**: Mailchimp 17, Omnisend 15, AdCreative.ai 14, ManyChat 13, Tidio 13, Klaviyo 11, Triple Whale 11.
+- **6 дубликатов с существующими 1st-wave ключами**: 3 pricing (klaviyo/postscript/gorgias) → refresh-only (UPDATE метрик); 3 comparison (klaviyo-vs-activecampaign + gorgias-vs-zendesk excluded; postscript-vs-klaviyo-sms покрыт klaviyo-vs-postscript) → skip полностью.
+- **35 `other` ключей**: 33 → guide (integration/features/Shopify-fit), 2 → excluded (sidekick release date + is sidekick free, low-value).
+- **44 `offer` ключей** → template='discount', страницы deferred до партнёрских промо-кодов.
+
+#### Migrations applied
+
+- **Migration 018** — 6 новых nullable колонок: `semrush_volume INTEGER`, `semrush_kd INTEGER`, `semrush_cpc NUMERIC(8,2)`, `source_count INTEGER`, `affiliate_strength TEXT`, `tool_label TEXT`. С COMMENT на каждой. `intent` reuse `search_intent` через mapping (commercial → commercial-investigation, transactional/informational as-is).
+- **Migration 019** — DROP + ADD `semantic_core_status_chk` (добавил `'second_wave'`) и `semantic_core_template_chk` (добавил `'discount'` + `'other'`). Первый --apply упал на 214 INSERTs из-за CHECK violations (schema doc лгал что OPEN); второй после 019 чисто.
+
+#### Load script + execution
+
+- **`scripts/load-etap-j.ts`** — single-pass loader, dry-run по умолчанию + `--apply`. Mapping CSV.page_type → template, CSV.intent → search_intent, CSV.tool → toolSlug (через regex normalization), `related_tool_slugs = [toolSlug]`. Cluster = toolSlug. priority_score, volume_estimate, difficulty заполняются И в legacy fields (backcompat) И в новые semrush_* (provenance).
+- **Counter bug первая попытка**: сидикик excluded rows double-counted (excluded + inserted). Fix: добавил `isExcluded` flag, не bump `inserted` для excluded. После — math 220 = 3+3+2+212.
+- **CHECK violation первая попытка `--apply`**: 214 INSERTs упали (status='second_wave' + template='discount'/'other'). 3 refresh (UPDATE) прошли — CHECK не trigger на UPDATE неmodified columns. Создал миграцию 019, owner applied, re-run чисто.
+
+#### DB state после load (verified)
+
+- **Total `semantic_core_entries`**: 319 (105 1st-wave + 214 Etap J INSERTs).
+- **By status**: 212 second_wave, 49 queued (1st-wave non-published), 43 published (1st-wave covered live), 12 excluded (10 Etap F prep + 2 Etap J sidekick), 3 in_writer_queue.
+- **By template**: 66 vs-comparison (37 → 66), 54 guide (21 → 54), 53 pricing (3 → 53), 44 discount (new), 37 best-for-segment (8 → 37), 27 alternatives (7 → 27), 26 review (20 → 26), 10 how-to (9 → 10), 2 other (new).
+- **Metrics population**: 217 rows имеют `semrush_volume` (212 new + 2 sidekick excluded + 3 refreshed pricing).
+
+#### CSV preserved
+
+`semantic-core/botapolis_core_REMAINING.csv` — перемещён из корня репо в `/semantic-core/` рядом с `full-core.csv`. Первоисточник с SEMrush приоритетами/метриками, держим для traceability (CHIEF будет ссылаться при prioritisation pool order).
+
+### Обнаружено
+
+- **Schema doc lied about OPEN schema** на `semantic_core_entries.status` + `.template`. Migration 008 содержит CHECK constraints, NEXT-SESSION-START + my own prior notes писали "schema OPEN" — drift. Reality: и status и template имеют CHECK. На будущее: всегда `grep -A20 "constraint.*chk"` в migrations/ перед предположением OPEN.
+- **CHECK trigger semantics**: UPDATE без modification on constrained column НЕ triggers CHECK violation. Поэтому 3 refresh (только метрики обновляли, template/status не трогали) прошли через первый failed `--apply` чисто. Удобный pattern для refresh-only operations при incompatible CHECK.
+- **Counter double-count в loader**: sidekick rows должны быть БУХ в excluded AND inserted (technical INSERTs are real). Fix через `isExcluded` flag и не-bumping `inserted` для excluded. На будущее: при сложной классификации проверять math ДО full apply (dry-run summary должен match total CSV rows).
+- **Tool-slug derivation простой**: lowercase + replace `.` → `-` + spaces → `-` + collapse `-+` → одну. Все 29 unique CSV tool names mapped корректно на existing slugs в `tools` (no missing). Подтверждает что 2-я волна полностью построена вокруг уже-каталогизированных тулзов.
+- **`offer` cluster intentionally deferred**: 44 ключа (manychat/omnisend/klaviyo/etc. discount codes, free trials, coupon codes) загружены как `template='discount'` но без планов генерации. Когда партнёрки активируются с подтверждёнными промо-кодами — открывается отдельная мини-волна generation (формат TBD, возможно простая redirect-страница с pinned promo + CTA).
+- **`intent='commercial'` mapped to 'commercial-investigation'** для соответствия existing convention. Schema CHECK на search_intent (`transactional|commercial-investigation|informational`) — CSV value 'commercial' rejected без mapping; mapping чистый.
+- **legacy `volume_estimate` + `difficulty` columns** — заполнены теми же значениями что и новые `semrush_volume` + `semrush_kd` для второй волны (backcompat для downstream consumers которые могут читать legacy fields). Long-term cleanup: deprecate legacy fields ИЛИ переключить consumers на semrush_*.
+
+### Fixes
+
+- **Migration 019** (CHECK extension) — fix для load failure.
+- **Loader counter math** — sidekick double-count устранён.
+- **CSV moved** в `/semantic-core/` (был в корне).
+
+### Open follow-ups (приоритет)
+
+**Новые из этой сессии:**
+
+- **#1 — Etap J-generate (generation of 2nd-wave pages)** — следующий major этап. 188 страниц во второй волне:
+  - 50 pricing (vendor-side pricing-pages)
+  - 33 guide (integration / features / Shopify-fit, mostly from CSV.other → guide)
+  - 29 vs-comparison (new pairs not in 1st wave)
+  - 29 best-for-segment (extended listicles)
+  - 20 alternatives (extended `/alternatives/[slug]`)
+  - 6 review (потенциально new tool catalogue entries? Или is-X-worth-it format)
+  - 1 how-to
+  - **44 discount** — НЕ generate сейчас, ждут партнёрок
+- **#2 — Pricing template не имеет route** — `/pricing/[slug]` маршрут не существует (только template value). Нужно: design + create route + MDX/DB hybrid (или extend `/reviews/[slug]` pricing section). Decision pending.
+- **#3 — Review-как-2nd-wave** — 6 CSV.review keys типа "is mailchimp worth it", "is klaviyo worth it" — overlap с existing `/reviews/[slug]` через "worth it" framing. Decision: redirect к existing review с anchor, либо separate "worth-it" review page.
+
+**Carryovers из Etap G (session 6) — unchanged:**
+- isoDate schema hardening (low priority).
+- 2 reclassified guide-keys нуждаются в guide-pass.
+- 6 best-of listings без партнёров — strategic discussion.
+- Pagefind best-of section.
+
+**Carryovers ранее — unchanged** (см. session 5/6 close blocks).
+
+### Что НЕ покрыто на закрытии (передаётся в Этап J-generate)
+
+См. `/sessions/NEXT-SESSION-START.md` для точки входа. Главное: **первая волна (101) полностью live + tracked; вторая волна (212) разложена в БД с метриками, готова к generation мини-волнами по template-bucket'ам, по priority_score (volume × intent × affiliate strength) ordering.**
+
+### Final commit chain (session 7)
+
+- `feat(etap-j): load 220 2nd-wave keys + migrations 018 + 019` — migrations + load script + CSV move + db state
+- `chore(sessions): close Etap J + NEXT-SESSION-START update + load-script cleanup` (this commit)
+
+### One-off artifacts cleaned
+
+Удалён `scripts/load-etap-j.ts` (one-off Etap J loader). Контент жив в migrations 018/019 + session-log + DB. Не оставлено.
+

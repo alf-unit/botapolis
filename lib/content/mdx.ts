@@ -102,21 +102,39 @@ export const guideFrontmatterSchema = baseFrontmatterSchema.extend({
   mentionedTools: z.array(z.string()).optional(),
 })
 
+// Etap G — /best/[slug] best-for-segment listings. Hybrid model: MDX body
+// carries the editorial prose; the `tools` slug array is the ranked
+// shortlist hydrated from `public.tools` at render time so rating /
+// pricing / affiliate stay live. `segment` is the human-readable segment
+// the listicle targets (used for breadcrumb + hero eyebrow). `summary` is
+// the standalone "who picks which" closer that renders below the ranked
+// grid even if the MDX body doesn't include one.
+export const bestFrontmatterSchema = baseFrontmatterSchema.extend({
+  segment:       z.string().min(2),
+  // Ranked tool slugs (order = ranking on the page). Each slug must
+  // resolve to a `tools` row; missing slugs are skipped at render time.
+  tools:         z.array(z.string()).min(1),
+  summary:       z.string().optional(),
+})
+
 export type ReviewFrontmatter = z.infer<typeof reviewFrontmatterSchema>
 export type GuideFrontmatter  = z.infer<typeof guideFrontmatterSchema>
+export type BestFrontmatter   = z.infer<typeof bestFrontmatterSchema>
 
 // ============================================================================
 // Public API
 // ============================================================================
 
-export type ContentType = "reviews" | "guides"
+export type ContentType = "reviews" | "guides" | "best"
 export type ContentLocale = "en" | "ru"
 
 const CONTENT_DIR = path.join(process.cwd(), "content")
 
 type FrontmatterFor<T extends ContentType> = T extends "reviews"
   ? ReviewFrontmatter
-  : GuideFrontmatter
+  : T extends "guides"
+    ? GuideFrontmatter
+    : BestFrontmatter
 
 export interface CompiledContent<T extends ContentType> {
   slug: string
@@ -174,7 +192,12 @@ export async function getMdxContent<T extends ContentType>(
   const source = await fs.readFile(resolved.filePath, "utf-8")
   const { content: rawBody, data: rawFrontmatter } = matter(source)
 
-  const schema = type === "reviews" ? reviewFrontmatterSchema : guideFrontmatterSchema
+  const schema =
+    type === "reviews"
+      ? reviewFrontmatterSchema
+      : type === "best"
+        ? bestFrontmatterSchema
+        : guideFrontmatterSchema
   const parsed = schema.safeParse(rawFrontmatter)
   if (!parsed.success) {
     // Loud failure: throw with context so the dev sees exactly which file is

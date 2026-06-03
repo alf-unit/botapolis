@@ -188,9 +188,36 @@ const reviewsToToolsRedirects = [
   { source: "/ru/reviews", destination: "/ru/tools", permanent: true },
 ]
 
+// ----------------------------------------------------------------------------
+// klaviyo-pricing relocation (Phase 3 of merge, 2026-06-03)
+// ----------------------------------------------------------------------------
+// klaviyo-pricing is editorial pricing-deep-dive content, not a tool catalog
+// entry — there's no `tools.slug='klaviyo-pricing'` row. Originally lived at
+// /reviews/klaviyo-pricing as MDX (legacy /reviews/ MDX pipeline pre-Etap-E).
+// After Phase 2 the URL became a 308 → /tools/klaviyo-pricing (which 404s
+// because no tool row), so Phase 3 moves the MDX to /guides/klaviyo-pricing
+// and pins direct one-hop redirects from BOTH legacy URL families.
+//
+// These rules MUST sit BEFORE the catch-all /reviews/:slug above — Next.js
+// stops at the first match, so a less-specific catch-all that fires first
+// would shadow these slug-specific rules.
+// ----------------------------------------------------------------------------
+const klaviyoPricingRedirects = [
+  { source: "/reviews/klaviyo-pricing", destination: "/guides/klaviyo-pricing", permanent: true },
+  { source: "/ru/reviews/klaviyo-pricing", destination: "/ru/guides/klaviyo-pricing", permanent: true },
+  // /tools/klaviyo-pricing covers any reader who hit /reviews/klaviyo-pricing
+  // before Phase 3 deploy and got cached at /tools/klaviyo-pricing (Phase 2
+  // catch-all sent them there). Single direct hop to the new canonical.
+  { source: "/tools/klaviyo-pricing", destination: "/guides/klaviyo-pricing", permanent: true },
+  { source: "/ru/tools/klaviyo-pricing", destination: "/ru/guides/klaviyo-pricing", permanent: true },
+]
+
 const nextConfig: NextConfig = {
   async redirects() {
-    return [...legacyReviewRedirects, ...reviewsToToolsRedirects]
+    // Order: slug-specific klaviyo-pricing first (so it wins over the
+    // catch-all /reviews/:slug), then legacy -review-2026 collapse, then
+    // the generic /reviews/{*,hub} → /tools/{*,hub} family.
+    return [...klaviyoPricingRedirects, ...legacyReviewRedirects, ...reviewsToToolsRedirects]
   },
   async headers() {
     return [

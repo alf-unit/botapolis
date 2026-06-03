@@ -2,7 +2,16 @@
  * POST /api/agents/article-published — git post-commit signal
  * ----------------------------------------------------------------------------
  * Called by .husky/post-commit when a commit adds or modifies an MDX file
- * under content/{reviews,comparisons,alternatives,guides,best,news}/{en,ru}/.
+ * under content/{comparisons,alternatives,guides,best,news}/{en,ru}/.
+ *
+ * Scope note (Phase 3 of /reviews/ → /tools/ merge, 2026-06-03):
+ *   `reviews` was removed from the accepted content types. Tool editorial
+ *   now lives on /tools/[slug] which reads directly from the `tools`
+ *   Supabase rows (no MDX → URL bridging needed). The hook regex and the
+ *   `repoPathToPublicUrl` whitelist below were tightened to refuse
+ *   `content/reviews/**` paths so a stray commit there doesn't trigger a
+ *   revalidatePath('/reviews/...') on a route that's now a 308 redirect.
+ *
  * The hook posts one entry per affected file; we flip the matching
  * semantic_core_entries row to status='published' and revalidate its path.
  *
@@ -13,7 +22,7 @@
  * Body shape:
  *   {
  *     "files": [
- *       { "path": "content/reviews/en/klaviyo.mdx", "primary_keyword": "klaviyo review" }
+ *       { "path": "content/guides/en/klaviyo-pricing.mdx", "primary_keyword": "klaviyo pricing" }
  *     ],
  *     "commit_sha": "abcdef1"
  *   }
@@ -58,13 +67,27 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb)
 }
 
-/** content/reviews/en/klaviyo.mdx → /reviews/klaviyo (en) or /ru/reviews/klaviyo (ru).
+/** content/guides/en/klaviyo-pricing.mdx → /guides/klaviyo-pricing (en) or
+ *  /ru/guides/klaviyo-pricing (ru).
  *  Note: file path uses /content/comparisons/ but URL path is /compare/ (different
- *  segment). Same for any future content type with non-1:1 file-to-URL mapping. */
+ *  segment). Same for any future content type with non-1:1 file-to-URL mapping.
+ *
+ *  Allowed types (Phase 3 tighten, 2026-06-03): comparisons, alternatives,
+ *  guides, best, news. `reviews` is refused — tool editorial moved into
+ *  the /tools/ DB-driven surface and no longer round-trips through MDX. */
+const ALLOWED_CONTENT_TYPES = new Set([
+  "comparisons",
+  "alternatives",
+  "guides",
+  "best",
+  "news",
+])
+
 function repoPathToPublicUrl(p: string): string | null {
   const m = p.match(/^content\/([^/]+)\/(en|ru)\/(.+)\.mdx$/)
   if (!m) return null
   const [, type, locale, slug] = m
+  if (!ALLOWED_CONTENT_TYPES.has(type)) return null
   // Map repo content type → public URL segment. Comparisons use /compare/<slug>,
   // not /comparisons/<slug> (Phase 3 finding 2026-05-26).
   const urlSegment = type === "comparisons" ? "compare" : type

@@ -24,14 +24,16 @@ export const revalidate = 86400
 /**
  * Static routes — only paths that resolve to a real page right now.
  *
- * Sprint 2 (May 2026): added /reviews and /guides indexes back after the
- * MDX pipeline shipped. Individual /reviews/{slug} and /guides/{slug}
- * detail pages are appended dynamically further down from the MDX
- * directory listing.
+ * Editorial hubs (/tools, /compare, /guides) plus the trust + legal pages.
+ * Individual /tools/{slug}, /compare/{slug}, /alternatives/{slug}, and
+ * /guides/{slug} detail pages are appended dynamically further down.
  *
- * Still excluded (the routes don't exist yet): /best, /news, /blog,
- * /methodology, /contact, /directory, /legal/cookie-policy. Add each path
- * back here ONLY after its route renders a 200.
+ * Phase 3 of /reviews/ → /tools/ merge (2026-06-03):
+ *   - /reviews hub removed (308 → /tools)
+ *   - /reviews/{slug} detail loop removed (308 → /tools/{slug})
+ *   - /best/{slug} listings are MDX-driven and could be added when the
+ *     hub page lands; currently emitted by the MDX-derived loop below
+ *     once /best gets the dynamic slug walk.
  */
 const STATIC_ROUTES: Array<{
   path: string
@@ -47,8 +49,6 @@ const STATIC_ROUTES: Array<{
   { path: "/tools/ai-cost-comparator",   changeFrequency: "monthly", priority: 0.85 },
   { path: "/tools/product-description",  changeFrequency: "monthly", priority: 0.85 },
   { path: "/compare",      changeFrequency: "weekly",  priority: 0.9 },
-  // Sprint 2 — editorial hubs.
-  { path: "/reviews",      changeFrequency: "weekly",  priority: 0.85 },
   { path: "/guides",       changeFrequency: "weekly",  priority: 0.85 },
   { path: "/about",        changeFrequency: "monthly", priority: 0.5 },
   // Block B (May 2026) — trust signals + contact surface.
@@ -150,22 +150,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })
   }
 
-  // ----- Reviews (Etap E flip 2026-06-01: tools-driven runtime, no MDX) ----
-  // /reviews/[slug] now renders from `tools` rows, not from MDX. Emit one
-  // sitemap entry per published tool. RU mirror reuses the same runtime
-  // page via re-export — the page exists for every slug regardless of
-  // whether its *_ru columns have been translated yet (localizeTool falls
-  // back to EN inside the route).
-  for (const t of tools ?? []) {
-    const path = `/reviews/${t.slug}`
-    routes.push({
-      url:             absoluteUrl(path),
-      lastModified:    new Date(t.updated_at),
-      changeFrequency: "monthly",
-      priority:        0.75,
-      alternates:      alternates(path),
-    })
-  }
+  // Reviews loop removed Phase 3 of /reviews/ → /tools/ merge (2026-06-03):
+  // /tools/{t.slug} already emitted above (line 107). /reviews/{slug} now
+  // 308-redirects there at the edge; emitting both URLs would dupe Google's
+  // index and force it through the redirect for every entry.
 
   // ----- Guides (still MDX, build-time slug list) --------------------------
   // Reads frontmatter so we can use the article's own `updatedAt` for

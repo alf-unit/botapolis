@@ -14,14 +14,12 @@
  * Each record carries a `type` filter so the client modal can group
  * results into the visible buckets (Tools / Guides / Compare).
  *
- * NOTE (Phase 2 of /reviews/ → /tools/ merge, 2026-06-03): the reviews
+ * NOTE (Phases 2-3 of /reviews/ → /tools/ merge, 2026-06-03): the reviews
  * MDX bucket was dropped — /reviews/[slug] now 308-redirects to
  * /tools/[slug] and editorial content lives on the tool surface itself
- * (sourced from the `tools` Supabase rows, indexed in bucket 2). One
- * legacy MDX file (content/reviews/{en,ru}/klaviyo-pricing.mdx) is
- * pending move to /guides/ in Phase 3 and is intentionally NOT indexed
- * here meanwhile — a search hit pointing at /reviews/klaviyo-pricing
- * would 308 to /tools/klaviyo-pricing which 404s.
+ * (sourced from the `tools` Supabase rows, indexed in bucket 2). The one
+ * legacy review MDX (klaviyo-pricing.mdx) moved to content/guides/ in
+ * Phase 3, so it's now indexed under the guides bucket.
  *
  * The script is opt-in: missing Supabase env or missing /content dir
  * degrades gracefully — search still ships, just with an empty index.

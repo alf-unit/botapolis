@@ -407,6 +407,8 @@ export default async function ComparisonPage({ params }: PageProps) {
     tocLabel:        locale === "ru" ? "Содержание"           : "On this page",
     tryA:           locale === "ru" ? `Открыть ${toolA.name}` : `Try ${toolA.name}`,
     tryB:           locale === "ru" ? `Открыть ${toolB.name}` : `Try ${toolB.name}`,
+    viewA:          locale === "ru" ? `Обзор ${toolA.name}` : `View ${toolA.name} details`,
+    viewB:          locale === "ru" ? `Обзор ${toolB.name}` : `View ${toolB.name} details`,
     affiliateNote:  locale === "ru"
       ? "Партнёрская ссылка. Цены и условия определяет вендор."
       : "Affiliate link. Pricing and terms are set by the vendor.",
@@ -631,6 +633,7 @@ export default async function ComparisonPage({ params }: PageProps) {
                 tool={toolA}
                 localePrefix={localePrefix}
                 tryLabel={t.tryA}
+                viewDetailsLabel={t.viewA}
               />
 
               {/* Vertical "VS" divider — pure CSS so we stay in the server tree */}
@@ -659,6 +662,7 @@ export default async function ComparisonPage({ params }: PageProps) {
                 tool={toolB}
                 localePrefix={localePrefix}
                 tryLabel={t.tryB}
+                viewDetailsLabel={t.viewB}
               />
             </div>
 
@@ -1373,23 +1377,39 @@ function ToolCardSide({
   tool,
   localePrefix,
   tryLabel,
+  viewDetailsLabel,
 }: {
   tool: ToolRow
   localePrefix: "" | "/ru"
   tryLabel: string
+  viewDetailsLabel: string
 }) {
-  // Outbound-link sweep (2026-06-01): only one CTA, gated by affiliate_url.
-  // Tools without affiliate_url (Judge.me carve-out) render with no outbound
-  // button at all — header info only. Owner rule: monetised /go/ is the
-  // single exit channel.
+  // Outbound-link sweep (2026-06-01): /go/ is the only monetised exit.
+  // Tools without affiliate_url (Judge.me carve-out) render no /go/ CTA.
+  // Phase C (2026-06-03): added internal "View details" link to
+  // /tools/{slug} for every tool — closes the satellite → centre gap
+  // (previously a reader on /compare/X-vs-Y could only escape via /go/
+  // or sibling /compare/, never to the central editorial page). For the
+  // Judge.me carve-out the "View details" CTA stays as the sole non-
+  // deadend exit, which is exactly the right outcome.
   const showAffiliateCta = tool.affiliate_url != null
+  const toolPath = `${localePrefix}/tools/${tool.slug}`
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6 shadow-[var(--shadow-sm)]">
       <div className="flex items-start gap-3">
         <ToolLogo src={tool.logo_url} name={tool.name} size={56} className="shrink-0 rounded-xl" />
         <div className="min-w-0">
+          {/* h2 wraps the tool name in a link to its catalog page — adds an
+              easy in-text path to /tools/[slug] without crowding the CTA row
+              with another button. Underline-on-hover keeps it clearly
+              clickable. */}
           <h2 className="text-h3 font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-            {tool.name}
+            <Link
+              href={toolPath}
+              className="hover:underline underline-offset-4 decoration-[var(--brand)]"
+            >
+              {tool.name}
+            </Link>
           </h2>
           {tool.tagline && (
             <p className="mt-1 text-[14px] leading-[1.5] text-[var(--text-secondary)] line-clamp-2">
@@ -1399,8 +1419,8 @@ function ToolCardSide({
         </div>
       </div>
 
-      {showAffiliateCta && (
-        <div className="mt-auto">
+      <div className="mt-auto flex flex-col gap-2">
+        {showAffiliateCta && (
           <Link
             href={`${localePrefix}/go/${tool.slug}`}
             rel="sponsored nofollow noopener"
@@ -1413,8 +1433,18 @@ function ToolCardSide({
             <span>{tryLabel}</span>
             <ArrowUpRight className="size-4" />
           </Link>
-        </div>
-      )}
+        )}
+        <Link
+          href={toolPath}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "default" }),
+            "h-10 px-4 text-[13px] justify-between w-full border-[var(--border-base)]",
+          )}
+        >
+          <span>{viewDetailsLabel}</span>
+          <ArrowUpRight className="size-3.5" />
+        </Link>
+      </div>
     </div>
   )
 }

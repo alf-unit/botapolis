@@ -278,9 +278,13 @@ export default async function AlternativesPage({ params }: PageProps) {
     if (why) perCardWhy.set(c.slug, why)
   }
 
+  // Phase C (2026-06-03): breadcrumb now points at the /alternatives hub
+  // instead of /tools. Mirrors /best/[slug] post-hub-launch and gives
+  // visitors a one-click jump back to the index of all alternatives
+  // surfaces. The JSON-LD chain and the rendered nav both updated below.
   const breadcrumb = generateBreadcrumbSchema([
     { name: t.home,    path: `${localePrefix}/` },
-    { name: dict.nav.tools, path: `${localePrefix}/tools` },
+    { name: dict.nav.alternatives, path: `${localePrefix}/alternatives` },
     { name: t.title,   path: `${localePrefix}/alternatives/${slug}` },
   ])
 
@@ -322,8 +326,8 @@ export default async function AlternativesPage({ params }: PageProps) {
                 {t.home}
               </Link>
               <span className="opacity-60">/</span>
-              <Link href={`${localePrefix}/tools`} className="hover:text-[var(--text-secondary)]">
-                {dict.nav.tools}
+              <Link href={`${localePrefix}/alternatives`} className="hover:text-[var(--text-secondary)]">
+                {dict.nav.alternatives}
               </Link>
               <span className="opacity-60">/</span>
               <span className="text-[var(--text-secondary)]">{t.title}</span>

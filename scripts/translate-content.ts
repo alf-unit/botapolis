@@ -72,7 +72,7 @@ Format preservation (CRITICAL):
   Example: <Callout variant="tip" title="Speed test">  →  <Callout variant="tip" title="Тест скорости">
 - Preserve markdown structure exactly: same heading levels, same list shape, same table columns.
 - Preserve link URLs verbatim, translate only the visible link text.
-  Example: [the Klaviyo review](/reviews/klaviyo-review-2026)  →  [обзор Klaviyo](/reviews/klaviyo-review-2026)
+  Example: [the Klaviyo review](/tools/klaviyo)  →  [обзор Klaviyo](/tools/klaviyo)
 - Preserve code blocks verbatim — do NOT translate code, command names, or JSON keys.
 - Preserve frontmatter delimiters (---) if you see them — but the input you receive will already be body-only.
 

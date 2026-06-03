@@ -7,12 +7,21 @@
  * demand, so there's no on-disk HTML for Pagefind's default crawler to
  * scan. Instead we feed Pagefind records sourced from:
  *
- *   1. MDX articles  (content/reviews/**, content/guides/**)
+ *   1. MDX articles  (content/guides/**)
  *   2. Tools         (Supabase `tools` table, status='published')
  *   3. Comparisons   (Supabase `comparisons` table, status='published')
  *
  * Each record carries a `type` filter so the client modal can group
- * results into the visible buckets (Tools / Reviews / Guides / Compare).
+ * results into the visible buckets (Tools / Guides / Compare).
+ *
+ * NOTE (Phase 2 of /reviews/ → /tools/ merge, 2026-06-03): the reviews
+ * MDX bucket was dropped — /reviews/[slug] now 308-redirects to
+ * /tools/[slug] and editorial content lives on the tool surface itself
+ * (sourced from the `tools` Supabase rows, indexed in bucket 2). One
+ * legacy MDX file (content/reviews/{en,ru}/klaviyo-pricing.mdx) is
+ * pending move to /guides/ in Phase 3 and is intentionally NOT indexed
+ * here meanwhile — a search hit pointing at /reviews/klaviyo-pricing
+ * would 308 to /tools/klaviyo-pricing which 404s.
  *
  * The script is opt-in: missing Supabase env or missing /content dir
  * degrades gracefully — search still ships, just with an empty index.
@@ -73,7 +82,7 @@ function mdxToPlainText(raw: string): string {
 
 async function indexMdx(
   index: PagefindIndex,
-  type: "reviews" | "guides",
+  type: "guides",
   locale: "en" | "ru",
 ): Promise<number> {
   const dir = path.join(CONTENT_DIR, type, locale)
@@ -117,10 +126,10 @@ async function indexMdx(
           // We point at the colocated OG image so the modal carousel
           // looks consistent with social-share previews.
           image:    `${url}/opengraph-image`,
-          type:     type === "reviews" ? "review" : "guide",
+          type:     "guide",
         },
         filters: {
-          type: [type === "reviews" ? "review" : "guide"],
+          type: ["guide"],
         },
       })
       if (errors.length > 0) {
@@ -280,8 +289,6 @@ async function main() {
     return
   }
 
-  const reviews = await indexMdx(index as PagefindIndex, "reviews", "en")
-  const reviewsRu = await indexMdx(index as PagefindIndex, "reviews", "ru")
   const guides = await indexMdx(index as PagefindIndex, "guides", "en")
   const guidesRu = await indexMdx(index as PagefindIndex, "guides", "ru")
   const db = await indexSupabase(index as PagefindIndex)
@@ -294,7 +301,7 @@ async function main() {
     process.exitCode = 1
   } else {
     console.log(
-      `[search-index] wrote ${outputPath} — reviews:${reviews + reviewsRu} guides:${guides + guidesRu} tools:${db.tools} comparisons:${db.comparisons}`,
+      `[search-index] wrote ${outputPath} — guides:${guides + guidesRu} tools:${db.tools} comparisons:${db.comparisons}`,
     )
   }
 

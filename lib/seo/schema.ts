@@ -68,7 +68,8 @@ export function generateWebSiteSchema(opts: {
 }
 
 // ============================================================================
-// SoftwareApplication + Review — for /reviews/[slug] and /directory/[slug]
+// SoftwareApplication + Review — for /tools/[slug] (canonical editorial URL
+// after the /reviews/ → /tools/ merge, Phase 2 of 2026-06-03)
 // ============================================================================
 interface ReviewSchemaInput {
   tool: Pick<
@@ -128,7 +129,7 @@ export function generateReviewSchema({
 
   const review = withContext({
     "@type":      "Review",
-    "@id":        `${SITE_URL}${reviewPath ?? `/reviews/${tool.slug}`}#review`,
+    "@id":        `${SITE_URL}${reviewPath ?? `/tools/${tool.slug}`}#review`,
     itemReviewed: application,
     author:       { "@type": "Organization", name: authorName },
     reviewBody:   tool.description ?? "",
@@ -287,9 +288,9 @@ export function generateItemListSchema(opts: {
 }
 
 // ============================================================================
-// Article — generic schema for /guides/[slug] and /reviews/[slug]
+// Article — generic schema for /guides/[slug] and /tools/[slug]
 // ----------------------------------------------------------------------------
-// For reviews we additionally emit `generateReviewSchema` (Review wraps a
+// For tool pages we additionally emit `generateReviewSchema` (Review wraps a
 // SoftwareApplication). The Article node is the editorial frame around it —
 // Google likes seeing both nodes on the same page.
 // ============================================================================
@@ -297,7 +298,7 @@ export function generateArticleSchema(opts: {
   /** Article headline (frontmatter.title). */
   headline:      string
   description:   string
-  /** Path including locale prefix, e.g. "/reviews/klaviyo". */
+  /** Path including locale prefix, e.g. "/tools/klaviyo". */
   path:          string
   /** ISO date of first publish. */
   publishedAt:   string

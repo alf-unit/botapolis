@@ -484,7 +484,7 @@ export default async function HomePage() {
                   return (
                   <li key={slug}>
                     <Link
-                      href={`${localePrefix}/reviews/${slug}`}
+                      href={`${localePrefix}/tools/${slug}`}
                       className={cn(
                         "group relative flex h-full flex-col overflow-hidden rounded-2xl",
                         "border border-[var(--border-base)] bg-[var(--bg-surface)]",

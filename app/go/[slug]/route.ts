@@ -4,7 +4,7 @@
  * Reads the tool by slug, logs a click row, and 302-redirects to the
  * monetized partner URL. If the tool has no `affiliate_url` (e.g. Judge.me
  * catalog-no-affiliate carve-out), this route refuses to send the visitor
- * to the vendor for free — instead it redirects to the internal review.
+ * to the vendor for free — instead it redirects to the internal /tools/[slug] page.
  *
  * Owner-locked 2026-06-01: monetisation is single-channel. The /go/ route
  * is the ONLY way out to a vendor and it must never fall through to a
@@ -71,10 +71,10 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   }
 
   // Fail-closed: no affiliate_url → never send visitor out to vendor. Land
-  // them on the internal review page (where ToolStickyCard etc. already
+  // them on the internal tool page (where ToolStickyCard etc. already
   // know to hide CTAs for this tool). Judge.me lives here.
   if (!tool.affiliate_url) {
-    return NextResponse.redirect(new URL(`/reviews/${slug}`, req.url))
+    return NextResponse.redirect(new URL(`/tools/${slug}`, req.url))
   }
 
   // ----- Build outbound URL with UTM overlay --------------------------------
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     outbound = new URL(tool.affiliate_url)
   } catch {
     // Stored affiliate_url is malformed — fall back to safe internal route.
-    return NextResponse.redirect(new URL(`/reviews/${slug}`, req.url))
+    return NextResponse.redirect(new URL(`/tools/${slug}`, req.url))
   }
 
   const incoming = new URL(req.url)

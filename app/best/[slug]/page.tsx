@@ -145,7 +145,7 @@ export default async function BestListingPage({ params }: PageProps) {
           name: frontmatter.title,
           items: ranked.map((t) => ({
             name: t.name,
-            url: `${localePrefix}/reviews/${t.slug}`,
+            url: `${localePrefix}/tools/${t.slug}`,
           })),
         })
       : null
@@ -244,7 +244,7 @@ export default async function BestListingPage({ params }: PageProps) {
                       />
                       <div className="min-w-0 flex-1">
                         <Link
-                          href={`${localePrefix}/reviews/${tool.slug}`}
+                          href={`${localePrefix}/tools/${tool.slug}`}
                           className="block"
                         >
                           <p className="text-h4 font-semibold tracking-[-0.015em] text-[var(--text-primary)] hover:underline underline-offset-4">
@@ -275,7 +275,7 @@ export default async function BestListingPage({ params }: PageProps) {
                       </div>
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`${localePrefix}/reviews/${tool.slug}`}
+                          href={`${localePrefix}/tools/${tool.slug}`}
                           className={cn(
                             buttonVariants({ variant: "outline", size: "sm" }),
                             "h-9 px-3 text-[12px]",

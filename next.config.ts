@@ -141,16 +141,19 @@ const embedHeaders = [
 ]
 
 // ----------------------------------------------------------------------------
-// Legacy review-slug redirects (Etap E flip 2026-06-01)
+// /reviews/ → /tools/ canonicalisation (Phase 2 of merge, 2026-06-03)
 // ----------------------------------------------------------------------------
-// 6 review tools historically lived at /reviews/{slug}-review-2026 as
-// MDX-driven editorial pages. They've been deleted; the new runtime
-// /reviews/{slug} reads from the `tools` table. These 12 redirects
-// (6 EN + 6 RU) preserve any inbound links / GSC index that pointed at
-// the old URLs.
+// The /reviews/[slug] route absorbed into /tools/[slug] (single canonical
+// surface for tool editorial). Three redirect families below, all 308 (which
+// Google treats identically to 301 for link-equity transfer):
 //
-// `permanent: true` emits 308 (method-preserving), which Google treats
-// identically to 301 for SEO equity transfer.
+//   1. The 12 legacy `-review-2026` MDX slugs collapse DIRECTLY to
+//      /tools/{slug} — single hop, no chain through /reviews/{slug}. Google
+//      penalises chained 301s, so we resolve the final destination here.
+//   2. /reviews/{slug} → /tools/{slug} (current canonical URL).
+//   3. /reviews → /tools (hub redirect).
+//
+// RU mirrors get the same treatment under the /ru prefix.
 // ----------------------------------------------------------------------------
 const LEGACY_REVIEW_SLUGS = [
   "klaviyo",
@@ -164,19 +167,30 @@ const LEGACY_REVIEW_SLUGS = [
 const legacyReviewRedirects = LEGACY_REVIEW_SLUGS.flatMap((slug) => [
   {
     source: `/reviews/${slug}-review-2026`,
-    destination: `/reviews/${slug}`,
+    destination: `/tools/${slug}`,
     permanent: true,
   },
   {
     source: `/ru/reviews/${slug}-review-2026`,
-    destination: `/ru/reviews/${slug}`,
+    destination: `/ru/tools/${slug}`,
     permanent: true,
   },
 ])
 
+const reviewsToToolsRedirects = [
+  // Order matters: more-specific [slug] patterns first, then the hub.
+  // Next.js evaluates redirects() top-to-bottom and stops at the first
+  // match — without this order the hub regex would swallow detail-page
+  // paths before the [slug] rule could fire.
+  { source: "/reviews/:slug", destination: "/tools/:slug", permanent: true },
+  { source: "/ru/reviews/:slug", destination: "/ru/tools/:slug", permanent: true },
+  { source: "/reviews", destination: "/tools", permanent: true },
+  { source: "/ru/reviews", destination: "/ru/tools", permanent: true },
+]
+
 const nextConfig: NextConfig = {
   async redirects() {
-    return [...legacyReviewRedirects]
+    return [...legacyReviewRedirects, ...reviewsToToolsRedirects]
   },
   async headers() {
     return [
@@ -234,7 +248,6 @@ const nextConfig: NextConfig = {
   // route). Pinning the trace to `content/**` is the documented fix:
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats
   outputFileTracingIncludes: {
-    "/reviews/**":  ["./content/reviews/**"],
     "/guides/**":   ["./content/guides/**"],
     "/sitemap.xml": ["./content/**"],
   },

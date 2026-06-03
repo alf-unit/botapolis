@@ -291,7 +291,11 @@ export async function getAllMdxFrontmatter<T extends ContentType>(
         const source = await fs.readFile(filePath, "utf-8")
         const { data } = matter(source)
         const schema =
-          type === "reviews" ? reviewFrontmatterSchema : guideFrontmatterSchema
+          type === "reviews"
+            ? reviewFrontmatterSchema
+            : type === "best"
+              ? bestFrontmatterSchema
+              : guideFrontmatterSchema
         const parsed = schema.safeParse(data)
         if (!parsed.success) {
           console.error(

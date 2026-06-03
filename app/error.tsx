@@ -51,8 +51,10 @@ const NAV_STRINGS = {
   en: {
     tools: "Tools",
     compare: "Compare",
-    reviews: "Reviews",
     guides: "Guides",
+    resources: "Resources",
+    best: "Best",
+    alternatives: "Alternatives",
     directory: "Directory",
     search: "Search",
     subscribe: "Subscribe",
@@ -64,8 +66,10 @@ const NAV_STRINGS = {
   ru: {
     tools: "Инструменты",
     compare: "Сравнения",
-    reviews: "Обзоры",
     guides: "Гайды",
+    resources: "Ресурсы",
+    best: "Подборки",
+    alternatives: "Альтернативы",
     directory: "Каталог",
     search: "Поиск",
     subscribe: "Подписаться",

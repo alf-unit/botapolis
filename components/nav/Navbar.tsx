@@ -2,10 +2,16 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Menu, Search } from "lucide-react"
+import { ChevronDown, Menu, Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Sheet,
   SheetClose,
@@ -30,8 +36,17 @@ import {
    ----------------------------------------------------------------------------
    - Sticky top, transparent at scrollY = 0
    - Glassmorphism (blur + glass border) kicks in once scrollY > 24
-   - Desktop:   logo · main nav · search · theme · lang · primary CTA
-   - Mobile:    logo · hamburger → Sheet (right-side drawer) with the same items
+   - Desktop:   logo · main nav (leaves + dropdowns) · search · theme · lang · primary CTA
+   - Mobile:    logo · hamburger → Sheet (right-side drawer); dropdowns render
+                their sub-items expanded inline (no nested overlay).
+
+   Adding a new menu entry — leaves vs dropdowns:
+     - Top-level leaf:        `{ kind: "leaf", label, href }` in the `nav` array
+                              below (e.g. News and Blog will land here later)
+     - Dropdown sub-item:     append to the matching dropdown's `items` array
+                              (e.g. /pricing, /discount when they ship)
+   The render paths (desktop + mobile) automatically pick up new entries —
+   no surface-specific changes required.
 ---------------------------------------------------------------------------- */
 
 export interface NavLink {
@@ -39,11 +54,31 @@ export interface NavLink {
   href: string
 }
 
+/** Sub-item shape for dropdown groups. */
+interface NavSubItem {
+  label: string
+  href: string
+}
+
+/**
+ * Discriminated nav-item: top-level entries are either a single leaf link
+ * or a labelled dropdown with sub-items. Both render variants are wired in
+ * one place so adding entries doesn't touch the desktop or mobile JSX.
+ */
+type NavItem =
+  | { kind: "leaf"; label: string; href: string }
+  | { kind: "dropdown"; label: string; items: NavSubItem[] }
+
 export interface NavbarStrings {
   tools: string
   compare: string
-  reviews: string
   guides: string
+  /** Dropdown label for the Resources cluster (Best, Alternatives, …). */
+  resources: string
+  /** Sub-item: /best hub. */
+  best: string
+  /** Sub-item: /alternatives hub. */
+  alternatives: string
   directory: string
   search: string
   // `searchPlaceholder` retired May 2026 audit (search palette removed; the
@@ -166,19 +201,28 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
     }
   }, [])
 
-  // Primary nav scope (Sprint 2, May 2026):
-  //   - /tools, /compare      — sprint 3-4, live since launch
-  //   - /reviews, /guides     — sprint 2 (MDX pipeline) shipped May 2026
-  //   - /directory            — still excluded (308 redirect to /tools)
-  // The order goes "do something" → "compare options" → "deep reads" so
-  // the path reflects intent rather than alphabet. Keeping it to four
-  // entries holds the desktop bar visually balanced against the right-side
-  // utility cluster.
-  const links: NavLink[] = [
-    { label: strings.tools,   href: `${localePrefix}/tools` },
-    { label: strings.compare, href: `${localePrefix}/compare` },
-    { label: strings.reviews, href: `${localePrefix}/reviews` },
-    { label: strings.guides,  href: `${localePrefix}/guides` },
+  // Primary nav scope (Phase A of nav rebuild, 2026-06-03):
+  //   - leaves: /tools, /compare, /guides
+  //   - dropdown: Resources -> /best, /alternatives  (extensible — add new
+  //     sub-items here as Pricing-cluster, Discount, etc. ship)
+  //   - future leaves: News, Blog will append as additional { kind: "leaf" }
+  //     entries when they ship.
+  // The order goes "catalog" → "head-to-head" → "playbooks" → "discovery
+  // surfaces", so the path reflects intent rather than alphabet.
+  const nav: NavItem[] = [
+    { kind: "leaf", label: strings.tools,   href: `${localePrefix}/tools` },
+    { kind: "leaf", label: strings.compare, href: `${localePrefix}/compare` },
+    { kind: "leaf", label: strings.guides,  href: `${localePrefix}/guides` },
+    {
+      kind: "dropdown",
+      label: strings.resources,
+      items: [
+        { label: strings.best,         href: `${localePrefix}/best` },
+        { label: strings.alternatives, href: `${localePrefix}/alternatives` },
+        // Extension slot — Pricing cluster, Discount, etc. land here.
+      ],
+    },
+    // Future top-level leaves (News, Blog) — add as `{ kind: "leaf", … }`.
   ]
 
   return (
@@ -205,20 +249,55 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
         <div className="flex items-center gap-6 lg:gap-8 min-w-0">
           <Logo href={`${localePrefix}/`} idSuffix="nav" />
           <nav aria-label="Primary" className="hidden lg:flex items-center gap-1">
-            {links.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={cn(
-                  "px-3 h-9 inline-flex items-center rounded-md",
-                  "text-sm font-medium text-[var(--text-secondary)]",
-                  "hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
-                  "transition-colors duration-150",
-                )}
-              >
-                {l.label}
-              </Link>
-            ))}
+            {nav.map((item) =>
+              item.kind === "leaf" ? (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "px-3 h-9 inline-flex items-center rounded-md",
+                    "text-sm font-medium text-[var(--text-secondary)]",
+                    "hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+                    "transition-colors duration-150",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <DropdownMenu key={item.label}>
+                  <DropdownMenuTrigger
+                    className={cn(
+                      "px-3 h-9 inline-flex items-center gap-1 rounded-md",
+                      "text-sm font-medium text-[var(--text-secondary)]",
+                      "hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)]",
+                      "data-[popup-open]:text-[var(--text-primary)] data-[popup-open]:bg-[var(--bg-muted)]",
+                      "transition-colors duration-150 outline-none",
+                    )}
+                  >
+                    {item.label}
+                    <ChevronDown
+                      className="size-3.5 opacity-70 transition-transform duration-150 data-[popup-open]:rotate-180"
+                      aria-hidden="true"
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" sideOffset={6} className="min-w-44 p-1.5">
+                    {item.items.map((sub) => (
+                      <DropdownMenuItem
+                        key={sub.href}
+                        render={
+                          <Link
+                            href={sub.href}
+                            className="px-2 py-1.5 text-sm"
+                          >
+                            {sub.label}
+                          </Link>
+                        }
+                      />
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ),
+            )}
           </nav>
         </div>
 
@@ -330,24 +409,61 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
                     </Link>
                   }
                 />
-                {links.map((l) => (
-                  <SheetClose
-                    key={l.href}
-                    nativeButton={false}
-                    render={
-                      <Link
-                        href={l.href}
+                {nav.map((item) =>
+                  item.kind === "leaf" ? (
+                    <SheetClose
+                      key={item.href}
+                      nativeButton={false}
+                      render={
+                        <Link
+                          href={item.href}
+                          className={cn(
+                            "px-3 h-11 inline-flex items-center rounded-md",
+                            "text-base font-medium text-[var(--text-primary)]",
+                            "hover:bg-[var(--bg-muted)]",
+                          )}
+                        >
+                          {item.label}
+                        </Link>
+                      }
+                    />
+                  ) : (
+                    /* Dropdowns render inline + always-expanded on mobile —
+                       no nested overlay (iOS Safari virtual keyboards +
+                       stacked overlays don't play nicely). The group label
+                       acts as an unclickable section header; sub-items sit
+                       under it at one indent level. */
+                    <div key={item.label} className="flex flex-col">
+                      <p
                         className={cn(
-                          "px-3 h-11 inline-flex items-center rounded-md",
-                          "text-base font-medium text-[var(--text-primary)]",
-                          "hover:bg-[var(--bg-muted)]",
+                          "px-3 pt-3 pb-1.5",
+                          "font-mono text-[11px] font-semibold uppercase tracking-[0.08em]",
+                          "text-[var(--text-tertiary)]",
                         )}
                       >
-                        {l.label}
-                      </Link>
-                    }
-                  />
-                ))}
+                        {item.label}
+                      </p>
+                      {item.items.map((sub) => (
+                        <SheetClose
+                          key={sub.href}
+                          nativeButton={false}
+                          render={
+                            <Link
+                              href={sub.href}
+                              className={cn(
+                                "pl-6 pr-3 h-11 inline-flex items-center rounded-md",
+                                "text-base font-medium text-[var(--text-primary)]",
+                                "hover:bg-[var(--bg-muted)]",
+                              )}
+                            >
+                              {sub.label}
+                            </Link>
+                          }
+                        />
+                      ))}
+                    </div>
+                  ),
+                )}
 
                 <div className="mt-4 pt-4 border-t border-[var(--border-base)] flex items-center justify-between gap-3">
                   <LanguageSwitcher />

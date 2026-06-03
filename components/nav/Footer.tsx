@@ -63,20 +63,18 @@ function GithubMark({ className }: { className?: string }) {
 export interface FooterStrings {
   tagline: string
   copyright: string
-  // Column titles. Sprint 2 (May 2026) re-introduced a "Library" column for
-  // the editorial routes (/reviews, /guides) now that the MDX pipeline ships.
-  // The earlier audit had dropped them because the pages didn't exist; that
-  // constraint no longer applies.
+  // Column titles. Phase A of nav rebuild (2026-06-03) renamed the editorial
+  // "Library" slot to "Resources" so it mirrors the Navbar Resources
+  // dropdown — Best / Alternatives / All guides.
   columns: {
     tools: string
     compare: string
-    library: string
+    resources: string
     site: string
     legal: string
   }
   // Link labels. Every key here MUST map to a route that returns 200; the
-  // shape mirrors what the dead-link audit (May 2026) + Sprint 2 + Block B
-  // verified is live.
+  // shape mirrors the live route table.
   links: {
     emailRoi:            string
     aiCostComparator:    string
@@ -86,9 +84,8 @@ export interface FooterStrings {
     omnisendKlaviyo:     string
     gorgiasTidio:        string
     allComparisons:      string
-    klaviyoReview:       string
-    productDescGuide:    string
-    allReviews:          string
+    bestHub:             string
+    alternativesHub:     string
     allGuides:           string
     about:               string
     catalog:             string
@@ -144,20 +141,16 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
       ],
     },
     {
-      // Sprint 2 — reviews + guides are linked from a single "Library"
-      // column. The featured entries are hand-picked (one of each); the
-      // "all" link sends people to the indexes. We avoid auto-generating
-      // the featured rows from MDX frontmatter to keep the footer stable
-      // — link-rot here cascades into a worse perceived navigation.
-      title: columns.library,
+      // Phase A of nav rebuild (2026-06-03): Resources column mirrors the
+      // Navbar Resources dropdown — Best, Alternatives — plus All guides as
+      // the editorial-playbook surface. Hand-picked featured links were
+      // dropped: they lost meaning post-merge (every tool catalog row is
+      // now a review surface, so highlighting one was arbitrary).
+      title: columns.resources,
       items: [
-        // Phase 2 of /reviews/ → /tools/ merge (2026-06-03): canonical
-        // review URL is /tools/[slug]. Hrefs flipped; locale labels for
-        // klaviyoReview + allReviews updated to drop the "review" word.
-        { label: links.klaviyoReview,    href: `${localePrefix}/tools/klaviyo` },
-        { label: links.allReviews,       href: `${localePrefix}/tools` },
-        { label: links.productDescGuide, href: `${localePrefix}/guides/how-to-use-ai-for-shopify-product-descriptions` },
-        { label: links.allGuides,        href: `${localePrefix}/guides` },
+        { label: links.bestHub,         href: `${localePrefix}/best` },
+        { label: links.alternativesHub, href: `${localePrefix}/alternatives` },
+        { label: links.allGuides,       href: `${localePrefix}/guides` },
       ],
     },
     {

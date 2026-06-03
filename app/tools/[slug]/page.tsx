@@ -21,6 +21,7 @@ import {
 } from "@/lib/seo/schema"
 import { createServiceClient } from "@/lib/supabase/service"
 import { localizeTool } from "@/lib/content/tool-locale"
+import { getAllMdxFrontmatter } from "@/lib/content/mdx"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
@@ -107,6 +108,135 @@ async function fetchCrossLinkedTools(
     return data ?? []
   } catch (err) {
     console.error(`[/tools] cross-link fetch threw:`, err)
+    return []
+  }
+}
+
+/**
+ * Comparisons featuring this tool — for the curated Related block.
+ *
+ * Curation logic (Phase C cross-linking, 2026-06-03):
+ *   1. Over-fetch 8 published same-language comparisons where this tool is
+ *      on either side, ordered by updated_at DESC.
+ *   2. Hydrate the OTHER tool of each pair (id, slug, name, name_ru,
+ *      logo_url, category).
+ *   3. Split into same-category pairs and cross-category pairs (preserving
+ *      the DESC order within each bucket).
+ *   4. Concatenate [same..., cross...] and slice 3 — same-category leads
+ *      because they're the most relevant intra-niche signal.
+ *
+ * Falls back gracefully when the row count is thin (single bucket pad) or
+ * the cross-link tool can't be resolved (filter out).
+ */
+interface RelatedComparison {
+  slug: string
+  verdict: string | null
+  other: { slug: string; name: string; logo_url: string | null }
+}
+
+async function fetchRelatedComparisons(
+  currentToolId: string,
+  currentCategory: string,
+  language: "en" | "ru",
+  locale: "en" | "ru",
+  limit = 3,
+): Promise<RelatedComparison[]> {
+  try {
+    const sb = createServiceClient()
+    const { data: rows, error: rowsErr } = await sb
+      .from("comparisons")
+      .select("slug, tool_a_id, tool_b_id, verdict, updated_at")
+      .eq("status", "published")
+      .eq("language", language)
+      .or(`tool_a_id.eq.${currentToolId},tool_b_id.eq.${currentToolId}`)
+      .order("updated_at", { ascending: false })
+      .limit(8)
+    if (rowsErr || !rows || rows.length === 0) return []
+
+    const otherIds = Array.from(
+      new Set(
+        rows.map((r) =>
+          r.tool_a_id === currentToolId ? r.tool_b_id : r.tool_a_id,
+        ),
+      ),
+    )
+    const { data: others } = await sb
+      .from("tools")
+      .select("id, slug, name, name_ru, logo_url, category")
+      .in("id", otherIds)
+    const byId = new Map((others ?? []).map((t) => [t.id, t]))
+
+    const annotated = rows.flatMap((r) => {
+      const otherId =
+        r.tool_a_id === currentToolId ? r.tool_b_id : r.tool_a_id
+      const other = byId.get(otherId)
+      if (!other) return []
+      const otherName = locale === "ru" ? other.name_ru ?? other.name : other.name
+      return [
+        {
+          slug: r.slug,
+          verdict: r.verdict,
+          other: {
+            slug: other.slug,
+            name: otherName,
+            logo_url: other.logo_url,
+          },
+          sameCategory: other.category === currentCategory,
+        },
+      ]
+    })
+
+    // Two buckets, preserve incoming updated_at DESC order inside each.
+    const same = annotated.filter((a) => a.sameCategory)
+    const cross = annotated.filter((a) => !a.sameCategory)
+    return [...same, ...cross].slice(0, limit).map(
+      ({ slug, verdict, other }): RelatedComparison => ({ slug, verdict, other }),
+    )
+  } catch (err) {
+    console.error(`[/tools] related comparisons fetch threw:`, err)
+    return []
+  }
+}
+
+/**
+ * Best-of listings that feature this tool in their ranked roster.
+ *
+ * Walks all `/best/{slug}.mdx` frontmatter for the active locale via
+ * `getAllMdxFrontmatter`, filters to entries whose `tools[]` slug array
+ * contains this tool, and returns the top `limit` by publishedAt DESC
+ * (the loader already sorts that way). Returns [] when this tool isn't
+ * ranked in any best-of — the section is hidden render-side.
+ */
+interface RelatedBestMention {
+  slug: string
+  title: string
+  publishedAt: string
+}
+
+async function fetchBestMentions(
+  currentSlug: string,
+  locale: "en" | "ru",
+  limit = 3,
+): Promise<RelatedBestMention[]> {
+  try {
+    const entries = await getAllMdxFrontmatter("best", locale)
+    const matches: RelatedBestMention[] = []
+    for (const e of entries) {
+      // `tools` is required on bestFrontmatterSchema; the runtime cast is
+      // defensive for the unlikely case of malformed frontmatter slipping
+      // through the loader.
+      const tools = (e.frontmatter as { tools?: string[] }).tools ?? []
+      if (!tools.includes(currentSlug)) continue
+      matches.push({
+        slug: e.slug,
+        title: e.frontmatter.title,
+        publishedAt: e.frontmatter.publishedAt,
+      })
+      if (matches.length >= limit) break
+    }
+    return matches
+  } catch (err) {
+    console.error(`[/tools] best mentions fetch threw:`, err)
     return []
   }
 }
@@ -218,6 +348,15 @@ export default async function ToolDetailPage({ params }: PageProps) {
   // Catalog cross-link grid — one DB call.
   const crossLinked = await fetchCrossLinkedTools(tool.integrates_with_tools ?? [])
 
+  // Related block — curated centre → satellite paths. Runs in parallel
+  // since the two fetchers are independent (DB vs MDX walk). The
+  // alternatives sub-section doesn't need a query — every published tool
+  // has its own /alternatives/[slug] page by construction.
+  const [relatedComparisons, bestMentions] = await Promise.all([
+    fetchRelatedComparisons(tool.id, tool.category, locale, locale, 3),
+    fetchBestMentions(tool.slug, locale, 3),
+  ])
+
   // i18n strings — local until tools earn a dict section.
   const t = {
     eyebrow:                locale === "ru" ? "Обзор" : "Review",
@@ -236,6 +375,13 @@ export default async function ToolDetailPage({ params }: PageProps) {
     externalRatingsHeading: locale === "ru" ? "Сторонние рейтинги" : "External ratings",
     operatorQuotesHeading:  locale === "ru" ? "Что говорят операторы" : "What operators say",
     verdictHeading:         locale === "ru" ? "Наш вывод" : "Our verdict",
+    relatedHeading:         locale === "ru" ? "Похожее" : "Related",
+    seeAlternativesLabel:   locale === "ru"
+      ? `Альтернативы ${tool.name}`
+      : `See ${tool.name} alternatives`,
+    headToHeadHeading:      locale === "ru" ? "Head-to-head сравнения" : "Head-to-head comparisons",
+    bestOfMentionsHeading:  locale === "ru" ? "В подборках" : "Featured in best-of",
+    versusSeparator:        locale === "ru" ? "vs" : "vs",
     tocLabel:               locale === "ru" ? "Содержание" : "On this page",
     perMonth:               locale === "ru" ? "/мес" : "/mo",
     startingPrice:          locale === "ru" ? "Старт от" : "Starting price",
@@ -277,6 +423,11 @@ export default async function ToolDetailPage({ params }: PageProps) {
   )
   const hasOperatorQuotes = (tool.operator_quotes?.length ?? 0) > 0
   const hasVerdict = !!tool.verdict
+  // Related block always renders the /alternatives/[slug] link (every
+  // published tool has one), so the section is never empty for a real
+  // tool. Compare + best-of sub-sections are conditional.
+  const hasRelatedCompares = relatedComparisons.length > 0
+  const hasRelatedBests = bestMentions.length > 0
 
   const tocEntries: TocEntry[] = []
   if (tool.description) tocEntries.push({ id: "tldr", title: t.tldrHeading, level: 2 })
@@ -290,6 +441,10 @@ export default async function ToolDetailPage({ params }: PageProps) {
   if (hasExternalRatings)  tocEntries.push({ id: "external-ratings", title: t.externalRatingsHeading, level: 2 })
   if (hasOperatorQuotes)   tocEntries.push({ id: "operator-quotes", title: t.operatorQuotesHeading, level: 2 })
   if (hasVerdict)          tocEntries.push({ id: "verdict", title: t.verdictHeading, level: 2 })
+  // Related always renders (at minimum the /alternatives link), so always
+  // surface it in ToC. Skipping the entry for thin pages would force the
+  // reader to scroll past PartnerAlternatives to discover it.
+  tocEntries.push({ id: "related", title: t.relatedHeading, level: 2 })
 
   // ──────────────────────────────────────────────────────────────────────
   // JSON-LD — Article + Review + Breadcrumb. We emit BOTH Article and
@@ -557,6 +712,121 @@ export default async function ToolDetailPage({ params }: PageProps) {
                   </div>
                 </Section>
               )}
+
+              {/* ── Related — curated centre → satellite paths.
+                  Sits BEFORE PartnerAlternatives so the editorial discovery
+                  links (this tool's own alternatives hub, head-to-head
+                  pairs, best-of mentions) lead, and the monetised partner
+                  alts close the page. Cap: 1 + 3 + 3 = 7 links; the
+                  comparison + best-of sub-sections are hidden when empty.
+                  See fetchRelatedComparisons + fetchBestMentions for the
+                  curation logic (same-category first for compares,
+                  publishedAt DESC for bests). */}
+              <Section id="related" title={t.relatedHeading} eyebrow="12">
+                <div className="flex flex-col gap-6 max-w-3xl">
+                  {/* a. Alternatives hub for this tool — always present. */}
+                  <Link
+                    href={`${localePrefix}/alternatives/${slug}`}
+                    className={cn(
+                      "group flex items-center justify-between gap-3 rounded-2xl",
+                      "border border-[var(--border-base)] bg-[var(--bg-surface)]",
+                      "px-4 py-3 transition-colors hover:border-[var(--border-strong)]",
+                    )}
+                  >
+                    <span className="text-[15px] font-medium text-[var(--text-primary)]">
+                      {t.seeAlternativesLabel}
+                    </span>
+                    <ArrowUpRight
+                      className="size-4 text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--brand)]"
+                      aria-hidden="true"
+                    />
+                  </Link>
+
+                  {/* b. Head-to-head comparisons — top 3, same-category first. */}
+                  {hasRelatedCompares && (
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                        {t.headToHeadHeading}
+                      </p>
+                      <ul role="list" className="mt-3 flex flex-col gap-2">
+                        {relatedComparisons.map((c) => (
+                          <li key={c.slug}>
+                            <Link
+                              href={`${localePrefix}/compare/${c.slug}`}
+                              className={cn(
+                                "group flex flex-col gap-1 rounded-xl",
+                                "border border-[var(--border-base)] bg-[var(--bg-surface)]",
+                                "px-4 py-3 transition-colors hover:border-[var(--border-strong)]",
+                              )}
+                            >
+                              <div className="flex items-center gap-2 text-[14px] font-semibold text-[var(--text-primary)]">
+                                {c.other.logo_url && (
+                                  <ToolLogo
+                                    src={c.other.logo_url}
+                                    name={c.other.name}
+                                    size={20}
+                                    className="shrink-0 rounded-md"
+                                  />
+                                )}
+                                <span>
+                                  {tool.name}{" "}
+                                  <span className="font-mono text-[12px] text-[var(--text-tertiary)]">
+                                    {t.versusSeparator}
+                                  </span>{" "}
+                                  {c.other.name}
+                                </span>
+                                <ArrowUpRight
+                                  className="ml-auto size-3.5 text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--brand)]"
+                                  aria-hidden="true"
+                                />
+                              </div>
+                              {/* Verdict snippet — single line, truncated. Pre-merge
+                                  comparisons may have multi-paragraph verdicts; we
+                                  only need the headline for a hint here. */}
+                              {c.verdict && (
+                                <p className="text-[13px] leading-[1.5] text-[var(--text-secondary)] line-clamp-1">
+                                  {c.verdict}
+                                </p>
+                              )}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* c. Best-of mentions — top 3, publishedAt DESC. */}
+                  {hasRelatedBests && (
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                        {t.bestOfMentionsHeading}
+                      </p>
+                      <ul role="list" className="mt-3 flex flex-col gap-2">
+                        {bestMentions.map((b) => (
+                          <li key={b.slug}>
+                            <Link
+                              href={`${localePrefix}/best/${b.slug}`}
+                              className={cn(
+                                "group flex items-center justify-between gap-3 rounded-xl",
+                                "border border-[var(--border-base)] bg-[var(--bg-surface)]",
+                                "px-4 py-3 transition-colors hover:border-[var(--border-strong)]",
+                              )}
+                            >
+                              <span className="text-[14px] font-medium text-[var(--text-primary)] line-clamp-2">
+                                {b.title}
+                              </span>
+                              <ArrowUpRight
+                                className="size-3.5 text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--brand)] shrink-0"
+                                aria-hidden="true"
+                              />
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </Section>
 
               {/* ── Partner alternatives — emphasized when this tool has no
                   affiliate_url so the block is the page's primary monetised

@@ -21,7 +21,13 @@ import {
 } from "@/lib/seo/schema"
 import { createServiceClient } from "@/lib/supabase/service"
 import { localizeTool } from "@/lib/content/tool-locale"
-import { getAllMdxFrontmatter, getAllMdxSlugs } from "@/lib/content/mdx"
+import { getAllMdxSlugs } from "@/lib/content/mdx"
+import {
+  fetchBestMentions,
+  fetchRelatedComparisons,
+  type RelatedBestMention,
+  type RelatedComparison,
+} from "@/lib/content/related-blocks"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
@@ -108,135 +114,6 @@ async function fetchCrossLinkedTools(
     return data ?? []
   } catch (err) {
     console.error(`[/tools] cross-link fetch threw:`, err)
-    return []
-  }
-}
-
-/**
- * Comparisons featuring this tool — for the curated Related block.
- *
- * Curation logic (Phase C cross-linking, 2026-06-03):
- *   1. Over-fetch 8 published same-language comparisons where this tool is
- *      on either side, ordered by updated_at DESC.
- *   2. Hydrate the OTHER tool of each pair (id, slug, name, name_ru,
- *      logo_url, category).
- *   3. Split into same-category pairs and cross-category pairs (preserving
- *      the DESC order within each bucket).
- *   4. Concatenate [same..., cross...] and slice 3 — same-category leads
- *      because they're the most relevant intra-niche signal.
- *
- * Falls back gracefully when the row count is thin (single bucket pad) or
- * the cross-link tool can't be resolved (filter out).
- */
-interface RelatedComparison {
-  slug: string
-  verdict: string | null
-  other: { slug: string; name: string; logo_url: string | null }
-}
-
-async function fetchRelatedComparisons(
-  currentToolId: string,
-  currentCategory: string,
-  language: "en" | "ru",
-  locale: "en" | "ru",
-  limit = 3,
-): Promise<RelatedComparison[]> {
-  try {
-    const sb = createServiceClient()
-    const { data: rows, error: rowsErr } = await sb
-      .from("comparisons")
-      .select("slug, tool_a_id, tool_b_id, verdict, updated_at")
-      .eq("status", "published")
-      .eq("language", language)
-      .or(`tool_a_id.eq.${currentToolId},tool_b_id.eq.${currentToolId}`)
-      .order("updated_at", { ascending: false })
-      .limit(8)
-    if (rowsErr || !rows || rows.length === 0) return []
-
-    const otherIds = Array.from(
-      new Set(
-        rows.map((r) =>
-          r.tool_a_id === currentToolId ? r.tool_b_id : r.tool_a_id,
-        ),
-      ),
-    )
-    const { data: others } = await sb
-      .from("tools")
-      .select("id, slug, name, name_ru, logo_url, category")
-      .in("id", otherIds)
-    const byId = new Map((others ?? []).map((t) => [t.id, t]))
-
-    const annotated = rows.flatMap((r) => {
-      const otherId =
-        r.tool_a_id === currentToolId ? r.tool_b_id : r.tool_a_id
-      const other = byId.get(otherId)
-      if (!other) return []
-      const otherName = locale === "ru" ? other.name_ru ?? other.name : other.name
-      return [
-        {
-          slug: r.slug,
-          verdict: r.verdict,
-          other: {
-            slug: other.slug,
-            name: otherName,
-            logo_url: other.logo_url,
-          },
-          sameCategory: other.category === currentCategory,
-        },
-      ]
-    })
-
-    // Two buckets, preserve incoming updated_at DESC order inside each.
-    const same = annotated.filter((a) => a.sameCategory)
-    const cross = annotated.filter((a) => !a.sameCategory)
-    return [...same, ...cross].slice(0, limit).map(
-      ({ slug, verdict, other }): RelatedComparison => ({ slug, verdict, other }),
-    )
-  } catch (err) {
-    console.error(`[/tools] related comparisons fetch threw:`, err)
-    return []
-  }
-}
-
-/**
- * Best-of listings that feature this tool in their ranked roster.
- *
- * Walks all `/best/{slug}.mdx` frontmatter for the active locale via
- * `getAllMdxFrontmatter`, filters to entries whose `tools[]` slug array
- * contains this tool, and returns the top `limit` by publishedAt DESC
- * (the loader already sorts that way). Returns [] when this tool isn't
- * ranked in any best-of — the section is hidden render-side.
- */
-interface RelatedBestMention {
-  slug: string
-  title: string
-  publishedAt: string
-}
-
-async function fetchBestMentions(
-  currentSlug: string,
-  locale: "en" | "ru",
-  limit = 3,
-): Promise<RelatedBestMention[]> {
-  try {
-    const entries = await getAllMdxFrontmatter("best", locale)
-    const matches: RelatedBestMention[] = []
-    for (const e of entries) {
-      // `tools` is required on bestFrontmatterSchema; the runtime cast is
-      // defensive for the unlikely case of malformed frontmatter slipping
-      // through the loader.
-      const tools = (e.frontmatter as { tools?: string[] }).tools ?? []
-      if (!tools.includes(currentSlug)) continue
-      matches.push({
-        slug: e.slug,
-        title: e.frontmatter.title,
-        publishedAt: e.frontmatter.publishedAt,
-      })
-      if (matches.length >= limit) break
-    }
-    return matches
-  } catch (err) {
-    console.error(`[/tools] best mentions fetch threw:`, err)
     return []
   }
 }

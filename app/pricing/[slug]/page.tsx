@@ -9,6 +9,7 @@ import { ArticleHero } from "@/components/content/ArticleHero"
 import { ArticleCover } from "@/components/content/ArticleCover"
 import { TableOfContents } from "@/components/content/TableOfContents"
 import { ToolLogo } from "@/components/tools/ToolLogo"
+import { PartnerAlternatives } from "@/components/tools/PartnerAlternatives"
 import { buttonVariants } from "@/components/ui/button"
 import { createServiceClient } from "@/lib/supabase/service"
 import { buildMetadata } from "@/lib/seo/metadata"
@@ -19,6 +20,10 @@ import {
   generateSoftwareApplicationSchema,
 } from "@/lib/seo/schema"
 import { getAllMdxSlugs, getMdxContent } from "@/lib/content/mdx"
+import {
+  fetchBestMentions,
+  fetchRelatedComparisons,
+} from "@/lib/content/related-blocks"
 import { localizeTool } from "@/lib/content/tool-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
@@ -47,7 +52,11 @@ import type { ToolRow } from "@/lib/supabase/types"
 ---------------------------------------------------------------------------- */
 
 export const revalidate = 86400
-export const dynamicParams = false
+// `true` so newly committed pricing MDX renders on the next request without
+// waiting for a full redeploy of generateStaticParams. Mirrors /tools/[slug]
+// behavior. Unknown slugs still 404 via notFound() inside the page when the
+// MDX file isn't on disk.
+export const dynamicParams = true
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -136,6 +145,17 @@ export default async function PricingPage({ params }: PageProps) {
   const pricingPath = `${localePrefix}/pricing/${slug}`
   const toolPath = `${localePrefix}/tools/${tool.slug}`
 
+  // Related block — curated centre → satellite paths. Same helper set as
+  // /tools/[slug] so the cross-link surface stays consistent: alternatives
+  // hub + head-to-head comparisons (same-category first) + best-of mentions.
+  // PartnerAlternatives renders below as the monetised tail.
+  const [relatedComparisons, bestMentions] = await Promise.all([
+    fetchRelatedComparisons(rawTool.id, rawTool.category, locale, locale, 3),
+    fetchBestMentions(rawTool.slug, locale, 3),
+  ])
+  const hasRelatedCompares = relatedComparisons.length > 0
+  const hasRelatedBests = bestMentions.length > 0
+
   const t =
     locale === "ru"
       ? {
@@ -147,9 +167,15 @@ export default async function PricingPage({ params }: PageProps) {
           pricingModel: "Модель",
           perMonth: "/мес",
           free: "Бесплатно",
+          custom: "По запросу",
           openReview: "Открыть обзор",
           tryLabel: "Открыть",
           ratingChip: "Оценка",
+          relatedHeading: "Похожее",
+          seeAlternativesLabel: `Альтернативы ${tool.name}`,
+          headToHeadHeading: "Head-to-head сравнения",
+          bestOfMentionsHeading: "В подборках",
+          versusSeparator: "vs",
           fellBackTitle: "Перевод в работе",
           fellBackBody:
             "Эта статья пока доступна только на английском. Мы переводим её.",
@@ -163,9 +189,15 @@ export default async function PricingPage({ params }: PageProps) {
           pricingModel: "Model",
           perMonth: "/mo",
           free: "Free",
+          custom: "Custom (sales)",
           openReview: "Read the review",
           tryLabel: "Try",
           ratingChip: "Rating",
+          relatedHeading: "Related",
+          seeAlternativesLabel: `See ${tool.name} alternatives`,
+          headToHeadHeading: "Head-to-head comparisons",
+          bestOfMentionsHeading: "Featured in best-of",
+          versusSeparator: "vs",
           fellBackTitle: "Translation in progress",
           fellBackBody:
             "This article hasn't been translated yet — you're reading the English original.",
@@ -284,6 +316,142 @@ export default async function PricingPage({ params }: PageProps) {
                   bill", alternatives. The depth that separates /pricing/
                   from /tools/ structurally and SERP-wise. */}
               <div className="pt-2 lg:pt-4 prose-content">{content}</div>
+
+              {/* ── Related — curated centre → satellite paths.
+                  Mirrors the /tools/[slug] Related block so the cross-link
+                  surface is consistent across both surfaces (pricing reader
+                  pivots back to overall review via the alternatives hub or
+                  head-to-head pair). PartnerAlternatives renders below as
+                  the monetised tail. Cap: 1 + 3 + 3 = 7 links. */}
+              <section
+                id="related"
+                className="py-10 lg:py-12 border-t border-[var(--border-subtle)]"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-6 items-center rounded-full border border-[var(--border-base)] bg-[var(--bg-muted)] px-2 text-[11px] font-mono text-[var(--text-tertiary)]">
+                    ↗
+                  </span>
+                  <h2 className="text-h3 font-semibold tracking-[-0.02em]">
+                    {t.relatedHeading}
+                  </h2>
+                </div>
+                <div className="mt-6 flex flex-col gap-6 max-w-3xl">
+                  {/* a. Alternatives hub for this tool — always present. */}
+                  <Link
+                    href={`${localePrefix}/alternatives/${slug}`}
+                    className={cn(
+                      "group flex items-center justify-between gap-3 rounded-2xl",
+                      "border border-[var(--border-base)] bg-[var(--bg-surface)]",
+                      "px-4 py-3 transition-colors hover:border-[var(--border-strong)]",
+                    )}
+                  >
+                    <span className="text-[15px] font-medium text-[var(--text-primary)]">
+                      {t.seeAlternativesLabel}
+                    </span>
+                    <ArrowUpRight
+                      className="size-4 text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--brand)]"
+                      aria-hidden="true"
+                    />
+                  </Link>
+
+                  {/* b. Head-to-head comparisons — top 3, same-category first. */}
+                  {hasRelatedCompares && (
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                        {t.headToHeadHeading}
+                      </p>
+                      <ul role="list" className="mt-3 flex flex-col gap-2">
+                        {relatedComparisons.map((c) => (
+                          <li key={c.slug}>
+                            <Link
+                              href={`${localePrefix}/compare/${c.slug}`}
+                              className={cn(
+                                "group flex flex-col gap-1 rounded-xl",
+                                "border border-[var(--border-base)] bg-[var(--bg-surface)]",
+                                "px-4 py-3 transition-colors hover:border-[var(--border-strong)]",
+                              )}
+                            >
+                              <div className="flex items-center gap-2 text-[14px] font-semibold text-[var(--text-primary)]">
+                                {c.other.logo_url && (
+                                  <ToolLogo
+                                    src={c.other.logo_url}
+                                    name={c.other.name}
+                                    size={20}
+                                    className="shrink-0 rounded-md"
+                                  />
+                                )}
+                                <span>
+                                  {tool.name}{" "}
+                                  <span className="font-mono text-[12px] text-[var(--text-tertiary)]">
+                                    {t.versusSeparator}
+                                  </span>{" "}
+                                  {c.other.name}
+                                </span>
+                                <ArrowUpRight
+                                  className="ml-auto size-3.5 text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--brand)]"
+                                  aria-hidden="true"
+                                />
+                              </div>
+                              {c.verdict && (
+                                <p className="text-[13px] leading-[1.5] text-[var(--text-secondary)] line-clamp-1">
+                                  {c.verdict}
+                                </p>
+                              )}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* c. Best-of mentions — top 3, publishedAt DESC. */}
+                  {hasRelatedBests && (
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
+                        {t.bestOfMentionsHeading}
+                      </p>
+                      <ul role="list" className="mt-3 flex flex-col gap-2">
+                        {bestMentions.map((b) => (
+                          <li key={b.slug}>
+                            <Link
+                              href={`${localePrefix}/best/${b.slug}`}
+                              className={cn(
+                                "group flex items-center justify-between gap-3 rounded-xl",
+                                "border border-[var(--border-base)] bg-[var(--bg-surface)]",
+                                "px-4 py-3 transition-colors hover:border-[var(--border-strong)]",
+                              )}
+                            >
+                              <span className="text-[14px] font-medium text-[var(--text-primary)] line-clamp-2">
+                                {b.title}
+                              </span>
+                              <ArrowUpRight
+                                className="size-3.5 text-[var(--text-tertiary)] transition-colors group-hover:text-[var(--brand)] shrink-0"
+                                aria-hidden="true"
+                              />
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* ── Partner alternatives — emphasized when this tool has no
+                  affiliate_url so the block is the page's primary monetised
+                  exit. Otherwise it's a bonus discovery surface below the
+                  Related list. Same component as /tools/[slug]. */}
+              <PartnerAlternatives
+                currentSlug={tool.slug}
+                currentName={tool.name}
+                currentCategory={tool.category}
+                currentSubcategories={tool.subcategories ?? []}
+                locale={locale}
+                localePrefix={localePrefix}
+                emphasized={tool.affiliate_url == null}
+                maxCount={3}
+                bare
+              />
             </article>
 
             {/* Sticky right column — ToC + ToolStickyCard. The card carries
@@ -357,11 +525,17 @@ function PriceCard({
     pricingModel: string
     perMonth: string
     free: string
+    custom: string
   }
 }) {
   const min = tool.pricing_min
   const max = tool.pricing_max
   const isFree = tool.pricing_model === "free" || (min === 0 && max == null)
+  // Custom-pricing tools (Attentive, Signifyd, Northbeam, Inventory Planner)
+  // have min/max=null + model='custom' — the PriceCard would otherwise show
+  // a meaningless "—" where the headline price lives. Render the localised
+  // "Custom (sales)" / "По запросу" label so the chip carries signal.
+  const isCustomQuote = tool.pricing_model === "custom" && min == null
   return (
     <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--bg-surface)] p-5 lg:p-6">
       <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
@@ -370,6 +544,8 @@ function PriceCard({
       <p className="mt-3 font-mono text-[28px] tracking-[-0.02em] text-[var(--text-primary)] tabular-nums">
         {isFree ? (
           t.free
+        ) : isCustomQuote ? (
+          t.custom
         ) : min != null ? (
           <>
             {formatPrice(min, { locale, maximumFractionDigits: 0 })}

@@ -36,7 +36,22 @@
 // Domain-level enums / discriminated literals
 // ----------------------------------------------------------------------------
 export type ToolStatus       = "draft" | "published" | "archived"
-export type ToolPricingModel = "free" | "freemium" | "subscription" | "one_time" | "enterprise"
+// Runtime DB shape carries broader labels than the legacy spec union.
+// Etap J-generate (2026-06-03) confirmed the set in use across published
+// rows: tiered, custom, usage-based, bundled, flat in addition to the
+// originals. Pricing renderers (PriceCard on /tools/[slug] and
+// /pricing/[slug]) read this raw label and narrow as needed.
+export type ToolPricingModel =
+  | "free"
+  | "freemium"
+  | "subscription"
+  | "one_time"
+  | "enterprise"
+  | "tiered"
+  | "custom"
+  | "usage-based"
+  | "bundled"
+  | "flat"
 export type ToolCategory     =
   | "email" | "sms" | "support" | "chat"
   | "ads" | "content" | "analytics" | "inventory"

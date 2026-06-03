@@ -1,0 +1,186 @@
+---
+title: "Gorgias pricing 2026: ticket caps, $0.36 overage, AI Agent double-billing, and when the bill blows up"
+description: "Gorgias is ticket-priced ($10-$900/mo) — bill compounds via $0.36 overage and AI Agent's $0.90 resolution fee that ALSO counts as a ticket. Real math + alternatives. Verified 2026-05-30."
+publishedAt: "2026-06-03"
+updatedAt: "2026-06-03"
+author: "Botapolis editorial"
+tags: ["gorgias", "pricing", "support", "shopify", "helpdesk"]
+primaryKeyword: "gorgias pricing"
+toolSlug: "gorgias"
+rating: 8.5
+ratingBreakdown:
+  easeOfUse: 9.0
+  value: 7.8
+  support: 8.7
+  features: 8.9
+pros:
+  - "Best-in-class Shopify-native helpdesk integration — order data, refunds, cancellations one click away from the ticket view"
+  - "AI Agent autonomously resolves a large share of routine tickets when configured well; macros + rules cover the rest"
+  - "Unlimited agent seats on all paid plans (up to 500) — no per-seat tax as the team scales"
+cons:
+  - "Ticket-based pricing compounds at growth — every cap break adds $0.36-0.40 per extra ticket plus AI Agent fees"
+  - "AI Agent is DOUBLE-BILLED — each resolution costs $0.90-1.00 AND still counts as a helpdesk ticket against your plan cap"
+  - "Gorgias support response is reported slow by long-tenured customers (Shopify App Store + G2 patterns)"
+  - "Old-thread replies can re-bill as new tickets after the inactivity window — silent driver of cap creep"
+  - "Voice + SMS billed separately as add-ons; published pricing covers helpdesk only"
+verdict: "Gorgias's pricing model rewards stores that can run AI Agent at high deflection rates and punishes the ones that can't — the $0.90-1.00 per-resolution charge plus the rule that AI resolutions still count against your ticket cap means a $360 Pro plan can carry +$600/mo of AI usage before you know it. At 1,500+ monthly tickets with deflection above 50%, Gorgias is the right pick. Below 800 tickets/mo, the $60 Basic plan with macros only is the honest math; AI Agent doesn't pencil at that scale."
+bestFor: "Shopify stores with 1,500+ monthly support tickets where AI Agent deflection above 50% offsets the per-resolution fee, and the unlimited-agent structure replaces a per-seat helpdesk."
+notFor: "Stores under 800 tickets/mo running macros-only support — Tidio or Shopify Inbox cover the workflow cheaper, and AI Agent's $0.90/resolution doesn't pay back at low volume."
+faq:
+  - q: "How much does Gorgias actually cost at 2,000 tickets per month?"
+    a: "Pro at $360/mo (monthly billing) or $300/mo (annual) covers exactly 2,000 tickets. Add ~20% AI Agent deflection (400 AI resolutions × $0.90 annual rate) and you're at $360 + $360 AI = ~$720/mo — assuming you stay under the 2,000-ticket cap. If AI Agent resolutions push total ticket count above 2,000 (they DO count against the cap), expect $0.36-$0.40 per overage ticket on top. Voice and SMS are separate add-ons."
+  - q: "Why does AI Agent feel like it's billed twice?"
+    a: "Because it is. Per Gorgias's own pricing documentation: each AI Agent resolution costs $0.90 (annual) or $1.00 (monthly) per resolved ticket, AND that resolution still counts as a helpdesk ticket against your plan cap. So if AI Agent handles 500 tickets on Pro, that's $450/mo in resolution fees AND consumes 500 of your 2,000 included tickets. The math only works above ~50% deflection AND high enough volume that the per-resolution charge is cheaper than your loaded human-agent cost."
+  - q: "What counts as a 'ticket' in Gorgias's billing?"
+    a: "A ticket is a distinct customer conversation. The complication: replies to old threads after an inactivity window (default ~7 days) can re-bill as a new ticket. Stores with long return windows (60-90 days) silently accumulate tickets that look like the same conversation but bill twice. The Gorgias help center documents this — the practical effect is that customer-service-driven brands typically overestimate their deflection metric by 15-25% vs the billing reality."
+  - q: "How does Gorgias's ticket-based model compare to seat-based helpdesks like Zendesk?"
+    a: "Gorgias trades per-seat economics for per-ticket. Unlimited agent seats on every paid plan (up to 500) means a 20-agent team doesn't pay 20x — that's the structural win. The trade-off: ticket volume scales linearly with revenue, so the bill compounds with the business. Zendesk's per-seat model caps at the team size but charges per agent regardless of volume. Stores with high tickets-per-seat ratios save with Gorgias; stores with many low-volume agents (managers, occasional touches) save with seat-based pricing."
+  - q: "Is the annual vs monthly discount worth it?"
+    a: "Yes, structurally. Annual billing saves ~16% across plans (Basic $50 vs $60, Pro $300 vs $360, Advanced $750 vs $900). AI Agent resolution fee drops from $1.00 to $0.90 per resolution on annual — a 10% discount on the largest variable cost. The catch: no mid-year refund if you downgrade or churn. Operators planning to stay on Gorgias > 8 months should commit annual; under that horizon, monthly's flexibility is worth the 16% premium."
+  - q: "When should I switch from Gorgias to something else?"
+    a: "Two thresholds. (1) Under 800 monthly tickets where macros + rules cover most of the workflow — Basic at $60/mo OR a simpler Tidio/Shopify Inbox setup wins on math. (2) When the AI Agent deflection rate stays under 30% after 60 days of tuning — at that level the $0.90 per resolution doesn't beat what a $20/hr offshore agent can handle, and Gorgias's value proposition collapses. For multi-brand operators on Shopify Plus, Re:amaze and Help Scout offer cleaner multi-brand admin at similar price points."
+schema:
+  type: Review
+---
+
+Gorgias's pricing is ticket-based, which is honest about how a helpdesk creates load — every customer conversation is a measurable unit, billed accordingly. The complication is the **AI Agent double-billing rule**: each AI resolution charges $0.90-$1.00 AND still counts as one of your plan's tickets. Most operators discover this 60-90 days in, when the bill is already +30% above the Pro headline.
+
+This piece does the math at the bands where Shopify stores actually live (800-3,000 tickets/mo) using rates verified 2026-05-30 against [gorgias.com/pricing](https://www.gorgias.com/pricing) cross-referenced against Research 02 column-wise data.
+
+## Bottom line up front
+
+- **Best for:** Shopify stores with 1,500+ monthly tickets running AI Agent at 50%+ deflection — the per-resolution charge becomes cheaper than a loaded human-agent cost at that scale.
+- **Avoid if:** Stores under 800 tickets/mo with macro-driven workflows — Basic at $60/mo is fine, but AI Agent doesn't pencil and lighter helpdesks (Tidio, Shopify Inbox) cover the same lane cheaper.
+- **Standout strength:** Shopify-native integration depth + unlimited agent seats on every paid plan (up to 500) — a 20-agent team doesn't pay 20× per-seat.
+- **Biggest weakness:** AI Agent double-counts. Each resolution is a fee AND a ticket against your cap.
+
+## The tiers (verified 2026-05-30)
+
+| Tier | Monthly | Annual | Tickets included | Overage |
+|---|---:|---:|---:|---|
+| Starter | $10 | n/a | 50 | $0.36-0.40/ticket |
+| Basic | $60 | $50 | 300 | $0.36-0.40/ticket |
+| Pro | $360 | $300 | 2,000 | $0.36-0.40/ticket |
+| Advanced | $900 | $750 | 5,000 | $0.36-0.40/ticket |
+| Enterprise | custom | custom | 5,000+ | qualify at $20M+ revenue or $40K+ contract |
+
+Source: [gorgias.com/pricing](https://www.gorgias.com/pricing), verified 2026-05-30. Starter is the entry plan but has agent-seat caps (3 seats) that most growing teams outgrow within 60-90 days — Basic at $50-60/mo is the realistic floor for a working ecommerce store.
+
+Annual saves ~16% across the tier headlines. There's no mid-year refund if you churn, so the annual commit needs an 8+ month confidence window.
+
+## The AI Agent double-billing trap
+
+This is the structural pricing surprise most operators don't internalise until invoice month 3. Per Gorgias's own pricing documentation, two rules combine:
+
+1. **Each AI Agent resolution costs $0.90 (annual) or $1.00 (monthly)** per resolved ticket.
+2. **AI Agent resolutions still count as one of your plan's helpdesk tickets** against the included cap.
+
+In practice: if AI Agent resolves 500 tickets on the Pro plan, the bill carries $450/mo in resolution fees AND those 500 resolutions consume 500 of your 2,000 included tickets. If your real ticket volume is 2,200/mo and AI takes 500, you've used 500 + 1,700 human = 2,200 tickets (cap exceeded) → +200 overage × $0.36 = +$72/mo on top of the $450 AI fee.
+
+For the math to clearly work, AI Agent needs to push deflection ABOVE the ticket-cap threshold AND above the equivalent loaded human-agent cost. Most operators benchmark "loaded agent cost" at ~$15-25/hour for offshore support and $35-50/hour for US. At ~5 tickets/hour, that's $3-10 per resolved ticket — so AI Agent's $0.90 is genuinely cheaper per resolution, but only when deflection rate is high enough to dominate the total cost curve.
+
+## Gorgias's full-stack cost at 2,000 tickets/mo (verified 2026-05-30)
+
+A typical scenario: a Shopify store at $1M ARR running ~2,000 support tickets/mo, with AI Agent enabled at 30% deflection (the often-quoted vendor baseline).
+
+| Line item | Monthly cost | Notes |
+|---|---:|---|
+| Pro plan (2,000 tickets) | $360 | Monthly billing; $300/mo on annual |
+| AI Agent — 600 resolutions × $1.00 | $600 | 30% of 2,000; monthly rate; annual would be $540 |
+| Overage — already inside 2,000 cap | $0 | AI resolutions count, but total stays at 2,000 |
+| Voice add-on (optional) | not included | Separate billing |
+| SMS add-on (optional) | not included | Separate billing |
+| **Full-stack subtotal (helpdesk only)** | **~$960/mo** | Pro + AI Agent at 30% deflection |
+
+The same store at 50% AI deflection (1,000 resolutions × $1.00 = $1,000 AI fee): bill jumps to $1,360/mo — but the 1,000 AI tickets still fit in the 2,000-cap, no overage. The same store at 70% deflection (1,400 AI × $1.00 = $1,400): bill is $1,760/mo. The pattern: at fixed total ticket count, **AI Agent cost scales linearly with deflection** — the deflection rate has to substitute for an equivalent loaded human cost that's higher than $0.90-1.00 per ticket.
+
+For context, [the full Klaviyo pricing breakdown](/pricing/klaviyo) doesn't carry an analogous per-action fee — Klaviyo bills on active profiles, not per-event. Different pricing logic, different optimisation lever.
+
+## What "ticket" actually means in Gorgias's billing
+
+The accounting nuance most stores discover the year after they should have:
+
+- **Distinct customer conversations** count as tickets — straightforward case.
+- **Replies to old threads** after an inactivity window (default ~7 days) can **re-bill as a new ticket**. Stores with long return windows (60-90 days) accumulate these silently.
+- **Cross-channel conversations** (started in chat, continued in email) count as one ticket if continuous, separate if the inactivity window resets.
+- **Internal-team messages** on a ticket don't add to count, but the ticket creation does.
+
+The practical effect: customer-service-driven brands (subscription boxes, returns-heavy verticals) often see real ticket counts 15-25% above what their support analytics suggest. Plan against the upper bound, not the average.
+
+## What you actually get on each tier
+
+| Tier | Headline | What changes vs the band below |
+|---|---|---|
+| Starter | $10/mo (50 tickets, 3 seats) | Trial-tier; 3-seat cap blocks team scale |
+| Basic | $60/mo (300 tickets) | Unlimited seats, macros, rules, basic integrations — production-ready for sub-300-ticket stores |
+| Pro | $360/mo (2,000 tickets) | AI Agent unlocks, advanced workflows, custom rules, statistics |
+| Advanced | $900/mo (5,000 tickets) | API access at higher rates, SAML SSO, dedicated CSM, custom reporting |
+| Enterprise | custom | 5,000+ tickets; qualify at $20M+ revenue or $40K+ contract |
+
+The structural pattern: Basic to Pro is a 6× price jump (300 → 2,000 tickets, 6.67× capacity) — roughly linear. Pro to Advanced is a 2.5× price jump (2,000 → 5,000 tickets, 2.5× capacity) — also roughly linear. The cliff is **between AI Agent inclusion and not** — Pro is where AI Agent unlocks, so the 300 → 2,000 jump is partly buying capacity and partly buying access to the AI-resolution lane.
+
+## Real operator outcomes
+
+Three operator quotes that capture the spread of experiences:
+
+> Our transition from Salesforce to Gorgias was a breeze, since it integrates so seamlessly with Shopify.
+>
+> — G2, 2026-03-02
+
+> We have been using Gorgias for about 7 years and the last few years the customer service has been terrible.
+>
+> — Shopify App Store, 2026
+
+> It is priced too high compared to the rest of the market, and its support is not helpful.
+>
+> — G2 (via Hiver review), 2025
+
+The pattern across non-vendor sources: Gorgias's Shopify-native depth and AI Agent capability are genuinely category-leading; Gorgias's own customer support and pricing transparency lag the product. Long-tenured customers report deterioration in service responsiveness, which is the classic later-stage SaaS pattern (focus shifts from retention to net-new acquisition).
+
+## What the pricing model gets wrong
+
+Three things, in order of bill impact:
+
+**1. AI Agent double-counting.** The structural surprise. Resolution charges + cap consumption mean a Pro plan with heavy AI usage can hit Advanced-tier total cost without unlocking Advanced-tier features. Stores planning aggressive AI deployment should run the math against Advanced ($900 base) before committing to Pro ($360 base) at projected volume.
+
+**2. Old-thread re-billing.** The accounting nuance that creates 15-25% bill creep on stores with long return/support windows. There's no toggle to disable the inactivity-window re-billing — it's policy. Plan ticket budgets at +20% above raw conversation count for returns-heavy verticals.
+
+**3. Voice + SMS unbundled.** Voice channel and SMS support are separate add-ons not covered in the headline tier price. Multi-channel operators should ask Sales for the bundle quote upfront rather than discovering the line items on the first invoice.
+
+## When the math doesn't work
+
+Three honest scenarios where Gorgias's stack stops penciling out:
+
+- **Under 800 monthly tickets, macro-only workflows.** Basic at $60/mo nominally fits, but [Tidio's free plan](/tools/tidio) or Shopify's built-in Inbox handle the same workflow at sub-300 tickets/mo without the cap-creep risk. Gorgias only shines when AI Agent or advanced rules are doing real work.
+- **AI Agent deflection stuck under 30% after 60 days of tuning.** At that rate, the $0.90-1.00 per resolution is more expensive than what a $20/hr offshore agent can handle, and the AI-Agent investment compounds without payoff. Some verticals (complex returns, custom-config products) have ceilings on what AI can autonomously resolve — pull the deflection rate for your own ticket categories before committing.
+- **Multi-brand operators on Shopify Plus.** Gorgias supports multi-brand but the admin UX is reportedly clunkier than Re:amaze or Help Scout for managing 3+ Shopify stores from one helpdesk — at the same price band, evaluate the alternatives for this specific use case.
+
+## Free tier reality check
+
+Gorgias doesn't have a permanent free tier. The published offer is a **7-day free trial** on any paid plan — enough to evaluate the integration depth and AI Agent setup, not enough to validate the deflection rate (which needs 30-60 days of real ticket volume to stabilise).
+
+Operators planning a real evaluation should budget for at least 60 days on Basic or Pro before judging the AI-resolution economics. The trial validates the workflow fit; the first two months validate the bill.
+
+## How to lower a Gorgias bill without losing capability
+
+In rough order of impact:
+
+1. **Tune AI Agent before scaling deployment.** Run AI Agent on 10-20% of tickets first; measure deflection rate per category before turning it loose on the full inbox. AI handling complex tickets badly creates negative deflection (the customer escalates, the conversation reopens, you've paid $0.90 to make support worse).
+2. **Audit ticket categories for AI-friendly patterns.** Order status, return initiation, FAQ — high-deflection categories. Custom configurations, disputes, escalations — low-deflection. Restrict AI Agent to high-deflection categories using rules to maximize the $0.90/resolution math.
+3. **Reduce old-thread re-bills by adjusting closing flows.** Aggressive ticket closure (close-after-X-days policies) prevents stale threads from re-opening as new tickets later. Trade-off: customers who reply after long gaps get treated as new conversations, which can hurt CSAT.
+4. **Commit annual when stable.** ~16% savings on plan + 10% savings on AI Agent rate. Don't commit until ticket volume has been steady ±20% for 90 days.
+5. **Bundle voice + SMS into the negotiation.** Add-ons are negotiable on annual contracts at Pro+ — don't let them appear as line-item surprises on the first invoice.
+
+## Alternatives worth considering
+
+- **Tidio** under 1,500 tickets/mo where Lyro AI deflection (64-67% reported) + chat-first workflow covers the lane at lower entry price. See the [Tidio review](/tools/tidio) and [Tidio pricing breakdown](/pricing/tidio) when published.
+- **Shopify Inbox** for sub-300-ticket stores running on Shopify — bundled free with Shopify subscription, covers the basics without the helpdesk-tier commitment.
+- **Re:amaze / Help Scout** for multi-brand operators where multi-Shopify-store admin matters more than AI Agent depth. Same price band, different operational fit.
+
+## Final verdict
+
+- **Score: 8.5/10** (matches the [full Gorgias review](/tools/gorgias)) — pricing model docked the score; Shopify-native integration and AI Agent capability pulled it back.
+- **Best for:** Shopify stores with 1,500+ monthly tickets where AI Agent at 50%+ deflection beats human-agent cost per resolution, and the unlimited-seat structure replaces per-seat helpdesk pricing.
+- **Skip if:** Under 800 tickets/mo, macro-driven workflows, OR AI Agent deflection stays under 30% after 60 days — the per-resolution fee doesn't pay back at that volume.
+
+Gorgias's pricing model isn't predatory — it's an honest match of product (a ticket-priced helpdesk with an AI-resolution overlay) to billing (per-ticket + per-resolution). The friction is that the AI Agent's economics are non-obvious until you've run 60-90 days of real traffic, and the cap-creep mechanics (overage + old-thread re-bills) reward operators who plan for the upper bound. Run AI Agent disciplined, watch the deflection rate per category, and the math works above 1,500 tickets/mo. Below that, simpler helpdesks cover the lane cheaper.

@@ -24,16 +24,14 @@ export const revalidate = 86400
 /**
  * Static routes — only paths that resolve to a real page right now.
  *
- * Editorial hubs (/tools, /compare, /guides) plus the trust + legal pages.
- * Individual /tools/{slug}, /compare/{slug}, /alternatives/{slug}, and
- * /guides/{slug} detail pages are appended dynamically further down.
+ * Editorial hubs (/tools, /compare, /guides, /best, /alternatives) plus the
+ * trust + legal pages. Individual /tools/{slug}, /compare/{slug},
+ * /alternatives/{slug}, /best/{slug}, and /guides/{slug} detail pages are
+ * appended dynamically further down.
  *
- * Phase 3 of /reviews/ → /tools/ merge (2026-06-03):
- *   - /reviews hub removed (308 → /tools)
- *   - /reviews/{slug} detail loop removed (308 → /tools/{slug})
- *   - /best/{slug} listings are MDX-driven and could be added when the
- *     hub page lands; currently emitted by the MDX-derived loop below
- *     once /best gets the dynamic slug walk.
+ * Phase A+B of nav rebuild (2026-06-03): /best and /alternatives hubs
+ * shipped — both now reachable from the Navbar Resources dropdown and the
+ * Footer Resources column, no longer orphaned.
  */
 const STATIC_ROUTES: Array<{
   path: string
@@ -50,6 +48,9 @@ const STATIC_ROUTES: Array<{
   { path: "/tools/product-description",  changeFrequency: "monthly", priority: 0.85 },
   { path: "/compare",      changeFrequency: "weekly",  priority: 0.9 },
   { path: "/guides",       changeFrequency: "weekly",  priority: 0.85 },
+  // Phase A+B hubs (2026-06-03) — close the orphans flagged in the nav audit.
+  { path: "/best",         changeFrequency: "weekly",  priority: 0.85 },
+  { path: "/alternatives", changeFrequency: "weekly",  priority: 0.85 },
   { path: "/about",        changeFrequency: "monthly", priority: 0.5 },
   // Block B (May 2026) — trust signals + contact surface.
   { path: "/methodology",  changeFrequency: "monthly", priority: 0.6 },
@@ -177,6 +178,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const slug of ruGuideSlugs) {
     routes.push({
       url:             absoluteUrl(`/ru/guides/${slug}`),
+      lastModified:    now,
+      changeFrequency: "monthly",
+      priority:        0.7,
+    })
+  }
+
+  // ----- Best-of listicles (MDX, same pattern as guides) -------------------
+  // Phase A+B (2026-06-03): the 8 /best/[slug] surfaces (Etap G) were
+  // missing from the sitemap entirely. Emit them here under the same
+  // build-time slug walk as guides, with their MDX `updatedAt` as
+  // lastModified.
+  const bestEntries = await getAllMdxFrontmatter("best", "en")
+  for (const { slug, frontmatter } of bestEntries) {
+    const path = `/best/${slug}`
+    routes.push({
+      url:             absoluteUrl(path),
+      lastModified:    new Date(frontmatter.updatedAt ?? frontmatter.publishedAt),
+      changeFrequency: "monthly",
+      priority:        0.75,
+      alternates:      alternates(path),
+    })
+  }
+  // RU best-of translations land later — emit RU URLs only when a
+  // `content/best/ru/{slug}.mdx` file actually exists. Today every EN
+  // best-of has an RU mirror (Etap G), so this loop reflects the live set.
+  const ruBestSlugs = await getAllMdxSlugs("best", "ru")
+  for (const slug of ruBestSlugs) {
+    routes.push({
+      url:             absoluteUrl(`/ru/best/${slug}`),
       lastModified:    now,
       changeFrequency: "monthly",
       priority:        0.7,

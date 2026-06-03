@@ -2,8 +2,10 @@
   "nav": {
     "tools": "Tools",
     "compare": "Compare",
-    "reviews": "Reviews",
     "guides": "Guides",
+    "resources": "Resources",
+    "best": "Best",
+    "alternatives": "Alternatives",
     "directory": "Directory",
     "search": "Search",
     "searchPlaceholder": "Search tools, reviews…",
@@ -109,7 +111,7 @@
     "columns": {
       "tools": "Tools",
       "compare": "Compare",
-      "library": "Library",
+      "resources": "Resources",
       "site": "Site",
       "legal": "Legal"
     },
@@ -122,9 +124,8 @@
       "omnisendKlaviyo": "Omnisend vs Klaviyo",
       "gorgiasTidio": "Gorgias vs Tidio",
       "allComparisons": "All comparisons",
-      "klaviyoReview": "Klaviyo",
-      "productDescGuide": "AI product descriptions",
-      "allReviews": "All tools",
+      "bestHub": "Best of",
+      "alternativesHub": "Alternatives",
       "allGuides": "All guides",
       "about": "About",
       "catalog": "Tool catalog",

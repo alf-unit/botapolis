@@ -2,8 +2,10 @@
   "nav": {
     "tools": "Инструменты",
     "compare": "Сравнения",
-    "reviews": "Обзоры",
     "guides": "Гайды",
+    "resources": "Ресурсы",
+    "best": "Подборки",
+    "alternatives": "Альтернативы",
     "directory": "Каталог",
     "search": "Поиск",
     "searchPlaceholder": "Поиск инструментов, обзоров…",
@@ -109,7 +111,7 @@
     "columns": {
       "tools": "Инструменты",
       "compare": "Сравнения",
-      "library": "Библиотека",
+      "resources": "Ресурсы",
       "site": "Сайт",
       "legal": "Правовое"
     },
@@ -122,9 +124,8 @@
       "omnisendKlaviyo": "Omnisend vs Klaviyo",
       "gorgiasTidio": "Gorgias vs Tidio",
       "allComparisons": "Все сравнения",
-      "klaviyoReview": "Klaviyo",
-      "productDescGuide": "AI-описания товаров",
-      "allReviews": "Все инструменты",
+      "bestHub": "Подборки",
+      "alternativesHub": "Альтернативы",
       "allGuides": "Все гайды",
       "about": "О проекте",
       "catalog": "Каталог инструментов",

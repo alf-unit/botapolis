@@ -261,7 +261,7 @@ function EnBody({ localePrefix }: { localePrefix: "" | "/ru" }) {
           <strong>Sponsored content is marked, isolated, and never affects the
           independent rating.</strong> If a tool pays us for a deep-dive piece, that
           piece carries a <em>Sponsored</em> chip in the hero, its own URL path
-          (<code>/sponsored/&hellip;</code>, not <code>/reviews/&hellip;</code>), and a
+          (<code>/sponsored/&hellip;</code>, not <code>/tools/&hellip;</code>), and a
           disclosure banner above the fold. It does <em>not</em> get a Botapolis rating.
         </li>
       </ul>
@@ -403,7 +403,7 @@ function RuBody({ localePrefix }: { localePrefix: "" | "/ru" }) {
         <li>
           <strong>Спонсорские материалы помечены и изолированы.</strong> Если вендор платит
           нам за deep-dive, этот материал получает чип <em>Sponsored</em> в хиро, свой URL
-          (<code>/sponsored/&hellip;</code>, а не <code>/reviews/&hellip;</code>) и баннер
+          (<code>/sponsored/&hellip;</code>, а не <code>/tools/&hellip;</code>) и баннер
           раскрытия над сгибом. Он <em>не</em> получает рейтинг Botapolis.
         </li>
       </ul>

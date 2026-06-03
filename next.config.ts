@@ -141,16 +141,19 @@ const embedHeaders = [
 ]
 
 // ----------------------------------------------------------------------------
-// Legacy review-slug redirects (Etap E flip 2026-06-01)
+// /reviews/ → /tools/ canonicalisation (Phase 2 of merge, 2026-06-03)
 // ----------------------------------------------------------------------------
-// 6 review tools historically lived at /reviews/{slug}-review-2026 as
-// MDX-driven editorial pages. They've been deleted; the new runtime
-// /reviews/{slug} reads from the `tools` table. These 12 redirects
-// (6 EN + 6 RU) preserve any inbound links / GSC index that pointed at
-// the old URLs.
+// The /reviews/[slug] route absorbed into /tools/[slug] (single canonical
+// surface for tool editorial). Three redirect families below, all 308 (which
+// Google treats identically to 301 for link-equity transfer):
 //
-// `permanent: true` emits 308 (method-preserving), which Google treats
-// identically to 301 for SEO equity transfer.
+//   1. The 12 legacy `-review-2026` MDX slugs collapse DIRECTLY to
+//      /tools/{slug} — single hop, no chain through /reviews/{slug}. Google
+//      penalises chained 301s, so we resolve the final destination here.
+//   2. /reviews/{slug} → /tools/{slug} (current canonical URL).
+//   3. /reviews → /tools (hub redirect).
+//
+// RU mirrors get the same treatment under the /ru prefix.
 // ----------------------------------------------------------------------------
 const LEGACY_REVIEW_SLUGS = [
   "klaviyo",
@@ -164,19 +167,57 @@ const LEGACY_REVIEW_SLUGS = [
 const legacyReviewRedirects = LEGACY_REVIEW_SLUGS.flatMap((slug) => [
   {
     source: `/reviews/${slug}-review-2026`,
-    destination: `/reviews/${slug}`,
+    destination: `/tools/${slug}`,
     permanent: true,
   },
   {
     source: `/ru/reviews/${slug}-review-2026`,
-    destination: `/ru/reviews/${slug}`,
+    destination: `/ru/tools/${slug}`,
     permanent: true,
   },
 ])
 
+const reviewsToToolsRedirects = [
+  // Order matters: more-specific [slug] patterns first, then the hub.
+  // Next.js evaluates redirects() top-to-bottom and stops at the first
+  // match — without this order the hub regex would swallow detail-page
+  // paths before the [slug] rule could fire.
+  { source: "/reviews/:slug", destination: "/tools/:slug", permanent: true },
+  { source: "/ru/reviews/:slug", destination: "/ru/tools/:slug", permanent: true },
+  { source: "/reviews", destination: "/tools", permanent: true },
+  { source: "/ru/reviews", destination: "/ru/tools", permanent: true },
+]
+
+// ----------------------------------------------------------------------------
+// klaviyo-pricing relocation (Phase 3 of merge, 2026-06-03)
+// ----------------------------------------------------------------------------
+// klaviyo-pricing is editorial pricing-deep-dive content, not a tool catalog
+// entry — there's no `tools.slug='klaviyo-pricing'` row. Originally lived at
+// /reviews/klaviyo-pricing as MDX (legacy /reviews/ MDX pipeline pre-Etap-E).
+// After Phase 2 the URL became a 308 → /tools/klaviyo-pricing (which 404s
+// because no tool row), so Phase 3 moves the MDX to /guides/klaviyo-pricing
+// and pins direct one-hop redirects from BOTH legacy URL families.
+//
+// These rules MUST sit BEFORE the catch-all /reviews/:slug above — Next.js
+// stops at the first match, so a less-specific catch-all that fires first
+// would shadow these slug-specific rules.
+// ----------------------------------------------------------------------------
+const klaviyoPricingRedirects = [
+  { source: "/reviews/klaviyo-pricing", destination: "/guides/klaviyo-pricing", permanent: true },
+  { source: "/ru/reviews/klaviyo-pricing", destination: "/ru/guides/klaviyo-pricing", permanent: true },
+  // /tools/klaviyo-pricing covers any reader who hit /reviews/klaviyo-pricing
+  // before Phase 3 deploy and got cached at /tools/klaviyo-pricing (Phase 2
+  // catch-all sent them there). Single direct hop to the new canonical.
+  { source: "/tools/klaviyo-pricing", destination: "/guides/klaviyo-pricing", permanent: true },
+  { source: "/ru/tools/klaviyo-pricing", destination: "/ru/guides/klaviyo-pricing", permanent: true },
+]
+
 const nextConfig: NextConfig = {
   async redirects() {
-    return [...legacyReviewRedirects]
+    // Order: slug-specific klaviyo-pricing first (so it wins over the
+    // catch-all /reviews/:slug), then legacy -review-2026 collapse, then
+    // the generic /reviews/{*,hub} → /tools/{*,hub} family.
+    return [...klaviyoPricingRedirects, ...legacyReviewRedirects, ...reviewsToToolsRedirects]
   },
   async headers() {
     return [
@@ -234,7 +275,6 @@ const nextConfig: NextConfig = {
   // route). Pinning the trace to `content/**` is the documented fix:
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats
   outputFileTracingIncludes: {
-    "/reviews/**":  ["./content/reviews/**"],
     "/guides/**":   ["./content/guides/**"],
     "/sitemap.xml": ["./content/**"],
   },

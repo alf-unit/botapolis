@@ -40,7 +40,7 @@ import type { ToolRow } from "@/lib/supabase/types"
 
    Container ownership:
      - `bare=true` — caller already provides container-default (e.g. when
-       embedded inside the `<article>` grid column of /reviews/[slug]).
+       embedded inside the `<article>` grid column of /tools/[slug]).
      - `bare=false` (default) — component provides its own container.
        Used by /tools/[slug] and /compare/[slug] which insert between
        top-level sections.
@@ -259,7 +259,7 @@ export async function PartnerAlternatives({
         return (
           <li key={alt.slug} className="flex flex-col gap-2">
             <Link
-              href={`${localePrefix}/reviews/${alt.slug}`}
+              href={`${localePrefix}/tools/${alt.slug}`}
               className={cn(
                 "group flex h-full flex-col gap-3 rounded-2xl border border-[var(--border-base)]",
                 "bg-[var(--bg-surface)] p-5 transition-shadow",

@@ -151,8 +151,11 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
       // — link-rot here cascades into a worse perceived navigation.
       title: columns.library,
       items: [
-        { label: links.klaviyoReview,    href: `${localePrefix}/reviews/klaviyo` },
-        { label: links.allReviews,       href: `${localePrefix}/reviews` },
+        // Phase 2 of /reviews/ → /tools/ merge (2026-06-03): canonical
+        // review URL is /tools/[slug]. Hrefs flipped; locale labels for
+        // klaviyoReview + allReviews updated to drop the "review" word.
+        { label: links.klaviyoReview,    href: `${localePrefix}/tools/klaviyo` },
+        { label: links.allReviews,       href: `${localePrefix}/tools` },
         { label: links.productDescGuide, href: `${localePrefix}/guides/how-to-use-ai-for-shopify-product-descriptions` },
         { label: links.allGuides,        href: `${localePrefix}/guides` },
       ],

@@ -1490,3 +1490,150 @@ Owner на site walk нашёл что после Etap E flip 2026-05-31 две 
 
 Удалён `scripts/load-etap-j.ts` (one-off Etap J loader). Контент жив в migrations 018/019 + session-log + DB. Не оставлено.
 
+
+---
+
+## 2026-06-03 — Структурный rebuild (слияние reviews→tools + nav + хабы + перелинковка) + pricing_notes cleanup
+
+### Commits
+
+- `feat(tools): merge /reviews/ into /tools/ as canonical surface (#1)` (PR #1 squash, e6757b7)
+- `feat(nav): Resources dropdown + /best & /alternatives hubs (#2)` (PR #2 squash, 1405441)
+- `feat(linking): centre <-> satellite cross-linking on /tools, /compare, /alternatives (#3)` (PR #3 squash, 3a45ec1)
+- `chore(sessions): update NEXT-SESSION-START — structure rebuild closed` (cf93c8d, intermediate)
+- `chore(content): clean pricing_notes — max 2 structural gotchas per tool` (e4af23d, SQL применён в Studio оператором)
+- `chore(sessions): close 2026-06-03 — structure rebuild + pricing cleanup` (this commit)
+
+### Задача
+
+Оператор пригнал SEO-аудит: 38 орфанов (8 best + 30 alternatives недостижимы из меню), nav-дыры (нет /best /alternatives), хабы 404, /reviews vs /tools дубль. Задача — закрыть всё разом, плюс почистить `pricing_notes` от историко-биллингового мусора.
+
+### Сделано
+
+#### Phase 1 — Слияние /reviews/[slug] → /tools/[slug]
+
+- **Шаблон /tools/[slug] расширен** на 7 уникальных reviews-секций: verdict (gradient-bar), rating_breakdown 4-axis с [H]/[I], external_ratings (G2/Shopify/Trustpilot, без href), operator_quotes (verbatim+source+date), shopify_native_notes narrative, integrates_with_tools cross-link grid (→ /tools/{slug}), pricing_source_url citation (некликабельный).
+- **Article-chrome добавлен**: ArticleHero, ArticleCover (программный OG), TableOfContents sticky + ToolStickyCard (category + Featured pill переехали сюда из старого hero), reading-time, Article JSON-LD в дополнение к Review schema.
+- **External-link policy preserved**: вендор только через /go/[slug]; pricing_source_url + rating-платформы — plain text без href.
+- **dynamicParams=true**, ISR 24h.
+
+#### Phase 2 — Редиректы + переключение ссылок
+
+- **next.config.ts**: 3 семейства редиректов (все 308, single-hop):
+  - 12 legacy /reviews/{slug}-review-2026 → /tools/{slug} НАПРЯМУЮ (не chain через /reviews/, Google штрафует chain)
+  - /reviews/{slug} → /tools/{slug} (en + ru)
+  - /reviews → /tools (en + ru hub)
+- **Снесены routes**: app/reviews/* + app/ru/reviews/* (page + [slug]/page + [slug]/opengraph-image, 6 файлов).
+- **Hardcoded hrefs переключены** (~20): PartnerAlternatives, best/[slug] (3 refs), Footer (2 hrefs), homepage Latest reviews, /go/ fail-closed fallback (2), lib/seo/schema.ts (Review @id default + comment), methodology (EN+RU code-block примеры).
+- **Locale labels**: klaviyoReview "Klaviyo review 2026" → "Klaviyo"; allReviews "All reviews" → "All tools"/«Все инструменты».
+- **MDX-ссылки переключены** sed-sweep: 20 файлов, 47 markdown-ссылок (comparisons EN, best EN+RU, guides EN+RU, klaviyo-pricing.mdx EN+RU).
+- **Scripts**: build-search-index.ts дропнул reviews MDX bucket; translate-content.ts пример-URL обновлён.
+
+#### Phase 3 — Sitemap + klaviyo-pricing move + webhook scope
+
+- **app/sitemap.ts**: /reviews/{slug} loop удалён; /reviews убран из STATIC_ROUTES; устаревший doc-comment переписан.
+- **klaviyo-pricing MDX перенесён** (git mv content/reviews/{en,ru}/klaviyo-pricing.mdx content/guides/{en,ru}/). Pinned редиректы в next.config.ts ПЕРЕД catch-all /reviews/:slug:
+  - /reviews/klaviyo-pricing → /guides/klaviyo-pricing (en + ru)
+  - /tools/klaviyo-pricing → /guides/klaviyo-pricing (en + ru, defensive — ловит Phase-2-cached хвост)
+  Фиксил 1 external reference в klaviyo-vs-omnisend.mdx: /tools/klaviyo-pricing → /guides/klaviyo-pricing.
+- **Webhook scope tightened** (app/api/agents/article-published/route.ts): ALLOWED_CONTENT_TYPES whitelist {comparisons, alternatives, guides, best, news} — без reviews. Synchronously dropped reviews из обоих post-commit hooks (.husky/post-commit + scripts/git-hooks/post-commit.sh mirror — должны быть в lockstep).
+- **DB cleanup**: оператор применил в Studio SQL UPDATE published_article_path REPLACE('/reviews/', '/tools/') — 1 строка тронута (klaviyo-pricing), verify=0.
+
+#### Phase A — Navbar + Footer
+
+- **Navbar.tsx**: введён NavItem discriminated union (leaf | dropdown). Top-level: **Tools · Compare · Guides · Resources▾**. Resources sub-items: Best, Alternatives. Расширяемая структура — pricing-кластер, discount sub-item'ами; будущие top-level News/Blog — той же структурой.
+  - Desktop dropdown через @/components/ui/dropdown-menu (Base-UI Popover). ChevronDown поворачивается 180° на open.
+  - Mobile (Sheet): dropdowns inline expanded — mono-uppercase group label + indent sub-items. БЕЗ вложенного overlay (iOS Safari + virtual keyboards + stacked overlays плохо).
+- **Footer.tsx**: Library column переименован/пересобран в **Resources** (зеркалит Navbar dropdown): Best, Alternatives, All guides. Hand-picked featured links убраны (потеряли смысл).
+- **Locales en+ru**: nav.{resources, best, alternatives} добавлены; nav.reviews убран; footer.columns.library → resources; footer.links.{bestHub, alternativesHub} добавлены.
+- **app/error.tsx**: sync of inline NAV_STRINGS (error boundary не достучается до server dict loader).
+
+#### Phase B — Хабы /best и /alternatives
+
+- **/best/page.tsx + /ru/best/page.tsx** (re-export): MDX-driven через getAllMdxFrontmatter("best", locale), 3-col grid, publishedAt DESC. Card meta: date + segment chip. Рендерит все 8 best-of листингов.
+- **/alternatives/page.tsx + /ru/alternatives/page.tsx**: DB-driven через public.tools (Featured DESC + rating DESC + name ASC). Card title «{name} alternatives» / «Альтернативы {name}». Рендерит все 30 published tools.
+- **lib/content/mdx.ts**: исправлен schema-selection bug — getAllMdxFrontmatter для "best" использовал guideFrontmatterSchema (strip segment/tools/summary). Теперь явно bestFrontmatterSchema.
+- **app/sitemap.ts**: /best + /alternatives в STATIC_ROUTES (weekly, 0.85). /best/{slug} loop добавлен (EN + RU).
+
+#### Phase C — Перелинковка спутник↔центр
+
+- **/tools/[slug] Related блок** между Verdict и PartnerAlternatives:
+  - link на свой /alternatives/{slug} (всегда)
+  - top 3 head-to-head comparisons (fetchRelatedComparisons DB: same-category first, updated_at DESC tiebreak, cross-category fallback)
+  - top 3 best-of mentions (fetchBestMentions MDX: filter tools.includes(slug), publishedAt DESC)
+  - Cap 1+3+3=7. ToC entry добавлен.
+- **/compare/[X-vs-Y] ToolCardSide**: h2 имени wrapped в Link на /tools/{slug}; secondary outline «View {name} details» button. Для Judge.me carve-out — sole exit, больше не deadend.
+- **/alternatives/[slug] breadcrumb**: Home / Tools / {name} → Home / Alternatives / {name} (зеркало /best/[slug]). JSON-LD + rendered nav оба обновлены.
+- **Anti-dup**: Related + PartnerAlternatives НЕ дедуплицированы. Разный intent. Owner проверил визуально — не навязчиво.
+
+#### Pricing notes cleanup
+
+- **30 published tools, EN + RU**: жёсткий стандарт — tiers (current prices + scale), MAX 1-2 structural-surprise gotchas, free plan отдельной строкой, verified date. Всё остальное (механика, %-fees, multipliers, $/seat, add-on enumerations, historic dates, positive notes, subjective commentary) — вырезано.
+- **Файл**: scripts/clean-pricing-notes.sql (722 строки, 30 UPDATE-блоков dollar-quoted). Owner применил в Studio единым transaction'ом.
+- **Coverage**: 28 tools с 2 gotchas; 2 (aftership, stay-ai) с 1 — больше нечего structural-surprise.
+- **Owner-driven iteration**: первый pass был «косметический» (убрал 1-2 фразы, стена осталась). Второй pass переписан радикально — 4-6 строк вместо 12-18.
+
+### Обнаружено
+
+- **@custom-variant hover × [a]:hover:* shadcn-stack — Turbopack-dev only баг** (globals.css:41). Production next build проходит с 70 CSS warnings, прод works. Локальный next dev падает с CSS parse error ДО рендера. Изоляционный тест (git stash моей правки → ровно та же ошибка на clean main) подтвердил — pre-existing, не от моей правки. Vercel-deploy всё это время был success. Урок: при подозрении «мой код сломал» — ВСЕГДА git stash + clean-main repro первым шагом.
+- **getAllMdxFrontmatter использовал guide schema для "best"** type — strip'ал segment/tools/summary при runtime. /best/page.tsx hub рендерился бы пустыми карточками. Фикс — одна строка branching.
+- **/compare/[X-vs-Y] ZERO /tools/ links pre-Phase-C** — только /go/ (affiliate). Reader на /compare/klaviyo-vs-mailchimp мог уйти только к вендору. Полный satellite→centre leak.
+- **AfterShip и Stay-AI имеют ровно 1 structural-surprise gotcha** — больше нечего. Стандарт допускает 0-2 (не строго 2).
+- **klaviyo-pricing MDX** парсится guideFrontmatterSchema (permissive — extra props ignored). Review-only fields silently dropped при /guides/[slug] render. Это OK — guide template их не использует.
+
+### Fixes
+
+- **Phase 1**: shadcn [a]:hover:* стэк в components/ui/badge.tsx — я думал моя правка сломала dev, временно убрал [a]:. После изоляции baseline сразу откатил, badge.tsx в HEAD остался как было.
+- **@custom-variant hover НЕ trogал** — owner-decision'ы по iOS hover gate. Отдельный DX-карьер.
+- **Schema-selection bug в mdx.ts** — фикс в Phase B вместе с /best/ хабом (один файл, одна строка).
+
+### Open follow-ups
+
+#### Новые этой сессии
+
+- **(a) 23 generic alternatives без editorial** — после Etap F было 7 source tools с заполненным alternatives_editorial jsonb. Остальные 23 рендерятся generic runtime DB-grid. Кандидат на мини-волну расширения. Не блокер.
+- **(b) PartnerAlternatives subcat-fallback слабо-релевантное** (Recharge на reviews/retention overlap). Owner-flagged ещё Etap F. При унификации subcategory canonical vocabulary фильтр станет точнее.
+- **(c) validate-infra.ts:62 ожидает пустые content/reviews/{en,ru}/** — после Phase 3 это пустые dirs. Cleanup отдельным PR.
+- **(d) @custom-variant hover DX-баг** — DX-only, прод OK. Не блокер.
+- **(e) Homepage Latest reviews блок сломан** с Etap E flip — getAllMdxFrontmatter("reviews", locale) возвращает пустоту. Re-wire на DB query (top 3 by Featured DESC + rating DESC) ИЛИ убрать. Owner-decision.
+- **(f) pricing_notes можно ещё компактнее** на будущих refresh-волнах: ranges уже частично; можно расширить. Не блокер.
+- **(g) /pricing/[slug] route** для 50 pricing-ключей 2-й волны — НЕ создан. Это ПЕРВЫЙ ВОПРОС следующей сессии (см. NEXT-SESSION-START).
+
+#### Carryovers — unchanged
+
+- isoDate schema hardening (low priority)
+- 6 best-of listings без партнёров — strategic discussion
+- getRatingAxisValue helper не вынесен (inline в /compare/ + /tools/)
+- tool.integrations legacy field — backfill 20 новых Etap D tools ИЛИ deprecate
+- Triple Whale affiliate_url NULL + affiliate_partner='partnerstack' mismatch
+- R2 CSV parser RFC 4180 hardening
+- Subcategory string-mismatch (sms ≠ sms-marketing) — связан с PartnerAlts хвостом (b)
+- Pagefind не индексирует 30 runtime /tools/[slug] (post-merge) + 8 best-of + 30 alternatives. klaviyo-pricing теперь в guides bucket автоматом.
+- RU auto-обновление в проде не реализовано
+- lib/content/rating.ts:getToolRatings dead-path cleanup
+- tools missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at)
+- system_config.modified_by CHECK constraint
+- Capture SCOUT runtime AGENTS.md
+- Newsletter ingestion via Beehiiv
+- OPS GPT-5.5 cost reconciliation
+- **FINAL-ARCHITECTURE-V4.md rewrite** — drift ещё больше после Этапов D-J + structure-rebuild
+- TOOLS.md ↔ AGENTS.md drift prevention CHIEF + SCOUT
+- app/robots.ts для AI crawlers
+
+### Что в проде живо после сессии
+
+- 4 коммита на main (3 squash PR + intermediate session update + pricing SQL).
+- /tools/[slug] — слитый шаблон. 30 published tools, EN + RU.
+- /reviews/* → 308 → /tools/* (one-hop, верифицировано curl на botapolis.com).
+- /best хаб + /best/[slug] × 8.
+- /alternatives хаб + /alternatives/[slug] × 30.
+- Navbar: Tools · Compare · Guides · Resources▾ (Best + Alternatives). Footer: Resources column зеркалит.
+- Related блок на каждом /tools/[slug] (alternatives + 3 compares + 3 bests, cap 7).
+- /compare/[X-vs-Y] ToolCardSide: h2 → /tools/{slug}, secondary «View details» CTA. Judge.me больше не deadend.
+- /alternatives/[slug] breadcrumb: Home / Alternatives / {name}.
+- pricing_notes сокращены в 2-3 раза по всем 30 tools (28 × 2 gotchas, 2 × 1).
+- semantic_core_entries.published_article_path обновлён (REPLACE /reviews/ → /tools/, оператор применил).
+
+### One-off artifacts
+
+scripts/clean-pricing-notes.sql оставлен в репо для traceability (idempotent — re-running == same canonical text). Можно удалить после следующей refresh-волны pricing-данных.

@@ -184,6 +184,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })
   }
 
+  // ----- Pricing deep-dives (Etap J-generate, MDX) --------------------------
+  // Etap J-generate (2026-06-03): /pricing/{slug} is the intent-split
+  // companion to /tools/{slug}. SERP audit showed pricing-intent keys
+  // ("X pricing", 10/10 top-10 are dedicated pages) need a dedicated
+  // canonical surface — emitted here at priority 0.78, slightly above
+  // guides (0.75) because the bucket is high-commercial-intent.
+  const pricingEntries = await getAllMdxFrontmatter("pricing", "en")
+  for (const { slug, frontmatter } of pricingEntries) {
+    const path = `/pricing/${slug}`
+    routes.push({
+      url:             absoluteUrl(path),
+      lastModified:    new Date(frontmatter.updatedAt ?? frontmatter.publishedAt),
+      changeFrequency: "monthly",
+      priority:        0.78,
+      alternates:      alternates(path),
+    })
+  }
+  const ruPricingSlugs = await getAllMdxSlugs("pricing", "ru")
+  for (const slug of ruPricingSlugs) {
+    routes.push({
+      url:             absoluteUrl(`/ru/pricing/${slug}`),
+      lastModified:    now,
+      changeFrequency: "monthly",
+      priority:        0.7,
+    })
+  }
+
   // ----- Best-of listicles (MDX, same pattern as guides) -------------------
   // Phase A+B (2026-06-03): the 8 /best/[slug] surfaces (Etap G) were
   // missing from the sitemap entirely. Emit them here under the same

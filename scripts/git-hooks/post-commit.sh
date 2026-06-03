@@ -23,7 +23,7 @@ fi
 
 sha=$(git rev-parse HEAD)
 changed=$(git diff-tree --no-commit-id --name-only --diff-filter=AM -r "$sha" \
-  | grep -E '^content/(comparisons|alternatives|guides|best|news)/(en|ru)/.*\.mdx$' \
+  | grep -E '^content/(comparisons|alternatives|guides|best|news|pricing)/(en|ru)/.*\.mdx$' \
   || true)
 
 if [ -z "$changed" ]; then

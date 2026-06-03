@@ -22,7 +22,7 @@
  * Body shape:
  *   {
  *     "files": [
- *       { "path": "content/guides/en/klaviyo-pricing.mdx", "primary_keyword": "klaviyo pricing" }
+ *       { "path": "content/pricing/en/klaviyo.mdx", "primary_keyword": "klaviyo pricing" }
  *     ],
  *     "commit_sha": "abcdef1"
  *   }
@@ -67,20 +67,21 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb)
 }
 
-/** content/guides/en/klaviyo-pricing.mdx → /guides/klaviyo-pricing (en) or
- *  /ru/guides/klaviyo-pricing (ru).
+/** content/pricing/en/klaviyo.mdx → /pricing/klaviyo (en) or
+ *  /ru/pricing/klaviyo (ru).
  *  Note: file path uses /content/comparisons/ but URL path is /compare/ (different
  *  segment). Same for any future content type with non-1:1 file-to-URL mapping.
  *
- *  Allowed types (Phase 3 tighten, 2026-06-03): comparisons, alternatives,
- *  guides, best, news. `reviews` is refused — tool editorial moved into
- *  the /tools/ DB-driven surface and no longer round-trips through MDX. */
+ *  Allowed types (Etap J-generate 2026-06-03): comparisons, alternatives,
+ *  guides, best, news, pricing. `reviews` is refused — tool editorial moved
+ *  into the /tools/ DB-driven surface and no longer round-trips through MDX. */
 const ALLOWED_CONTENT_TYPES = new Set([
   "comparisons",
   "alternatives",
   "guides",
   "best",
   "news",
+  "pricing",
 ])
 
 function repoPathToPublicUrl(p: string): string | null {

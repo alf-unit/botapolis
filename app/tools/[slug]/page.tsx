@@ -21,7 +21,7 @@ import {
 } from "@/lib/seo/schema"
 import { createServiceClient } from "@/lib/supabase/service"
 import { localizeTool } from "@/lib/content/tool-locale"
-import { getAllMdxFrontmatter } from "@/lib/content/mdx"
+import { getAllMdxFrontmatter, getAllMdxSlugs } from "@/lib/content/mdx"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
@@ -349,13 +349,26 @@ export default async function ToolDetailPage({ params }: PageProps) {
   const crossLinked = await fetchCrossLinkedTools(tool.integrates_with_tools ?? [])
 
   // Related block — curated centre → satellite paths. Runs in parallel
-  // since the two fetchers are independent (DB vs MDX walk). The
+  // since the fetchers are independent (DB vs MDX walks). The
   // alternatives sub-section doesn't need a query — every published tool
   // has its own /alternatives/[slug] page by construction.
-  const [relatedComparisons, bestMentions] = await Promise.all([
+  //
+  // `pricingSlugs` powers the "See full pricing breakdown" CTA that
+  // surfaces inside the Pricing section when a matching /pricing/{slug}
+  // MDX exists. Gated by file presence so the catalog doesn't link to
+  // 404s during the Etap J-generate rollout — only the 50 tools we
+  // ship pricing pages for get the deep-dive link; the rest keep the
+  // summary-only pricing section.
+  const [relatedComparisons, bestMentions, pricingSlugsEn, pricingSlugsRu] = await Promise.all([
     fetchRelatedComparisons(tool.id, tool.category, locale, locale, 3),
     fetchBestMentions(tool.slug, locale, 3),
+    getAllMdxSlugs("pricing", "en"),
+    locale === "ru" ? getAllMdxSlugs("pricing", "ru") : Promise.resolve<string[]>([]),
   ])
+  // Loader's EN fallback means /pricing/{slug} resolves as long as the EN
+  // MDX exists — RU MDX is a bonus, not a prerequisite.
+  const pricingPageExists =
+    pricingSlugsEn.includes(slug) || pricingSlugsRu.includes(slug)
 
   // i18n strings — local until tools earn a dict section.
   const t = {
@@ -388,6 +401,9 @@ export default async function ToolDetailPage({ params }: PageProps) {
     upTo:                   locale === "ru" ? "до" : "up to",
     pricingModel:           locale === "ru" ? "Модель" : "Model",
     pricingSource:          locale === "ru" ? "Источник цен" : "Pricing source",
+    pricingDeepDiveCta:     locale === "ru"
+      ? `Полный разбор цен ${tool.name}`
+      : `See the full ${tool.name} pricing breakdown`,
     free:                   locale === "ru" ? "Бесплатно" : "Free",
     externalPlatformsLabel: locale === "ru" ? "Внешние платформы" : "External platforms",
     crossLinkedLabel:       locale === "ru" ? "Интеграции с тулзами каталога" : "Catalog integrations",
@@ -585,6 +601,26 @@ export default async function ToolDetailPage({ params }: PageProps) {
                     <span className="text-[var(--text-secondary)] break-all">
                       {tool.pricing_source_url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
                     </span>
+                  </p>
+                )}
+
+                {/* Deep-dive CTA — renders only when a /pricing/{slug}
+                    page exists for this tool. The pricing section above
+                    is intentionally a summary (see Etap J-generate
+                    audit 2026-06-03: ~50 words by design); the deep
+                    page targets the pricing-intent SERP separately. */}
+                {pricingPageExists && (
+                  <p className="mt-6">
+                    <Link
+                      href={`${localePrefix}/pricing/${slug}`}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 text-[14px] font-medium",
+                        "text-[var(--brand)] hover:underline underline-offset-4",
+                      )}
+                    >
+                      <span>{t.pricingDeepDiveCta}</span>
+                      <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                    </Link>
                   </p>
                 )}
               </Section>

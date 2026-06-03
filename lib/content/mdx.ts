@@ -117,15 +117,56 @@ export const bestFrontmatterSchema = baseFrontmatterSchema.extend({
   summary:       z.string().optional(),
 })
 
-export type ReviewFrontmatter = z.infer<typeof reviewFrontmatterSchema>
-export type GuideFrontmatter  = z.infer<typeof guideFrontmatterSchema>
-export type BestFrontmatter   = z.infer<typeof bestFrontmatterSchema>
+// Etap J-generate — /pricing/[slug] deep-dive pricing pages. Hybrid:
+// PriceCard summary (min/max/model) is hydrated from the `tools` row
+// keyed by `toolSlug` so the structured chip stays in lockstep with the
+// catalog; the MDX body owns the long-form narrative (tier-by-tier
+// breakdown, hidden-cost math, FAQ, alternatives) that closes the
+// pricing-intent SERP. This is the deliberate intent-split companion to
+// `/tools/[slug]`: /tools/ stays summary (~50 words pricing section),
+// /pricing/ goes deep (1500-3000 words). Same tool, two surfaces, no
+// content dup because the depth differs by an order of magnitude.
+export const pricingFrontmatterSchema = baseFrontmatterSchema.extend({
+  // Required link back to the `tools` row. Empty/unknown slug throws at
+  // the loader so we never render a pricing page without the structured
+  // PriceCard data it depends on.
+  toolSlug:        z.string().min(2),
+  // Head keyword the page targets ("klaviyo pricing"). Informational —
+  // surfaced in metadata builds and (later) GSC tracking joins.
+  primaryKeyword:  z.string().optional(),
+  // FAQ items emitted as JSON-LD FAQPage + optionally rendered inline by
+  // the MDX body via the AccordionFAQ component. Empty array = no schema.
+  faq:             z.array(z.object({ q: z.string(), a: z.string() })).default([]),
+  // Legacy review-frontmatter fields (klaviyo-pricing.mdx pre-dates
+  // /pricing/ as its own route, originally authored as a review MDX).
+  // Kept optional so newer pricing pages can drop them — the tool row
+  // is the authoritative source for rating / pros / cons.
+  rating:          z.number().min(0).max(10).optional(),
+  ratingBreakdown: z
+    .object({
+      easeOfUse: z.number().min(0).max(10).optional(),
+      value:     z.number().min(0).max(10).optional(),
+      support:   z.number().min(0).max(10).optional(),
+      features:  z.number().min(0).max(10).optional(),
+    })
+    .optional(),
+  pros:            z.array(z.string()).default([]),
+  cons:            z.array(z.string()).default([]),
+  verdict:         z.string().optional(),
+  bestFor:         z.string().optional(),
+  notFor:          z.string().optional(),
+})
+
+export type ReviewFrontmatter  = z.infer<typeof reviewFrontmatterSchema>
+export type GuideFrontmatter   = z.infer<typeof guideFrontmatterSchema>
+export type BestFrontmatter    = z.infer<typeof bestFrontmatterSchema>
+export type PricingFrontmatter = z.infer<typeof pricingFrontmatterSchema>
 
 // ============================================================================
 // Public API
 // ============================================================================
 
-export type ContentType = "reviews" | "guides" | "best"
+export type ContentType = "reviews" | "guides" | "best" | "pricing"
 export type ContentLocale = "en" | "ru"
 
 const CONTENT_DIR = path.join(process.cwd(), "content")
@@ -134,7 +175,9 @@ type FrontmatterFor<T extends ContentType> = T extends "reviews"
   ? ReviewFrontmatter
   : T extends "guides"
     ? GuideFrontmatter
-    : BestFrontmatter
+    : T extends "best"
+      ? BestFrontmatter
+      : PricingFrontmatter
 
 export interface CompiledContent<T extends ContentType> {
   slug: string
@@ -197,7 +240,9 @@ export async function getMdxContent<T extends ContentType>(
       ? reviewFrontmatterSchema
       : type === "best"
         ? bestFrontmatterSchema
-        : guideFrontmatterSchema
+        : type === "pricing"
+          ? pricingFrontmatterSchema
+          : guideFrontmatterSchema
   const parsed = schema.safeParse(rawFrontmatter)
   if (!parsed.success) {
     // Loud failure: throw with context so the dev sees exactly which file is
@@ -295,7 +340,9 @@ export async function getAllMdxFrontmatter<T extends ContentType>(
             ? reviewFrontmatterSchema
             : type === "best"
               ? bestFrontmatterSchema
-              : guideFrontmatterSchema
+              : type === "pricing"
+                ? pricingFrontmatterSchema
+                : guideFrontmatterSchema
         const parsed = schema.safeParse(data)
         if (!parsed.success) {
           console.error(

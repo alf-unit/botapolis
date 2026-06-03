@@ -189,27 +189,33 @@ const reviewsToToolsRedirects = [
 ]
 
 // ----------------------------------------------------------------------------
-// klaviyo-pricing relocation (Phase 3 of merge, 2026-06-03)
+// klaviyo-pricing relocation (Etap J-generate, 2026-06-03)
 // ----------------------------------------------------------------------------
-// klaviyo-pricing is editorial pricing-deep-dive content, not a tool catalog
-// entry — there's no `tools.slug='klaviyo-pricing'` row. Originally lived at
-// /reviews/klaviyo-pricing as MDX (legacy /reviews/ MDX pipeline pre-Etap-E).
-// After Phase 2 the URL became a 308 → /tools/klaviyo-pricing (which 404s
-// because no tool row), so Phase 3 moves the MDX to /guides/klaviyo-pricing
-// and pins direct one-hop redirects from BOTH legacy URL families.
+// klaviyo-pricing was the proof-of-concept for the /pricing/ route added
+// in Etap J-generate. Originally /reviews/klaviyo-pricing (legacy MDX
+// route), then 2026-06-03 Phase 3 moved it to /guides/klaviyo-pricing as
+// a holding pen, and now it's at its canonical home /pricing/klaviyo.
 //
-// These rules MUST sit BEFORE the catch-all /reviews/:slug above — Next.js
-// stops at the first match, so a less-specific catch-all that fires first
-// would shadow these slug-specific rules.
+// All four legacy URL families collapse to /pricing/klaviyo in a SINGLE
+// hop — Google penalises redirect chains, so the destinations are pinned
+// to the final canonical, not to the intermediate /guides/ holding pen.
+//
+// These rules MUST sit BEFORE the catch-all /reviews/:slug below —
+// Next.js stops at the first match, so a less-specific catch-all that
+// fires first would shadow these slug-specific rules.
 // ----------------------------------------------------------------------------
 const klaviyoPricingRedirects = [
-  { source: "/reviews/klaviyo-pricing", destination: "/guides/klaviyo-pricing", permanent: true },
-  { source: "/ru/reviews/klaviyo-pricing", destination: "/ru/guides/klaviyo-pricing", permanent: true },
-  // /tools/klaviyo-pricing covers any reader who hit /reviews/klaviyo-pricing
-  // before Phase 3 deploy and got cached at /tools/klaviyo-pricing (Phase 2
-  // catch-all sent them there). Single direct hop to the new canonical.
-  { source: "/tools/klaviyo-pricing", destination: "/guides/klaviyo-pricing", permanent: true },
-  { source: "/ru/tools/klaviyo-pricing", destination: "/ru/guides/klaviyo-pricing", permanent: true },
+  // Legacy /reviews/ MDX URL family — original 2026-05 home.
+  { source: "/reviews/klaviyo-pricing", destination: "/pricing/klaviyo", permanent: true },
+  { source: "/ru/reviews/klaviyo-pricing", destination: "/ru/pricing/klaviyo", permanent: true },
+  // Phase 2 cache hangovers (/reviews/ → /tools/ catch-all sent some
+  // readers here before Phase 3). Single direct hop to the canonical.
+  { source: "/tools/klaviyo-pricing", destination: "/pricing/klaviyo", permanent: true },
+  { source: "/ru/tools/klaviyo-pricing", destination: "/ru/pricing/klaviyo", permanent: true },
+  // Phase 3 holding pen — promote any reader still landing on the
+  // /guides/ URL to the /pricing/ canonical.
+  { source: "/guides/klaviyo-pricing", destination: "/pricing/klaviyo", permanent: true },
+  { source: "/ru/guides/klaviyo-pricing", destination: "/ru/pricing/klaviyo", permanent: true },
 ]
 
 const nextConfig: NextConfig = {
@@ -276,6 +282,7 @@ const nextConfig: NextConfig = {
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats
   outputFileTracingIncludes: {
     "/guides/**":   ["./content/guides/**"],
+    "/pricing/**":  ["./content/pricing/**"],
     "/sitemap.xml": ["./content/**"],
   },
 }

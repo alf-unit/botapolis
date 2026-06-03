@@ -1637,3 +1637,146 @@ Owner на site walk нашёл что после Etap E flip 2026-05-31 две 
 ### One-off artifacts
 
 scripts/clean-pricing-notes.sql оставлен в репо для traceability (idempotent — re-running == same canonical text). Можно удалить после следующей refresh-волны pricing-данных.
+
+
+---
+
+## 2026-06-03 (session 2) — Pricing-route Etap J-generate · 5 sample pages + метод data-first+realtime-web codified
+
+### Commits
+- `feat(pricing): Etap J-generate sample wave — 5 pricing pages + method codified` (squash 4e85415)
+- `chore(sessions): close 2026-06-03 (session 2) — sample wave + method` (this commit)
+
+Squash источники (в feat/pricing-bulk до squash): sample wave (mailchimp/attentive + backlink loader), variant A vs B audit (gorgias), recharge realtime demo, dynamicParams fix, Related+PartnerAlts add к /pricing/, CONTENT-WRITING.md rewrite (operator-authored), /pricing-db audit route removal. Плюс removal+revert цикл по Related блокам — net zero для финального state.
+
+### Задача
+
+Закрыть Pricing bucket Шаг 4 после контрольного klaviyo с прошлой сессии. Решить метод bulk-генерации (pure MDX manual / DB-driven / гибрид + realtime web). Залить sample wave для верификации качества. Зафиксировать метод в CONTENT-WRITING.md. Починить перелинковку на /pricing/[slug] — без Related + PartnerAlternatives блоков pricing-страница тупик после verdict.
+
+### Сделано
+
+#### Метод выбран и зафиксирован — data-first + realtime web add
+- Альтернативы рассмотрены: Pure A (manual MDX из static research, 25-30h на 49), Pure B (DB-driven, 0h но не ранжируется под "X pricing"), B+ (DB + extended jsonb schema, 27-37h после честного FAQ-авторинга estimate).
+- **Признана работающей**: WebSearch + WebFetch для realtime web research — vendor pricing page + 2-3 third-party math + fresh operator quotes per article. Метод A + realtime web = **~8-14 min per article** вместо 30-40 на pure static.
+- **49 страниц = ~8-10 часов content generation** при том же качестве как у controlled klaviyo.
+- CONTENT-WRITING.md полностью переписан (operator-authored, оператор сам отредактировал, я закоммитил). Старая packets/SCOUT/reviews/OPS pipeline workflow удалена. Кодифицировано: Шаг 1 база (Research 02/05 + tools row), Шаг 2 веб-добор (vendor + third-party + quotes), Шаг 3 синтез. Web→DB write-back rules (existing fields only, no migrations).
+
+#### 5 контрольных pricing-страниц на проде
+- `/pricing/klaviyo` — control template из прошлой сессии (2026-06-03 утро)
+- `/pricing/mailchimp` — deep ~2200 слов: April 13 2026 hike + unsubscribed-bloat tax + full-stack math at 5K contacts
+- `/pricing/attentive` — programmatic ~1500 слов: custom-pricing reveal ($2-3K quarterly + 6-12 mo contracts + exclusivity)
+- `/pricing/gorgias` — deep ~2200 слов: AI Agent double-billing math
+- `/pricing/recharge` — realtime web demo ~2300 слов: hidden $25 tier + Skio acquisition outlook + payment stacking math
+
+Каждая страница: tier tables (3-5 rows), full-stack cost math, 4-6 FAQ + FAQPage JSON-LD, alternatives + final verdict, internal cross-links на /tools/, /compare/, /pricing/, 3 operator quotes с верифицируемой атрибуцией.
+
+#### Перелинковка на /pricing/[slug] — bug closed
+- Pre-fix: после verdict сразу ToolStickyCard → footer (тупик).
+- Post-fix: **Related блок** (alternatives link + top-3 head-to-head compares same-category-first + best-of mentions) + **PartnerAlternatives cards strip** (партнёрские альтернативы той же категории, two-pass с subcategory fallback).
+- Был removal+revert cycle: оператор сначала сказал text-link Related "херня" → снёс → потом "верни обратно" → revert обоих коммитов. Net state = оба блока на странице (как утверждено).
+- Helpers `fetchRelatedComparisons` + `fetchBestMentions` extracted в `lib/content/related-blocks.ts` — shared между /tools/ и /pricing/.
+
+#### DB обновлена realtime веб-добором (метод в действии)
+- `recharge.pricing_min`: 25 → 99 (vendor TODAY публично показывает Starter $99; $25 — hidden offer для new merchants only, обнаружено через WebFetch getrecharge.com/pricing). Update через прямой DB write при синтезе recharge.mdx.
+- Это **first instance применения rule**: real-time web находит расхождение со static base → existing field updated прямо в DB при синтезе. Pattern для bulk-46.
+
+#### Программный /compare/ → /pricing/ backlink loader
+- `scripts/pricing-compare-backlinks.ts` — обходит `public.comparisons` где `tool_a_id`/`tool_b_id` matches pricing-тулз, append'ит ссылку на /pricing/{tool} в `verdict` (EN + RU), idempotent через `position(...) = 0` guard.
+- Dry-run по умолчанию, `--apply` пишет. Config — `BACKLINKS` array per-tool: расширяется до 50 для bulk-46.
+- Закрывает системную задачу из memory [[project_compare-pricing-backlink-step4]] для klaviyo control (Block B SQL уже applied оператором ранее, теперь обобщено в loader).
+
+#### Минор-фиксы шаблона /pricing/[slug]
+- `dynamicParams: false → true` — newly committed MDX рендерится без redeploy (mirror /tools/[slug] behavior).
+- `PriceCard` handles custom-quote tools — "Custom (sales)" / "По запросу" вместо `"—"` для tools с `model='custom' && pricing_min=null` (Attentive/Signifyd/Northbeam/Inventory Planner).
+- `ToolPricingModel` union extended — runtime DB shape (`tiered/custom/usage-based/bundled/flat`) теперь type-safe. Pre-existing drift документирован как fixed в `lib/supabase/types.ts`.
+
+#### Cleanup
+- `/pricing-db/[slug]` audit-only route removed (Variant B был отвергнут как production approach — pure DB рендер без MDX даёт 4-5K words / 0 FAQ / 0 tables vs MDX 8-10K / 6 FAQ / 3-4 tables).
+- Branch `feat/pricing-bulk` deleted (local + remote) после squash.
+
+### Обнаружено
+
+- **WebSearch + WebFetch работают** для real-time content generation. ~2-4 веб-вызова + DB row + Research baseline = ~8-14 min per article. Существенно быстрее чем static-only synthesis. **Это меняет economics всего pSEO-конвейера** — следующая контентная сессия не нуждается в дополнительных Deep Research циклах.
+- **Vendor pricing page может скрывать tiers which ARE available** — recharge $25 Starter существует per Recharge docs + Research 02 + third-party, но публично listed только как Starter $99. Realtime веб поймал расхождение; static-only бы не сравнил. Превратилось в content moment ("hidden $25 tier" в title MDX).
+- **Third-party math быстрее устаревает чем кажется** — Research 02 (Verified 2026-05-30) уже устарел в 1-3 числах за 4 дня. Realtime cross-check третьих source'ов (Ringly, Retainful, EmailToolTester, Spendhound, Vendr) ловит свежее. Lesson: даже свежий column-wise research нужен realtime augmentation per-article.
+- **/compare/[slug] DB-driven gap reconfirmed** — MDX edits на `/content/comparisons/` не докатываются до live render (webhook bridge intentionally не overwrite'ит existing rows). Все cross-link updates на live `/compare/` rows делаются через programmatic loader, не MDX. Закодифицировано в CONTENT-WRITING.md раздел 5.
+- **Operator confirmation pattern**: removal+revert cycle по Related блокам показал что UI changes требуют скриншот-confirmation от оператора перед committing, не guess. Lesson learned — при ambiguous wording (e.g. "херня") проверять интент через AskUserQuestion вместо предположения.
+- **Variant B (pure DB-driven /pricing-db/) проверен и отвергнут** — pure render из tools row без MDX даёт ~4-5K visible words vs ~8-10K у MDX-варианта, 0 FAQ Q nodes (vs 6), 0 tables (vs 3-4), 10 h2 sections (vs 14). Operator viewed side-by-side and confirmed Variant A wins on SERP match + content depth.
+
+### Fixes
+
+- `/pricing/[slug]` dynamicParams `false → true` — fixed 404 на newly committed MDX без redeploy
+- PriceCard handles `model='custom' && min=null` — render "Custom (sales)" / "По запросу" instead of meaningless "—"
+- `ToolPricingModel` union widened to match DB shape — fixes TS errors при работе с custom/tiered/etc rows
+- **Related + PartnerAlternatives added на `/pricing/[slug]`** — bug закрыт (был тупик после verdict)
+- Related fetch helpers extracted в `lib/content/related-blocks.ts` — DRY между /tools/ и /pricing/
+- `recharge.pricing_min` DB updated `25 → 99` (vendor TODAY reveal)
+
+### Open follow-ups
+
+#### Контент — pricing bucket (приоритет)
+- **~46 оставшихся pricing-страниц** методом из CONTENT-WRITING.md. Топ-volume первыми: `mailchimp` уже сделан, `manychat` / `omnisend` / `yotpo` / `triple-whale` / `tidio` / `signifyd` / `inventory-planner`, далее middle/low. Включить `gorgias pricing` (210) + `postscript pricing` (480) из 1st-wave queued — оба уже published как tools, нужны только pricing pages.
+- При генерации каждой: программно расширять `BACKLINKS` array в `scripts/pricing-compare-backlinks.ts`, `--apply` после deploy для добивки live `/compare/` rows.
+
+#### Контент — остальные buckets 2-й волны
+- `guide` (33 new + 19 carry-over + 2 reclassified G) ≈ 54 страниц → `/guides/[slug]` MDX
+- `vs-comparison` (29 new pairs) → `/compare/[slug]` DB (Etap F pattern)
+- `best-for-segment` (29 extended) → `/best/[slug]` MDX+DB hybrid (Etap G pattern)
+- `alternatives` (20 extended editorial) → расширение `alternatives_editorial` jsonb (closes хвост (a) "23 generic alternatives → editorial")
+- `review` (6 "is X worth it") — decision pending, overlap с `/tools/[slug]`
+- `how-to` (1) → `/guides/[slug]`
+- `discount` (44) — **deferred до партнёрок** (промо-коды)
+
+#### Структурные
+- **Этап H** — нумерация всего пула (1st + 2nd wave) → передача CHIEF
+- **Этап I** — CHIEF капельно публикует (4/день старт)
+- **`/pricing/` hub + Resources nav sub-item "Pricing"** — 5 страниц уже live, **порог достигнут**, можно делать (раньше отложено до 5+).
+
+#### Carryovers (нерешённые)
+- 23 generic alternatives → editorial extension (как Etap F делал 7) — medium priority
+- PartnerAlternatives subcat-fallback weak relevance (Recharge на reviews via retention overlap) — low
+- `validate-infra.ts:62` ожидает пустые `content/reviews/{en,ru}/` folders — cleanup low
+- `@custom-variant hover` Turbopack-dev only DX-баг — low (прод OK)
+- Homepage "Latest reviews" блок сломан (`getAllMdxFrontmatter("reviews")` returns empty post-merge) — medium
+- **OG-image fallback** на `/pricing/` + `/tools/` — meta `og:image` рендерит default `/api/og?title=Botapolis...` вместо colocated `/pricing/{slug}/opengraph-image` (pre-existing baseline, не regression этой сессии)
+- Pagefind не индексирует runtime `/tools/[slug]` + `/best/[slug]` + `/alternatives/[slug]` + `/pricing/[slug]` — medium
+
+#### Carryovers ранее — unchanged
+- isoDate schema hardening (low)
+- 6 best-of listings без партнёров — strategic discussion
+- `getRatingAxisValue` helper не вынесен (inline в /compare/ + /tools/ + /pricing/)
+- `tool.integrations` legacy field — backfill ИЛИ deprecate
+- Triple Whale `affiliate_url` NULL + `affiliate_partner='partnerstack'` mismatch
+- R2 CSV parser RFC 4180 hardening
+- Subcategory string-mismatch (`sms` ≠ `sms-marketing`)
+- RU auto-обновление в проде не реализовано
+- `lib/content/rating.ts:getToolRatings` dead-path cleanup
+- `tools` missing columns (pricing_url, pricing_css_selectors, pricing_data, affiliate_health_checked_at)
+- `system_config.modified_by` CHECK constraint
+- Capture SCOUT runtime AGENTS.md
+- Newsletter ingestion via Beehiiv
+- OPS GPT-5.5 cost reconciliation
+- `FINAL-ARCHITECTURE-V4.md` rewrite — drift накопился ещё больше после этой сессии
+- `app/robots.ts` для AI crawlers
+
+### Что в проде живо после сессии
+
+- 5 `/pricing/{slug}` страниц на botapolis.com — klaviyo + mailchimp + attentive + gorgias + recharge
+- Оба блока перелинковки на каждой: Related (alternatives + 3-5 compares + best-of) + PartnerAlternatives cards
+- /pricing/klaviyo → JSON-LD: Article + SoftwareApplication ($20 price) + Breadcrumb + FAQPage (6 Q/A) — все verified
+- /pricing-db/[slug] route — 404 (audit-only, удалён)
+- CONTENT-WRITING.md под data-first + realtime web модель — обязателен для следующей сессии
+- recharge.pricing_min в DB = 99 (было 25; vendor TODAY truth)
+- `scripts/pricing-compare-backlinks.ts` готов к расширению BACKLINKS для bulk-46
+- Squash commit `4e85415` на main
+
+### Final commit chain (session 2)
+
+- `feat(pricing): Etap J-generate sample wave — 5 pricing pages + method codified` (4e85415, squash)
+- `chore(sessions): close 2026-06-03 (session 2) — sample wave + method` (this commit)
+
+### One-off artifacts
+
+- `/pricing-db/[slug]` route — снесён в squash
+- `scripts/pricing-compare-backlinks.ts` — **production tool** для bulk-46. Оставлен. Расширяется через `BACKLINKS` array
+- `scripts/fix-klaviyo-pricing-path.sql` — оставлен в репо (idempotent SQL для traceability klaviyo control)

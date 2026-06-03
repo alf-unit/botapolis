@@ -146,3 +146,33 @@ For 007, Omnisend side was thinner — research has competing-ESP Omnisend prici
 - **`primaryKeyword` in deep-review template** — add to `content-templates/deep-review.md` frontmatter example.
 - **Author voice resolution** — pricing/analysis articles vs hands-on reviews; CONTENT-WRITING.md rule vs existing klaviyo-review-2026 framing. Choose one canonical.
 - **content-validator.ts comparison schema coverage** — currently silent on `content/comparisons/`. Surface as warning or add the schema.
+
+
+---
+
+## 2026-06-03 — указатель: метод генерации и структурный фундамент — детали в infra-log.md
+
+Сегодняшняя крупная работа была **в инфра-сессии**, не в контентной. Здесь короткий pointer для следующей контентной сессии (CONTENT_WRITING_02 / Content writing). Детали — в [`/sessions/infra-log.md`](./infra-log.md), блок `2026-06-03 (session 2)`.
+
+### Кратко что произошло
+
+- **Структура сайта здорова** (на main): tools+reviews слиты в `/tools/[slug]`, навигация Resources, хабы `/best` + `/alternatives` живые, перелинковка спутник→центр working.
+- **Метод генерации контента выбран и зафиксирован**: data-first база (`tools` row + Research 02/05) + realtime веб-добор (WebFetch вендора + WebSearch top third-party + fresh operator quotes) + синтез в MDX. **Полная инструкция — в обновлённом [`CONTENT-WRITING.md`](../CONTENT-WRITING.md) — прочитай его на старте, это обязательно**. Файл переписан полностью под текущую модель; старая packets/SCOUT/reviews workflow удалена.
+- **Шаблон `/pricing/[slug]` полный**: deep MDX (1500-2500 слов) + tier tables + 6 FAQ + Related блок (alternatives + compares + best-of) + PartnerAlternatives cards strip + sticky card с CTA. JSON-LD: Article + SoftwareApplication + Breadcrumb + FAQPage.
+- **5 контрольных pricing-страниц на проде**: `/pricing/klaviyo` + `mailchimp` + `attentive` + `gorgias` + `recharge`. Все опираются на baseline (Research 02 + DB row) + realtime веб per article.
+
+### СЛЕДУЮЩЕЕ для контентной сессии
+
+1. **Догенерить ~46 оставшихся pricing-страниц** методом из `CONTENT-WRITING.md`. Приоритет — топ-volume: `manychat` / `omnisend` / `yotpo` / `triple-whale` / `tidio` / `signifyd` / `inventory-planner`, далее остальные. Плюс `gorgias pricing` (210 vol) и `postscript pricing` (480 vol) из 1st-wave queued.
+2. После pricing — остальные buckets 2-й волны: 33 guide + 29 comparison + 29 best-for + 20 alternatives editorial + 6 review + 1 how-to. Discount (44) deferred до партнёрок.
+3. **Программная `/compare/` → `/pricing/` перелинковка** — через `scripts/pricing-compare-backlinks.ts`. Расширяй BACKLINKS array, `--apply` после deploy. Идемпотентно. НЕ руками по одной.
+4. **Realtime веб-добор может находить расхождения с базой** — обновляй существующие поля БД (не предлагай миграции). В commit summary перечисляй "тул: было→стало, источник". Пример этой сессии: `recharge.pricing_min` 25→99 (vendor TODAY publicly lists $99; $25 — hidden offer для new merchants only).
+5. После всего пула готов — Этап H (нумерация) → передача CHIEF → Этап I (капельная публикация 4/день).
+
+### Полезное окружение
+
+- 5 готовых pricing MDX в `/content/pricing/en/` — reference templates для bulk-генерации
+- `scripts/pricing-compare-backlinks.ts` готов к расширению (production tool, не one-off)
+- `lib/content/related-blocks.ts` — shared helpers `fetchRelatedComparisons` + `fetchBestMentions`
+- `/pricing/` hub + Resources nav sub-item НЕ создан, но **порог 5+ страниц достигнут** — можно делать
+- DB-driven `/compare/` rows: при content session edit MDX, но **финальные правки live verdict делай через loader, не через MDX edit** (webhook не overwrite'ит existing rows)

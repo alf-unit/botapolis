@@ -1780,3 +1780,143 @@ Squash источники (в feat/pricing-bulk до squash): sample wave (mailc
 - `/pricing-db/[slug]` route — снесён в squash
 - `scripts/pricing-compare-backlinks.ts` — **production tool** для bulk-46. Оставлен. Расширяется через `BACKLINKS` array
 - `scripts/fix-klaviyo-pricing-path.sql` — оставлен в репо (idempotent SQL для traceability klaviyo control)
+
+
+---
+
+## 2026-06-03 (session 3) — content-gate v2 (type-agnostic) + 15/15 RU pricing backfill + merge wave 1 в main
+
+### Commits
+
+- feat(infra): content gate v2 — type-agnostic validator, Haiku out, 3/15 RU pricing backfill
+- content(pricing): RU backfill 4/15 — sample wave complete (attentive, gorgias, mailchimp, recharge)
+- content(pricing): RU backfill +1 — aftership (8/15)
+- content(pricing): RU backfill +1 — inventory-planner (9/15)
+- content(pricing): RU backfill +2 — northbeam, rebuy (11/15)
+- content(pricing): RU backfill +4 — signifyd, tidio, triple-whale, yotpo (15/15 complete)
+- fix(content-gate): flip pairing to ERROR + TS strict-mode fixes after build
+- Merge feat/pricing-bulk: content-gate v2 + 16 pricing pages EN+RU
+- chore(sessions): close 2026-06-03 (session 3) — content-gate v2 + RU backfill 15/15 + main merge (this commit)
+
+### Задача
+
+Закрыть omnisend/postscript SSR 500 которые лежали с утра 2026-06-03 на main, и вместе с фиксом построить **единую type-agnostic защиту контента** (валидатор + перевод как два разных звена), чтобы такой класс ошибок не повторялся ни на одном существующем или будущем content-типе. После — добить wave 1 pricing на main с полным RU-покрытием.
+
+### Сделано
+
+**Звено 1 — валидатор (gate, type-agnostic, обходит все типы без белых списков):**
+
+- `scripts/content-validator.ts` переписан: универсальный обход `content/*/{en,ru}/**/*.mdx` через `readdir` (не enum типов), per-type schema detection через map из путей, fallback на `baseFrontmatter` для неизвестных типов с warning.
+- Прежние passes сохранены (schema, code-fence lang), добавлены два новых: `checkBareLtGt` (regex `<(?=[\d$])` и `>(?=[\d$])` по body вне fenced/inline code blocks) и EN↔RU pairing pass (всегда обходит full tree даже на staged-only invocations).
+- Bridge-only типы (`comparisons`, `alternatives`) исключены из schema + pairing passes — это DB-driven контент, MDX в `content/comparisons/` — артефакт webhook-bridge'а, рендерится `public.comparisons` row. Safety/fence на них всё равно работает.
+- Pairing-режим управляется CLI флагом `--strict-pairing`: WARNING по дефолту, ERROR с флагом.
+- `.husky/pre-commit` упрощён до одного шага — `validate:content -- --strict-pairing` на любом staged MDX под `content/*/(en|ru)/**/*.mdx`. Универсальная regex, новые типы покрываются автоматически.
+
+**Звено 2 — перевод (producing, EN+RU в одной сессии Claude Code, без Haiku):**
+
+- Удалены `scripts/translate-{content,tools,comparisons}.ts` (3 файла) + 4 npm scripts (`translate`, `translate:missing`, `translate:tools`, `translate:comparisons`) из `package.json`. OpenRouter/Haiku-путь вырезан целиком.
+- `CONTENT-WRITING.md` раздел 3 расширен подразделом "Локализация — HARD RULE: EN + RU в одной сессии" с правилом для MDX/DB-driven/гибрид типов + opt-out через `noRuPair: true` в frontmatter.
+- `CLAUDE.md` Common project-wide rules — добавлен bullet ссылающийся на CONTENT-WRITING.md раздел 3.
+- Quality checklist в CONTENT-WRITING.md пополнен пунктом "RU twin создан в той же сессии (hard rule 2026-06-03)".
+
+**Safety-pass first-run чистка (валидатор поймал на full-tree run):**
+
+- 12 голых `>` перед `$`/цифрой в существующих файлах заменены на "over X" (canonical owner-стиль): comparisons/klaviyo-vs-omnisend (2 точки), guides/how-to-set-up-shopify-email-automation (EN + RU), pricing/northbeam (4), omnisend (1), triple-whale (3 точки `>20% off-Shopify`).
+- 2 голых `<` перед `$` в табличных ячейках pricing/northbeam (`<$250K`, `<$1.5M`) + аналогичные в triple-whale, rebuy, inventory-planner, signifyd — все заменены на "under X".
+- 2 code-fence без lang-tag (rebuy:109, signifyd:92) — добавлен `text` после ```.
+- 8 EN pricing description-полей с overflow >220 chars сокращены до ≤220 (aftership, inventory-planner, northbeam, omnisend, postscript, rebuy, signifyd, triple-whale).
+
+**Backfill — 15/15 RU pricing twins:**
+
+- Создан полный RU перевод (frontmatter полностью включая `faq` qa-array, body 1:1 со структурой EN, internal links без `/ru/` префикса, brand names в латинице) для: omnisend, postscript, manychat (wave 1 priority), recharge, mailchimp, attentive, gorgias (sample wave), aftership, inventory-planner, northbeam, rebuy, signifyd, tidio, triple-whale, yotpo (wave 1 closeout).
+- Все 15 файлов прошли валидатор: schema ✓ · safety ✓ · fence ✓ · pairing ✓.
+- В нескольких файлах description RU вышло за 220 chars при первом проходе и было сокращено перед commit — overflow ловится валидатором, исправляется итеративно.
+- Прогресс коммитился порциями (4 checkpoint-коммита) — не одной мегабомбой, чтобы прогресс не терялся при потенциальном context exhaust.
+
+**Merge в main:**
+
+- `feat/pricing-bulk` (8 коммитов сверху wave 1 `c7c5f7f`) смержен в main через `--no-ff` (merge коммит `fbfffcc`), запушен.
+- Vercel auto-deploy прошёл за ~2 минуты. Прод verified:
+  - `https://botapolis.com/pricing/omnisend` → 200
+  - `https://botapolis.com/ru/pricing/omnisend` → 200, h1 = `Цены Omnisend в 2026: подсчёт контактов, MCP бесплатно и реальная стоимость на 10k контактах` (RU контент рендерится)
+  - `https://botapolis.com/ru/pricing/postscript` → 200, h1 = `Цены Postscript в 2026: сдвиг на platform-fee, минимум $49 Starter, математика AI-плана, Shopify-only глубина`
+
+После merge на main живут все 16 pricing-страниц EN + 16 RU (klaviyo был уже на main с прошлой сессии и имел старый RU; новые 15 EN + 15 RU добавились этой сессией; manychat — единственный из wave 1 что был на main до сегодня, но без RU twin — теперь RU есть).
+
+### Обнаружено
+
+- **Два разных класса MDX SSR-500**, оба раньше проявлялись как "MDX/JSX parser error" в логах но имели разные корневые причины:
+  - **Class A — frontmatter `description` > 220 chars.** Zod-схема в `lib/content/mdx.ts:54` фейлит на длинных описаниях, ошибка летит из `Module.C [as generateMetadata]` SSR-builder'а Next.js. На вид — обычный SSR 500, без подсказки про длину в публичной ошибке. **Это и был реальный bug omnisend (250) + postscript (223) сегодня утром.** Прошлая сессия 2026-06-03 (#2) гипотезу проверила не до конца — заменила голый `>` (red herring), 500 остался, страницы реверт'ились без поиска точного stack trace. Сегодня поднял локальный prod на 3002 (поскольку owner-овский dev на 3000 был в broken state, не трогал), curl/pricing/omnisend → реальный stack: `[mdx] frontmatter invalid for pricing/omnisend (en): description: Too big`. Reproducible 1:1.
+  - **Class B — голый `<` или `>` сразу перед цифрой/$ в MDX body (вне fenced/inline code).** MDX-парсер интерпретирует `<5K`/`<$200` как малформированный JSX-tag opener, `>120K`/`>$250` симметрично как malformed closer. Иногда срабатывает на SSR (parser error), иногда нет — зависит от окружения (валидатор у меня поймал `>120K` в omnisend, но на прод-3002 страница omnisend всё равно 200 после фикса description — то есть в текущем MDX-окружении этот конкретный `>` не ломал, но мог сломать на другом setup-е). **Канонический фикс owner-а** уже устоявшийся: `<5K` → `under 5K`, `>120K` → `over 120K`. Валидатор теперь блокирует оба паттерна.
+- **Корень почему overflow проскочил в коммит `c7c5f7f` утром:** `scripts/content-validator.ts` `walkContent()` был hard-coded на `["reviews", "guides"]` (строка 103 старого файла), `parseFileArg` regex тоже только на эти 2 типа (строка 192). Pre-commit hook regex покрывал 6 типов (reviews|guides|comparisons|alternatives|news|best) **но pricing забыт в самом hook'е**, а валидатор всё равно резал не-reviews/guides на input-уровне. Pricing-тип создан был в Etap J (прошлая сессия), но gate не расширили на него — slip-through. Сегодняшний переписанный validator universal-обход устраняет этот класс slip-through'ов для любых будущих новых типов.
+- **MDX bridge-only типы — отдельная категория** не должна проходить strict schema. comparisons/en/klaviyo-vs-omnisend.mdx + klaviyo-vs-mailchimp.mdx изначально валились в validator на отсутствие `publishedAt` — это `webhook bridge artifacts`, рендеринг идёт из `public.comparisons` row, MDX-файл — транспорт для webhook'а в DB не более. Внёс `BRIDGE_ONLY_TYPES = new Set(["comparisons", "alternatives"])` set в validator: для них пропускается pass 1 (schema) и pass 4 (pairing) — но safety + fence checks остаются (если когда-нибудь рендерится — не ломает).
+- **Validator + pre-commit + writer-конвенция = три замкнутых звена.** Они работают только вместе: validator ловит факт, pre-commit запускает в нужный момент (`git commit`), конвенция в CONTENT-WRITING.md диктует Claude Code'у создавать EN+RU параллельно — иначе pairing-ошибка на commit'е. Без любой из трёх частей защита дырявая. Закодифицировал все три в одну сессию намеренно.
+- **Workflow context-management lesson:** 15 объёмных RU-переводов (~30k слов суммарно) в одной сессии — впритык к 200K context window'у на Opus 4.7. Стратегия "checkpoint commit'ы порциями" (4 батча × 1-4 файла) сохранила прогресс — если бы делал одной мегабомбой и context-exhaust случился на 11-м файле, потеря времени была бы существенной. Тот же паттерн применим к любой массовой content-нагрузке.
+
+### Open follow-ups
+
+**ВЫСОКИЙ ПРИОРИТЕТ — следующая задача:**
+
+- **Капельный механизм отложенной публикации — НЕ СДЕЛАН.** Все 16 EN + 16 RU pricing страниц после merge ушли в прод одним залпом — Google может зафлагить velocity. Нужен общий механизм для ВСЕХ content-типов: добавить `published: false` boolean в frontmatter MDX (и аналог в DB-driven таблицах: `comparisons.is_published`, etc.), скрывать `published=false` записи из всех роутов через `getAllMdxFrontmatter` / DB-фильтры + из `app/sitemap.ts`. CHIEF (или Claude Code helper script) флипает `published: true` N штук в день по приоритет-списку (priority_score из `semantic_core_entries`). Без этого механизма любая будущая масс-публикация = velocity-flag риск.
+- **~34 оставшихся pricing-ключей** из 2-й волны Этапа J (50 pricing keys total minus 16 published сегодня = ~34). Метод тот же — data-first + realtime web add (см. CONTENT-WRITING.md раздел 2). Каждая страница: EN+RU в одной сессии (hard rule 2026-06-03 enforced валидатором).
+- **Остальные buckets 2-й волны** добивать в существующие группы / роуты:
+  - `guide` 33 new + 19 carry-over + 2 reclassified Etap G = **~54 страниц** в `/guides/[slug]` MDX
+  - `how-to` 1 → `/guides/[slug]` (тот же роут)
+  - `vs-comparison` 29 new pairs → `/compare/[slug]` DB-driven (Etap F pattern)
+  - `best-for-segment` 29 extended → `/best/[slug]` MDX+DB hybrid (Etap G pattern)
+  - `alternatives` 20 extended editorial → расширение `alternatives_editorial` jsonb (закрывает хвост "23 generic alternatives → editorial" из Etap F)
+  - `review` 6 "is X worth it" — decision pending, overlap с `/tools/[slug]`
+  - `discount` 44 — **deferred** до партнёрок (промо-коды)
+- **Этап H** — нумерация всего пула (1st wave 101 + 2nd wave 212 + новые волны) для CHIEF prioritisation.
+- **Этап I** — после нумерации CHIEF капельно публикует (4/день старт) через механизм отложенной публикации (см. выше — блокер).
+
+**Системные/инфра:**
+
+- **`scripts/build-search-index.ts` проверить на все типы.** В прошлой сессии (#2) уже отмечалось что Pagefind не индексирует runtime-генерируемые типы — `/tools/[slug]`, `/best/[slug]`, `/alternatives/[slug]`, `/pricing/[slug]`. Из последнего билд-лога `pagefind` пишет только `guides:10 tools:0 comparisons:0` — pricing и другие типы вне индекса. Расширение поиска критично для UX после ramp-up контента.
+- **`/pricing/` hub-страница + Resources nav sub-item "Pricing"** — порог 5+ страниц достигнут (даже 16+), теперь имеет смысл. Раньше отложено до 5 страниц.
+- **content-validator.ts TS strict-mode** — non-null assertions добавлены post-build (Next.js 16.2.6 не narrowit типы через `await exitAfterDrain(0)` который вызывает `process.exit` но TS видит `Promise<never>`). Безопасно (early-exit branches return до использования), но subtle — стоит при следующей правке файла перейти на явные `return` вместо assertions.
+
+**Carryovers (нерешённые из сессий 1-7 + 2026-06-03 sessions 1-2) — unchanged, переиспользую сжатый список:**
+
+- isoDate schema hardening (low)
+- 6 best-of listings без партнёров — strategic discussion
+- `getRatingAxisValue` helper не вынесен (inline в /compare/, /tools/, /pricing/)
+- `tool.integrations` legacy field — backfill ИЛИ deprecate
+- Triple Whale `affiliate_url` NULL + `affiliate_partner='partnerstack'` mismatch
+- R2 CSV parser RFC 4180 hardening
+- Subcategory string-mismatch (`sms` ≠ `sms-marketing`)
+- RU auto-обновление в проде (теперь покрыто через EN+RU same-session правило, но legacy-flow всё ещё ссылается)
+- `lib/content/rating.ts:getToolRatings` dead-path cleanup
+- `tools` missing columns (`pricing_url`, `pricing_css_selectors`, `pricing_data`, `affiliate_health_checked_at`)
+- `system_config.modified_by` CHECK constraint rejects agent values
+- Capture SCOUT runtime `AGENTS.md` to `/agent-snapshots/scout/`
+- Newsletter ingestion via Beehiiv
+- OPS GPT-5.5 cost reconciliation
+- `FINAL-ARCHITECTURE-V4.md` rewrite (drift накопился ещё больше)
+- `app/robots.ts` для AI crawlers
+- OG-image fallback на `/pricing/` + `/tools/` рендерит default `/api/og` вместо colocated `opengraph-image`
+- Homepage "Latest reviews" блок сломан (`getAllMdxFrontmatter("reviews")` пустой post-merge `/reviews/` → `/tools/`)
+
+### Что в проде живо после сессии
+
+- 16 `/pricing/{slug}` EN + 16 `/ru/pricing/{slug}` RU страниц на botapolis.com — все 200, RU контент рендерится с переведённым h1/body/faq.
+- **Content-gate v2 на main:** `scripts/content-validator.ts` универсальный, `.husky/pre-commit` с `--strict-pairing`. Любой future-коммит MDX с overflow description / голым `<>` перед цифрой/$/ или без RU twin будет блокироваться pre-commit'ом до того как дойдёт до прода.
+- **Haiku/OpenRouter путь удалён.** 3 translate-* скрипта + 4 npm scripts вычищены. `OPENROUTER_API_KEY` зависимости в pre-commit hook нет.
+- **CONTENT-WRITING.md / CLAUDE.md** прописывают EN+RU same-session как hard rule.
+- Merge commit `fbfffcc` на main (за 8 коммитов из feat/pricing-bulk).
+
+### Final commit chain (session 3)
+
+- `feat(infra): content gate v2 — type-agnostic validator, Haiku out, 3/15 RU pricing backfill` (bf2b63f)
+- `content(pricing): RU backfill 4/15 — sample wave complete (attentive, gorgias, mailchimp, recharge)` (8bcbe8b)
+- `content(pricing): RU backfill +1 — aftership (8/15)` (35fae6d)
+- `content(pricing): RU backfill +1 — inventory-planner (9/15)` (5ace210)
+- `content(pricing): RU backfill +2 — northbeam, rebuy (11/15)` (4138450)
+- `content(pricing): RU backfill +4 — signifyd, tidio, triple-whale, yotpo (15/15 complete)` (444db4d)
+- `fix(content-gate): flip pairing to ERROR + TS strict-mode fixes after build` (9f51c75)
+- `Merge feat/pricing-bulk: content-gate v2 + 16 pricing pages EN+RU` (fbfffcc, merge commit на main)
+- `chore(sessions): close 2026-06-03 (session 3) — content-gate v2 + RU backfill 15/15 + main merge` (this commit)
+
+### One-off artifacts
+
+В этой сессии one-off скриптов НЕ создавал. Validator, pre-commit, MDX-файлы — все production-tools / прод-контент.

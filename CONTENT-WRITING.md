@@ -98,8 +98,33 @@ Supabase Studio. Запись ДАННЫХ в существующие поля 
 - Каталожные/сравнительные (tools, compare, alternatives) собираются из базы.
 - Содержательные статьи (pricing, guide, best) пишутся MDX, наполняются
   методом из раздела 2.
-RU версии в `/content/[type]/ru/[slug].mdx`; где RU нет — EN fallback с
-пометкой "Перевод в работе".
+
+### Локализация — HARD RULE: EN + RU в одной сессии
+
+С 2026-06-03 правило: **при создании ЛЮБОГО EN-контента Claude Code обязан в
+той же сессии создать RU twin.** Без исключений по типу страницы — pricing,
+guide, best, news, или любой новый тип в `content/*/en/` требует
+`content/*/ru/` файл с тем же slug.
+
+Применяется к трём классам:
+- **MDX** (`/content/<type>/en/<slug>.mdx` → `/content/<type>/ru/<slug>.mdx`)
+  — оба файла записываются одной операцией.
+- **DB-driven** (`/compare/[slug]`, `/alternatives/[slug]`) — каждый
+  `public.<table>` INSERT/UPDATE с `language='en'` сопровождается parallel
+  INSERT/UPDATE с `language='ru'` в той же сессии. Webhook EN→DB bridge НЕ
+  переводит — RU row пишет Claude Code.
+- **Гибрид (`/best/[slug]`)** — MDX EN + MDX RU оба, plus tools-array
+  hydration параллельно.
+
+Pre-commit валидатор (`scripts/content-validator.ts`) обходит весь content
+tree и проверяет EN↔RU pairing. С backfill = `--strict-pairing` ERROR (без
+RU twin → commit заблокирован). До backfill = WARNING (видно но не блочит).
+
+Движок перевода — сам Claude Code в текущей сессии (Opus на Max, бесплатно).
+Никакого OpenRouter/Haiku — путь удалён 2026-06-03.
+
+Opt-out для редких случаев когда RU не нужен: добавить `noRuPair: true` в EN
+frontmatter (например, EN-only owner letter). По дефолту RU обязателен.
 
 ---
 
@@ -234,6 +259,8 @@ canonical всегда на собственный URL (/pricing/{slug}, не н
 - [ ] /compare/→/pricing/ backlink добавлен (если у тула есть /pricing/)
 - [ ] BANNED PHRASES прогнаны (check-banned-phrases.sh)
 - [ ] Frontmatter валиден, canonical на свой URL
+- [ ] **RU twin создан в той же сессии** (`/content/[type]/ru/[slug].mdx`) —
+      hard rule с 2026-06-03, см. раздел 3 "Локализация"
 - [ ] Honest framing (нет фейк hands-on)
 - [ ] Quality gate: если данных мало (база+веб) — НЕ публикуй, помечай
 

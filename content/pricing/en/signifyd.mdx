@@ -1,6 +1,6 @@
 ---
 title: "Signifyd pricing 2026: the % of approved-orders model, when chargeback math pencils, and the SMB threshold"
-description: "Signifyd's pricing is a percentage of approved order value — varies by vertical, AOV, and order volume. Billed only on approved orders. Real math on when the chargeback guarantee math works vs Shopify's native fraud analysis. Verified 2026-06-03."
+description: "Signifyd is priced as a percentage of approved order value — varies by vertical, AOV, and volume. Billed only on approved orders. When the chargeback guarantee math works vs Shopify's. Verified 2026-06-03."
 publishedAt: "2026-06-03"
 updatedAt: "2026-06-03"
 author: "Botapolis editorial"
@@ -23,7 +23,7 @@ cons:
   - "Operating cost high for SMBs — % of approved-orders model only pencils above certain AOV/volume thresholds"
   - "Pricing is quote-only with no public floor — % varies by vertical, AOV, order volume, products purchased"
   - "Capterra/G2 reviews flag messy billing reconciliation — verify invoice clarity in trial"
-verdict: "Signifyd's pricing model — percentage of approved order value — is the right shape for high-AOV, high-chargeback-exposure brands but structurally over-engineered for small Shopify stores with low fraud rates. The 100% financial guarantee on approved orders is the only structural differentiator in the category, and the Commerce Network's 98% known-shopper recognition is a real moat. The math works when: average chargeback cost × baseline fraud rate × volume exceeds the Signifyd per-order fee × volume. For electronics, luxury, home, and grocery verticals at $100+ AOV, that math is comfortable. For sub-$50 AOV with <0.3% fraud rate, Shopify's native fraud analysis suffices and Signifyd is over-built."
+verdict: "Signifyd's pricing model — percentage of approved order value — is the right shape for high-AOV, high-chargeback-exposure brands but structurally over-engineered for small Shopify stores with low fraud rates. The 100% financial guarantee on approved orders is the only structural differentiator in the category, and the Commerce Network's 98% known-shopper recognition is a real moat. The math works when: average chargeback cost × baseline fraud rate × volume exceeds the Signifyd per-order fee × volume. For electronics, luxury, home, and grocery verticals at $100+ AOV, that math is comfortable. For sub-$50 AOV with under 0.3% fraud rate, Shopify's native fraud analysis suffices and Signifyd is over-built."
 bestFor: "Mid-market and enterprise/Shopify Plus merchants with high AOV, high chargeback exposure, or large international order volume — electronics, luxury, home, grocery."
 notFor: "Small/early-stage Shopify stores with low fraud rates (Shopify's native fraud analysis covers this); merchants whose margins can't absorb percentage-based pricing; non-card-not-present businesses."
 faq:
@@ -89,7 +89,7 @@ Variables to compute:
 
 Break-even formula:
 
-```
+```text
 Chargeback cost per order = chargeback_rate × avg_chargeback_cost
 Signifyd cost per order = signifyd_rate × AOV
 
@@ -153,13 +153,13 @@ Three things, in order of bill impact:
 
 Signifyd doesn't offer a free tier — only a custom-quoted trial period typically structured as a proof-of-concept (POC) with a small order subset. The POC validates the ML decisioning accuracy against the merchant's existing fraud patterns and surfaces the realistic rate negotiation.
 
-For SMB Shopify stores wanting free or low-cost fraud protection: **Shopify's native fraud analysis** is included with Shopify Plus and provides risk scoring (high/medium/low) plus suggested actions. It doesn't include the financial guarantee, but for sub-$50 AOV brands with <0.3% chargeback rates, it covers the practical need at zero cost.
+For SMB Shopify stores wanting free or low-cost fraud protection: **Shopify's native fraud analysis** is included with Shopify Plus and provides risk scoring (high/medium/low) plus suggested actions. It doesn't include the financial guarantee, but for sub-$50 AOV brands with under 0.3% chargeback rates, it covers the practical need at zero cost.
 
 ## When the math doesn't work
 
 Three honest scenarios where Signifyd doesn't pencil:
 
-- **Small Shopify stores with low fraud rates.** Sub-$50 AOV with <0.3% chargeback rate means the Signifyd fee outpaces the unmitigated chargeback exposure. Shopify's native fraud analysis covers the practical need.
+- **Small Shopify stores with low fraud rates.** Sub-$50 AOV with under 0.3% chargeback rate means the Signifyd fee outpaces the unmitigated chargeback exposure. Shopify's native fraud analysis covers the practical need.
 - **Margins that can't absorb 0.3-1.5% on every approved order.** For low-margin verticals (commodity products, narrow-margin grocery), every basis point matters. Signifyd's fee directly reduces contribution margin.
 - **Non-card-not-present businesses.** Brick-and-mortar retail with in-person card-present transactions has different fraud dynamics. Signifyd is purpose-built for card-not-present (online) fraud; physical retail uses different controls (chip cards, signature verification).
 
@@ -168,7 +168,7 @@ Three honest scenarios where Signifyd doesn't pencil:
 In rough order of impact:
 
 1. **Negotiate the percentage at signature.** The published % range (0.3-1.5%) is wide. For high-volume brands or low-vertical-fraud profiles, push for the lower end. Bring volume forecasts and vertical-specific fraud data to the negotiation.
-2. **Verify Complete Chargeback Protection economics quarterly.** Complete extends coverage to non-fraud chargebacks but adds 0.2-0.4% to the rate. If non-fraud chargebacks are <50% of total chargeback volume, base Guaranteed Fraud Protection may pencil cheaper.
+2. **Verify Complete Chargeback Protection economics quarterly.** Complete extends coverage to non-fraud chargebacks but adds 0.2-0.4% to the rate. If non-fraud chargebacks are under 50% of total chargeback volume, base Guaranteed Fraud Protection may pencil cheaper.
 3. **Audit declined-order patterns monthly.** Limited rejection transparency means good orders may get declined. Tracking decline rates against industry baselines surfaces whether the ML is over-aggressive on your traffic profile.
 4. **Cross-check invoice reconciliation against Shopify approved-order count.** A 0.1-0.5% reconciliation gap is worth raising with Signifyd's account team. At scale this compounds.
 5. **Renegotiate at the renewal cycle.** Multi-year contracts lock in rates but renewal cycles are leverage moments. Volume increases over the contract term should buy lower rates at renewal.

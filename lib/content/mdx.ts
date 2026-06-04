@@ -14,6 +14,7 @@ import { z } from "zod"
 import { mdxComponents } from "@/components/content/mdx-components"
 import { extractToc, type TocEntry } from "@/lib/content/toc"
 import { getReadingTime, type ReadingTime } from "@/lib/content/reading-time"
+import { filterVisibleSlugs, isSlugVisible } from "@/lib/content/visibility"
 
 /* ----------------------------------------------------------------------------
    MDX pipeline (server-only)
@@ -232,6 +233,12 @@ export async function getMdxContent<T extends ContentType>(
   const resolved = await resolveContentPath(type, slug, locale)
   if (!resolved) return null
 
+  // Drip gate — a page hidden by the publication gate reads as "not found" so
+  // the detail route notFound()s. No-op when DRIP_GATE_ENABLED is off, and
+  // never applies to non-gated types (defunct `reviews`). Locale-agnostic:
+  // the gate keys on (type, slug), so EN and RU share one visibility decision.
+  if (!(await isSlugVisible(type, slug))) return null
+
   const source = await fs.readFile(resolved.filePath, "utf-8")
   const { content: rawBody, data: rawFrontmatter } = matter(source)
 
@@ -312,9 +319,14 @@ export async function getAllMdxSlugs(
   } catch {
     return []
   }
-  return files
+  const slugs = files
     .filter((f) => f.endsWith(".mdx"))
     .map((f) => f.replace(/\.mdx$/, ""))
+  // Drip gate — drop slugs not yet published. Locale-agnostic, so this filters
+  // both EN and RU walks (fixes the RU-sitemap + generateStaticParams holes
+  // where drafts/unpublished slugs previously leaked). No-op when the flag is
+  // off. getAllMdxFrontmatter() calls through here, so hubs inherit the gate.
+  return filterVisibleSlugs(type, slugs)
 }
 
 /**

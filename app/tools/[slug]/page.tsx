@@ -23,6 +23,11 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { localizeTool } from "@/lib/content/tool-locale"
 import { getAllMdxSlugs } from "@/lib/content/mdx"
 import {
+  filterVisibleRows,
+  filterVisibleSlugs,
+  isSlugVisible,
+} from "@/lib/content/visibility"
+import {
   fetchBestMentions,
   fetchRelatedComparisons,
   type RelatedBestMention,
@@ -84,6 +89,10 @@ async function fetchTool(slug: string): Promise<ToolRow | null> {
       console.error(`[/tools/${slug}] tool fetch failed:`, error.message)
       return null
     }
+    // Drip gate — a tool hidden by the drip mechanism reads as "not found"
+    // so generateMetadata noIndexes and the page notFound()s. No-op when
+    // DRIP_GATE_ENABLED is off.
+    if (data && !(await isSlugVisible("tools", slug))) return null
     return data
   } catch (err) {
     console.error(`[/tools/${slug}] tool fetch threw:`, err)
@@ -111,7 +120,8 @@ async function fetchCrossLinkedTools(
       console.error(`[/tools] cross-link fetch failed:`, error.message)
       return []
     }
-    return data ?? []
+    // Drip gate — never cross-link to a tool that isn't publicly visible yet.
+    return filterVisibleRows("tools", data ?? [])
   } catch (err) {
     console.error(`[/tools] cross-link fetch threw:`, err)
     return []
@@ -127,7 +137,9 @@ export async function generateStaticParams() {
       .eq("status", "published")
       .limit(1000)
     if (error || !data) return []
-    return data.map((t) => ({ slug: t.slug }))
+    // Drip gate — don't pre-render tools still hidden by the drip mechanism.
+    const visible = await filterVisibleSlugs("tools", data.map((t) => t.slug))
+    return visible.map((slug) => ({ slug }))
   } catch {
     return []
   }

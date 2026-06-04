@@ -26,6 +26,7 @@ import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
 import { canonicalCompareSlug, isCanonicalCompareSlug } from "@/lib/content/slug"
 import { getToolRatings } from "@/lib/content/rating"
+import { filterVisibleRows, isSlugVisible } from "@/lib/content/visibility"
 import type { TocEntry } from "@/lib/content/toc"
 import { localizeTool } from "@/lib/content/tool-locale"
 import {
@@ -188,8 +189,12 @@ async function fetchRelatedComparisons(
 
     if (error || !rows || rows.length === 0) return []
 
+    // Drip gate — drop related comparisons not yet publicly visible.
+    const visibleRows = await filterVisibleRows("comparisons", rows)
+    if (visibleRows.length === 0) return []
+
     const ids = Array.from(
-      new Set(rows.flatMap((r) => [r.tool_a_id, r.tool_b_id])),
+      new Set(visibleRows.flatMap((r) => [r.tool_a_id, r.tool_b_id])),
     )
     const { data: tools } = await supabase
       .from("tools")
@@ -197,7 +202,7 @@ async function fetchRelatedComparisons(
       .in("id", ids)
 
     const byId = new Map(tools?.map((t) => [t.id, t]) ?? [])
-    return rows
+    return visibleRows
       .map((r): RelatedComparison | null => {
         const a = byId.get(r.tool_a_id)
         const b = byId.get(r.tool_b_id)
@@ -235,6 +240,10 @@ async function fetchComparison(slug: string, language: "en" | "ru" = "en") {
       return null
     }
     if (!cmp) return null
+
+    // Drip gate — a comparison hidden by the drip mechanism reads as "not
+    // found" so the page notFound()s. No-op when DRIP_GATE_ENABLED is off.
+    if (!(await isSlugVisible("comparisons", slug))) return null
 
     // Hydrate both tools in parallel — independent reads, no need to serialize.
     const [{ data: toolA }, { data: toolB }] = await Promise.all([

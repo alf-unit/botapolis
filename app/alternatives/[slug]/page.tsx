@@ -18,6 +18,7 @@ import {
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { localizeTool, localizeToolPartial } from "@/lib/content/tool-locale"
+import { filterVisibleRows, isSlugVisible } from "@/lib/content/visibility"
 import { absoluteUrl, cn } from "@/lib/utils"
 import type { ToolRow } from "@/lib/supabase/types"
 
@@ -70,6 +71,9 @@ async function fetchSource(slug: string): Promise<ToolRow | null> {
       console.error(`[/alternatives/${slug}] source fetch failed:`, error.message)
       return null
     }
+    // Drip gate — /alternatives/[slug] is its own drip unit (content_type=
+    // 'alternatives'). Hidden → page notFound()s. No-op when flag is off.
+    if (data && !(await isSlugVisible("alternatives", slug))) return null
     return data
   } catch (err) {
     console.error(`[/alternatives/${slug}] source threw:`, err)
@@ -112,7 +116,11 @@ async function fetchAlternatives(source: ToolRow, limit = 8): Promise<AltCard[]>
 
   const partners = partnerRes.data ?? []
   const nonPartners = nonPartnerRes.data ?? []
-  const pool: AltCard[] = [...partners, ...nonPartners].slice(0, limit)
+  // Drip gate — never list/link an alternative whose tool page isn't visible
+  // yet. Filter BEFORE slicing so `limit` counts visible tools only. No-op
+  // when the flag is off.
+  const visiblePool = await filterVisibleRows("tools", [...partners, ...nonPartners])
+  const pool: AltCard[] = visiblePool.slice(0, limit)
   if (pool.length >= 2) return pool
 
   // Fallback — small categories (today: chat = ManyChat alone). Widen the
@@ -126,7 +134,7 @@ async function fetchAlternatives(source: ToolRow, limit = 8): Promise<AltCard[]>
     .order("rating", { ascending: false, nullsFirst: false })
     .limit(limit)
 
-  return anyOther ?? []
+  return filterVisibleRows("tools", anyOther ?? [])
 }
 
 // --------------------------------------------------------------------------

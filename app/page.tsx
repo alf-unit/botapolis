@@ -22,6 +22,7 @@ import { getLocale } from "@/lib/i18n/get-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getAllMdxFrontmatter } from "@/lib/content/mdx"
 import { createServiceClient } from "@/lib/supabase/service"
+import { filterVisibleRows } from "@/lib/content/visibility"
 import {
   generateOrganizationSchema,
   generateWebSiteSchema,
@@ -66,8 +67,12 @@ async function fetchHomeComparisons(
       .limit(4)
     if (cmpErr || !cmps || cmps.length === 0) return []
 
+    // Drip gate — drop comparisons not yet publicly visible.
+    const visibleCmps = await filterVisibleRows("comparisons", cmps)
+    if (visibleCmps.length === 0) return []
+
     const ids = Array.from(
-      new Set(cmps.flatMap((c) => [c.tool_a_id, c.tool_b_id])),
+      new Set(visibleCmps.flatMap((c) => [c.tool_a_id, c.tool_b_id])),
     )
     const { data: tools, error: toolsErr } = await supabase
       .from("tools")
@@ -76,7 +81,7 @@ async function fetchHomeComparisons(
     if (toolsErr || !tools) return []
 
     const byId = new Map(tools.map((t) => [t.id, t]))
-    return cmps.reduce<HomeComparisonRow[]>((acc, c) => {
+    return visibleCmps.reduce<HomeComparisonRow[]>((acc, c) => {
       const a = byId.get(c.tool_a_id)
       const b = byId.get(c.tool_b_id)
       if (!a || !b) return acc

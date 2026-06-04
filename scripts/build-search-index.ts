@@ -39,6 +39,33 @@ const ROOT = process.cwd()
 const CONTENT_DIR = path.join(ROOT, "content")
 const OUTPUT_PATH = path.join(ROOT, "public", "pagefind")
 
+// Drip gate — mirror lib/content/visibility.ts but standalone (this build
+// script can't import the `server-only` helper). When DRIP_GATE_ENABLED isn't
+// "true" every visible-set is null → index everything, no filtering.
+const DRIP_GATE_ENABLED = process.env.DRIP_GATE_ENABLED === "true"
+
+/** Visible slug set for a content_type, or null = "don't filter" (gate off /
+ *  no env / error → fail open, same contract as the runtime helper).
+ *  `supabase` is the loosely-typed @supabase/supabase-js client this build
+ *  script already uses (no Database generic), so the param is `any`. */
+async function fetchVisibleSet(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  contentType: string,
+): Promise<Set<string> | null> {
+  if (!DRIP_GATE_ENABLED) return null
+  const { data, error } = await supabase
+    .from("page_publications")
+    .select("slug")
+    .eq("content_type", contentType)
+    .not("visible_at", "is", null)
+  if (error) {
+    console.error(`[search-index] visible-set ${contentType} failed — failing OPEN:`, error.message)
+    return null
+  }
+  return new Set((data ?? []).map((r: { slug: string }) => r.slug))
+}
+
 interface PagefindIndex {
   addCustomRecord(record: {
     url:      string
@@ -83,6 +110,7 @@ async function indexMdx(
   index: PagefindIndex,
   type: "guides",
   locale: "en" | "ru",
+  visible: Set<string> | null,
 ): Promise<number> {
   const dir = path.join(CONTENT_DIR, type, locale)
   let files: string[] = []
@@ -97,6 +125,8 @@ async function indexMdx(
   for (const file of files) {
     if (!file.endsWith(".mdx")) continue
     const slug = file.replace(/\.mdx$/, "")
+    // Drip gate — don't index a page that isn't publicly visible yet.
+    if (visible && !visible.has(slug)) continue
     const filePath = path.join(dir, file)
     try {
       const raw = await fs.readFile(filePath, "utf-8")
@@ -146,7 +176,11 @@ async function indexMdx(
 // ---------------------------------------------------------------------------
 // Supabase → records
 // ---------------------------------------------------------------------------
-async function indexSupabase(index: PagefindIndex): Promise<{ tools: number; comparisons: number }> {
+async function indexSupabase(
+  index: PagefindIndex,
+  visTools: Set<string> | null,
+  visCmp: Set<string> | null,
+): Promise<{ tools: number; comparisons: number }> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) {
@@ -172,6 +206,8 @@ async function indexSupabase(index: PagefindIndex): Promise<{ tools: number; com
     console.error("[search-index] tools fetch error:", toolsErr.message)
   } else {
     for (const tool of tools ?? []) {
+      // Drip gate — don't index a tool that isn't publicly visible yet.
+      if (visTools && !visTools.has(tool.slug)) continue
       const body = [
         tool.name,
         tool.tagline,
@@ -236,6 +272,8 @@ async function indexSupabase(index: PagefindIndex): Promise<{ tools: number; com
     console.error("[search-index] comparisons fetch error:", cmpErr.message)
   } else {
     for (const c of comparisons ?? []) {
+      // Drip gate — don't index a comparison that isn't publicly visible yet.
+      if (visCmp && !visCmp.has(c.slug)) continue
       const a = nameById[c.tool_a_id] ?? c.tool_a_id
       const b = nameById[c.tool_b_id] ?? c.tool_b_id
       const title = c.meta_title ?? `${a} vs ${b}`
@@ -288,9 +326,28 @@ async function main() {
     return
   }
 
-  const guides = await indexMdx(index as PagefindIndex, "guides", "en")
-  const guidesRu = await indexMdx(index as PagefindIndex, "guides", "ru")
-  const db = await indexSupabase(index as PagefindIndex)
+  // Drip gate — fetch visible-slug sets once (null when the flag is off → no
+  // filtering). A dedicated client just for the gate read; indexSupabase keeps
+  // its own client for the bulk data queries.
+  let visGuides: Set<string> | null = null
+  let visTools: Set<string> | null = null
+  let visCmp: Set<string> | null = null
+  const gUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const gKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (DRIP_GATE_ENABLED && gUrl && gKey) {
+    const gate = createClient(gUrl, gKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    ;[visGuides, visTools, visCmp] = await Promise.all([
+      fetchVisibleSet(gate, "guides"),
+      fetchVisibleSet(gate, "tools"),
+      fetchVisibleSet(gate, "comparisons"),
+    ])
+  }
+
+  const guides = await indexMdx(index as PagefindIndex, "guides", "en", visGuides)
+  const guidesRu = await indexMdx(index as PagefindIndex, "guides", "ru", visGuides)
+  const db = await indexSupabase(index as PagefindIndex, visTools, visCmp)
 
   const { errors: writeErrors, outputPath } = await (index as PagefindIndex).writeFiles({
     outputPath: OUTPUT_PATH,

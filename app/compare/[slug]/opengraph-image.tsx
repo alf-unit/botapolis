@@ -18,6 +18,7 @@
  */
 import { ImageResponse } from "next/og"
 import { createServiceClient } from "@/lib/supabase/service"
+import { filterVisibleSlugs } from "@/lib/content/visibility"
 import type { ToolRow } from "@/lib/supabase/types"
 
 export const alt = "Comparison · Botapolis"
@@ -49,7 +50,9 @@ export async function generateStaticParams() {
       .eq("language", "en")
       .limit(1000)
     if (error || !data) return []
-    return data.map((c) => ({ slug: c.slug }))
+    // Drip gate — don't prebuild OG images for comparisons still hidden.
+    const visible = await filterVisibleSlugs("comparisons", data.map((c) => c.slug))
+    return visible.map((slug) => ({ slug }))
   } catch {
     return []
   }

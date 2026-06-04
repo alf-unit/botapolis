@@ -2,6 +2,7 @@ import "server-only"
 
 import { createServiceClient } from "@/lib/supabase/service"
 import { getAllMdxFrontmatter } from "@/lib/content/mdx"
+import { filterVisibleRows } from "@/lib/content/visibility"
 
 /* ----------------------------------------------------------------------------
    Related-blocks data helpers (server-only)
@@ -65,9 +66,13 @@ export async function fetchRelatedComparisons(
       .limit(8)
     if (rowsErr || !rows || rows.length === 0) return []
 
+    // Drip gate — drop comparisons not yet publicly visible before hydrating.
+    const visibleRows = await filterVisibleRows("comparisons", rows)
+    if (visibleRows.length === 0) return []
+
     const otherIds = Array.from(
       new Set(
-        rows.map((r) =>
+        visibleRows.map((r) =>
           r.tool_a_id === currentToolId ? r.tool_b_id : r.tool_a_id,
         ),
       ),
@@ -78,7 +83,7 @@ export async function fetchRelatedComparisons(
       .in("id", otherIds)
     const byId = new Map((others ?? []).map((t) => [t.id, t]))
 
-    const annotated = rows.flatMap((r) => {
+    const annotated = visibleRows.flatMap((r) => {
       const otherId =
         r.tool_a_id === currentToolId ? r.tool_b_id : r.tool_a_id
       const other = byId.get(otherId)

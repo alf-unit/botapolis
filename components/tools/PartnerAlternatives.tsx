@@ -6,6 +6,7 @@ import { ToolLogo } from "@/components/tools/ToolLogo"
 import { createServiceClient } from "@/lib/supabase/service"
 import { localizeToolPartial } from "@/lib/content/tool-locale"
 import { canonicalCompareSlug } from "@/lib/content/slug"
+import { filterVisibleRows } from "@/lib/content/visibility"
 import { cn } from "@/lib/utils"
 import type { ToolRow } from "@/lib/supabase/types"
 
@@ -164,7 +165,9 @@ async function fetchExistingCompareSlugs(
       console.error("[PartnerAlternatives] comparisons fetch failed:", error.message)
       return new Set()
     }
-    return new Set((data ?? []).map((r) => r.slug))
+    // Drip gate — only offer compare links to publicly-visible comparisons.
+    const visible = await filterVisibleRows("comparisons", data ?? [])
+    return new Set(visible.map((r) => r.slug))
   } catch (err) {
     console.error("[PartnerAlternatives] comparisons fetch threw:", err)
     return new Set()
@@ -195,19 +198,22 @@ export async function PartnerAlternatives({
     exclude,
     maxCount,
   )
-  if (rawAlternatives.length === 0) return null
+  // Drip gate — these cards link to /tools/[slug], so never surface a tool
+  // whose page isn't publicly visible yet. No-op when DRIP_GATE_ENABLED is off.
+  const visibleAlternatives = await filterVisibleRows("tools", rawAlternatives)
+  if (visibleAlternatives.length === 0) return null
 
   // Compute canonical compare-pair slugs and check which actually exist as
   // published comparison pages. Skipped entirely when showCompareLinks is false.
   let existingCompareSlugs = new Set<string>()
   if (showCompareLinks) {
-    const candidatePairs = rawAlternatives.map((a) =>
+    const candidatePairs = visibleAlternatives.map((a) =>
       canonicalCompareSlug(`${currentSlug}-vs-${a.slug}`),
     )
     existingCompareSlugs = await fetchExistingCompareSlugs(candidatePairs, locale)
   }
 
-  const alternatives = rawAlternatives.map((a) => localizeToolPartial(a, locale))
+  const alternatives = visibleAlternatives.map((a) => localizeToolPartial(a, locale))
 
   // ────────────────────────────────────────────────────────────────────
   // i18n — inline. If a third surface picks this block up, migrate to dict.

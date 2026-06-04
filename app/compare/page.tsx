@@ -10,6 +10,7 @@ import {
   generateItemListSchema,
   generateBreadcrumbSchema,
 } from "@/lib/seo/schema"
+import { filterVisibleRows } from "@/lib/content/visibility"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl } from "@/lib/utils"
@@ -69,9 +70,14 @@ async function fetchComparisons(
     }
     if (!cmps || cmps.length === 0) return []
 
+    // Drip gate — drop comparisons not yet published by the drip mechanism.
+    // Keyed on slug (locale-agnostic in the gate). No-op when flag is off.
+    const visibleCmps = await filterVisibleRows("comparisons", cmps)
+    if (visibleCmps.length === 0) return []
+
     // Collect the unique tool IDs we need to hydrate.
     const ids = Array.from(
-      new Set(cmps.flatMap((c) => [c.tool_a_id, c.tool_b_id])),
+      new Set(visibleCmps.flatMap((c) => [c.tool_a_id, c.tool_b_id])),
     )
 
     const { data: tools, error: toolsErr } = await supabase
@@ -88,7 +94,7 @@ async function fetchComparisons(
 
     // Drop any comparison whose tools we couldn't resolve — a half-card with
     // a placeholder name is worse than skipping it entirely.
-    return cmps.reduce<CompareIndexRow[]>((acc, c) => {
+    return visibleCmps.reduce<CompareIndexRow[]>((acc, c) => {
       const toolA = byId.get(c.tool_a_id)
       const toolB = byId.get(c.tool_b_id)
       if (!toolA || !toolB) return acc

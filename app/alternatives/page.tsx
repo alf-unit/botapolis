@@ -12,6 +12,7 @@ import {
   generateItemListSchema,
 } from "@/lib/seo/schema"
 import { localizeToolPartial } from "@/lib/content/tool-locale"
+import { filterVisibleRows } from "@/lib/content/visibility"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl, cn } from "@/lib/utils"
@@ -62,7 +63,9 @@ async function fetchAlternativeSources(): Promise<CardTool[]> {
       console.error("[/alternatives] tools fetch failed:", error.message)
       return []
     }
-    return data ?? []
+    // Drip gate — /alternatives/[slug] is its own drip unit (content_type=
+    // 'alternatives'), mirroring published tools. No-op when the flag is off.
+    return filterVisibleRows("alternatives", data ?? [])
   } catch (err) {
     console.error("[/alternatives] tools fetch threw:", err)
     return []

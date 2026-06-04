@@ -562,6 +562,33 @@ export type ScoutSitemapSnapshotInsert = Omit<
   changes_detected?: unknown | null
 }
 
+// Migration 020 — drip-publication gate. One row per logical page
+// (content_type + slug, locale-agnostic). `visible_at` NULL = hidden;
+// `pool_number` is the Этап H sequential publish order (NULL until numbered).
+export type PagePublicationRow = {
+  content_type:
+    | "pricing"
+    | "guides"
+    | "best"
+    | "tools"
+    | "comparisons"
+    | "alternatives"
+  slug: string
+  pool_number: number | null
+  visible_at: string | null
+  created_at: string
+  updated_at: string
+}
+export type PagePublicationInsert = Omit<
+  PagePublicationRow,
+  "pool_number" | "visible_at" | "created_at" | "updated_at"
+> & {
+  pool_number?: number | null
+  visible_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
 // ----------------------------------------------------------------------------
 // Database — the shape consumed by `createBrowserClient<Database>()` etc.
 // ----------------------------------------------------------------------------
@@ -586,6 +613,8 @@ export type Database = {
       system_config:         { Row: SystemConfigRow;     Insert: SystemConfigInsert;       Update: Partial<SystemConfigInsert>;      Relationships: NoRels }
       // SCOUT sitemap-diff monitoring — migration 011
       scout_sitemap_snapshots: { Row: ScoutSitemapSnapshotRow; Insert: ScoutSitemapSnapshotInsert; Update: Partial<ScoutSitemapSnapshotInsert>; Relationships: NoRels }
+      // Drip-publication gate — migration 020
+      page_publications:     { Row: PagePublicationRow;     Insert: PagePublicationInsert;     Update: Partial<PagePublicationInsert>;    Relationships: NoRels }
     }
     Views: {
       content_like_counts: { Row: ContentLikeCountRow; Relationships: NoRels }

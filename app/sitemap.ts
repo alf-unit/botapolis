@@ -12,6 +12,7 @@
 import type { MetadataRoute } from "next"
 import { createServiceClient } from "@/lib/supabase/service"
 import { getAllMdxSlugs, getAllMdxFrontmatter } from "@/lib/content/mdx"
+import { getVisibleSet } from "@/lib/content/visibility"
 import { absoluteUrl } from "@/lib/utils"
 
 // Sitemap revalidation budget: daily is plenty for a docs-style site.
@@ -80,6 +81,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
   const routes: MetadataRoute.Sitemap = []
 
+  // Drip gate — visible-slug sets per DB-backed type. `null` means the gate is
+  // off (or errored → fail open) → emit everything as before. MDX loops below
+  // (guides/pricing/best) inherit the gate via getAllMdx* and need no extra
+  // filtering here. /tools and /alternatives are emitted from the same `tools`
+  // rows but gate independently — a tool can be live while its alternatives
+  // page is still queued, or vice versa.
+  const [visTools, visAlts, visCmp] = await Promise.all([
+    getVisibleSet("tools"),
+    getVisibleSet("alternatives"),
+    getVisibleSet("comparisons"),
+  ])
+
   // ----- Static routes (both languages) -------------------------------------
   for (const r of STATIC_ROUTES) {
     routes.push({
@@ -109,26 +122,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // /directory as a separate catalog tree but sprint 1 merged it into
     // /tools and made /directory a redirect. The sitemap still emitted
     // the old path until this fix — Google was indexing 7 dead URLs.
-    const path = `/tools/${t.slug}`
-    routes.push({
-      url:             absoluteUrl(path),
-      lastModified:    new Date(t.updated_at),
-      changeFrequency: "weekly",
-      priority:        0.7,
-      alternates:      alternates(path),
-    })
+    // Drip gate — emit /tools/{slug} only when visible (or gate off).
+    if (!visTools || visTools.has(t.slug)) {
+      const path = `/tools/${t.slug}`
+      routes.push({
+        url:             absoluteUrl(path),
+        lastModified:    new Date(t.updated_at),
+        changeFrequency: "weekly",
+        priority:        0.7,
+        alternates:      alternates(path),
+      })
+    }
 
     // Block F (May 2026): /alternatives/[slug] pSEO sibling. Same lastmod
     // as the tool row — the alternatives grid is computed from the same
     // data, so whenever the tool record updates the listicle re-ranks.
-    const altPath = `/alternatives/${t.slug}`
-    routes.push({
-      url:             absoluteUrl(altPath),
-      lastModified:    new Date(t.updated_at),
-      changeFrequency: "weekly",
-      priority:        0.65,
-      alternates:      alternates(altPath),
-    })
+    // Gates independently from /tools above (its own drip unit).
+    if (!visAlts || visAlts.has(t.slug)) {
+      const altPath = `/alternatives/${t.slug}`
+      routes.push({
+        url:             absoluteUrl(altPath),
+        lastModified:    new Date(t.updated_at),
+        changeFrequency: "weekly",
+        priority:        0.65,
+        alternates:      alternates(altPath),
+      })
+    }
   }
 
   // ----- Comparisons (pSEO X-vs-Y) ------------------------------------------
@@ -144,6 +163,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   for (const c of comparisons ?? []) {
+    // Drip gate — skip comparisons not yet publicly visible.
+    if (visCmp && !visCmp.has(c.slug)) continue
     const path = c.language === "ru" ? `/ru/compare/${c.slug}` : `/compare/${c.slug}`
     routes.push({
       url:             absoluteUrl(path),

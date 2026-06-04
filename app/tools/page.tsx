@@ -9,6 +9,7 @@ import { buildMetadata } from "@/lib/seo/metadata"
 import { generateItemListSchema, generateBreadcrumbSchema } from "@/lib/seo/schema"
 import { getToolRatings } from "@/lib/content/rating"
 import { localizeToolPartial } from "@/lib/content/tool-locale"
+import { filterVisibleRows } from "@/lib/content/visibility"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { absoluteUrl } from "@/lib/utils"
@@ -58,7 +59,9 @@ async function fetchTools(): Promise<CardTool[]> {
       console.error("[/tools] supabase fetch failed:", error.message)
       return []
     }
-    return data ?? []
+    // Drip gate — drop tools not yet published by the drip mechanism. No-op
+    // when DRIP_GATE_ENABLED is off (returns the list unchanged).
+    return filterVisibleRows("tools", data ?? [])
   } catch (err) {
     // Migration may not be applied yet — degrade to empty state, don't crash.
     console.error("[/tools] supabase fetch threw:", err)

@@ -1920,3 +1920,72 @@ Squash источники (в feat/pricing-bulk до squash): sample wave (mailc
 ### One-off artifacts
 
 В этой сессии one-off скриптов НЕ создавал. Validator, pre-commit, MDX-файлы — все production-tools / прод-контент.
+
+### Extended work in same session (orphan-fix + DoD rule)
+
+После первого close-блока owner проверил прод и обнаружил что **32 pricing-страницы (16 EN + 16 RU) висят на проде как орфаны** — ни хаба `/pricing`, ни пункта в Navbar/Footer, не найти через меню. Доступ только по прямому URL или через перелинковку с `/tools/`/`/compare/` (для большинства — только klaviyo, остальные `/compare/` backlinks ещё не были применены). Доделал в той же сессии до закрытия.
+
+**Сделано:**
+
+- **`app/pricing/page.tsx` + `app/ru/pricing/page.tsx` — type-agnostic hub.** Читает `getAllMdxFrontmatter("pricing", locale)` — любая новая pricing-страница добавится в хаб автоматически без правок кода. Card grid + hero recipe скопированы с `/best/` для visual consistency. Chip на карточке использует `toolSlug` (естественная axis для pricing) с mint-tint. Empty-state fallback для случаев когда RU локаль пуста.
+- **`components/nav/Navbar.tsx` Resources dropdown расширен** — `pricing` sub-item добавлен между `alternatives` и extension-slot. NavbarStrings interface получил `pricing: string` поле.
+- **`components/nav/Footer.tsx` Resources column** — `pricingHub` link добавлен после alternativesHub. FooterStrings.links обновлён.
+- **`locales/en.json` + `locales/ru.json`** — `nav.pricing` (Pricing / Цены) + `footer.links.pricingHub` (Pricing / Цены).
+- **`app/error.tsx` inline NAV_STRINGS** — pricing string добавлен в обе локали (error boundary не достучается до server dict loader, поэтому держит свою копию строк). Build-time TS обнаружил это slip-через — без правки error.tsx build падал на missing 'pricing' field.
+- **`app/sitemap.ts` STATIC_ROUTES** — `/pricing` добавлен на priority 0.85 (паритет с `/best` и `/alternatives`). Loop по `/pricing/{slug}` и `/ru/pricing/{slug}` уже был.
+- **`scripts/pricing-compare-backlinks.ts` BACKLINKS** расширен с 13 до 16 tools — добавлены `gorgias`, `klaviyo`, `recharge` (sample wave которые отсутствовали). Применён `--apply` — 14 rows в `public.comparisons` updated (40 уже были linked из prior runs, 8 skipped — no verdict). Каждая `/compare/{X-vs-Y}` теперь имеет ссылку в verdict на `/pricing/{X}` И `/pricing/{Y}` для всех 16 published pricing-tools.
+
+**Definition of Done — HARD RULE зафиксирован type-agnostic** в `CONTENT-WRITING.md` (новый раздел перед "Локализация") и в `CLAUDE.md` (bullet в Common project-wide rules):
+
+> Страница любого типа НЕ готова и НЕ публикуется пока не выполнено ВСЁ:
+> (1) EN+RU контент в одной сессии;
+> (2) FINDABLE — страница в хабе своего типа И в Navbar/Footer (не орфан);
+> (3) в `app/sitemap.ts` (оба языка);
+> (4) перелинкована: Related + PartnerAlts + body links + `/compare/` backlinks где применимо;
+> (5) валидатор `npm run validate:content -- --strict-pairing` зелёный.
+>
+> Type-agnostic — применяется к pricing, guide, comparison, alternatives, best, review, news и всем будущим типам. При генерации пачки контента навигация / хаб / sitemap / перелинковка делаются в том же заходе, не postfactum.
+
+**Прод verified после Vercel deploy `fc1e949`:**
+
+- `https://botapolis.com/pricing` → 200, h1 "Real cost, not marketing rates.", 16 уникальных pricing-card links на странице.
+- `https://botapolis.com/ru/pricing` → 200, h1 "Реальная стоимость, не маркетинговые ценники."
+- `https://botapolis.com/pricing/omnisend` + `/ru/pricing/omnisend` → 200.
+- "Pricing" встречается на homepage в 3 местах (Navbar desktop + Navbar mobile Sheet + Footer Resources column).
+
+**Open follow-ups — обновлённый список (после orphan-fix):**
+
+- **КАПЕЛЬНЫЙ МЕХАНИЗМ отложенной публикации** — НЕ СДЕЛАН, следующая задача. `published: false` boolean во frontmatter / DB columns, скрывает из роутов + sitemap, CHIEF (или Claude Code helper) флипает N штук/день по priority-списку. Общий type-agnostic — pricing/guide/comparison/best/alternatives. Без этого механизма следующие массовые публикации = velocity-flag риск.
+- **~34 оставшихся pricing-ключей** из 2-й волны Etap J. Метод data-first + realtime web (CONTENT-WRITING.md раздел 2). По Definition of Done — каждая страница EN+RU + hub auto-update (уже type-agnostic) + sitemap (loop уже type-agnostic) + перелинковка + `/compare/` backlinks (BACKLINKS array расширять при добавлении новых tools).
+- **Остальные buckets 2-й волны — все по Definition of Done:**
+  - `guide` 33 + 19 carry-over + 2 reclassified = **~54 страниц** → `/guides/[slug]` MDX
+  - `how-to` 1 → `/guides/[slug]`
+  - `vs-comparison` 29 new pairs → `/compare/[slug]` DB
+  - `best-for-segment` 29 extended → `/best/[slug]` MDX+DB hybrid
+  - `alternatives` 20 extended editorial → расширение `alternatives_editorial` jsonb
+  - `review` 6 "is X worth it" — decision pending
+  - `discount` 44 — deferred до партнёрок
+- **Этап H** — нумерация всего пула для CHIEF prioritisation.
+- **Этап I** — CHIEF капельно публикует через механизм отложенной публикации.
+
+**Системные/инфра (unchanged):**
+
+- `scripts/build-search-index.ts` проверить на все типы (pagefind не индексирует runtime-генерируемые типы — /tools/, /best/, /alternatives/, /pricing/).
+- `content-validator.ts` TS strict-mode — non-null assertions добавлены post-build, при следующей правке валидатора заменить на явные `return`.
+- Все carryovers из сессий 1-7 + 2026-06-03 sessions 1-2 — unchanged (см. предыдущий список выше в этом блоке).
+
+### Final commit chain (session 3 — extended)
+
+- (8 коммитов выше из `feat/pricing-bulk` + merge `fbfffcc`)
+- `chore(sessions): close 2026-06-03 (session 3) — content-gate v2 + RU backfill 15/15 + main merge` (5fcfbe5) — первый close-блок
+- `feat(nav): /pricing hub + Resources nav/footer entries + DoD rule + backlinks bulk-16` (fc1e949) — orphan-fix + DoD правило, на main, прод verified
+- `chore(sessions): close 2026-06-03 (session 3) — extended: orphan-fix + DoD rule + 14 backlinks applied` (this commit)
+
+### Что в проде живо после сессии — финальное
+
+- 16 `/pricing/{slug}` EN + 16 `/ru/pricing/{slug}` RU — все 200.
+- **`/pricing` + `/ru/pricing` хаб** — list-grid всех pricing-страниц текущей локали, type-agnostic discovery, breadcrumb + ItemList JSON-LD.
+- **Navbar Resources dropdown** содержит Best · Alternatives · Pricing (desktop + mobile Sheet). **Footer Resources column** mirror.
+- **Sitemap** включает `/pricing` хаб (priority 0.85) + per-slug loop для обоих языков.
+- **`/compare/{X-vs-Y}` verdict** содержит backlinks на `/pricing/{X}` и `/pricing/{Y}` для всех 16 pricing-tools (14 newly applied + 40 already linked + 8 no-verdict skipped).
+- **`CONTENT-WRITING.md` + `CLAUDE.md`** прописывают **Definition of Done** type-agnostic правило: страница не готова без хаба + Navbar/Footer + sitemap + перелинковки + валидатора.

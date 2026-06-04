@@ -79,6 +79,8 @@ export interface NavbarStrings {
   best: string
   /** Sub-item: /alternatives hub. */
   alternatives: string
+  /** Sub-item: /pricing hub. */
+  pricing: string
   directory: string
   search: string
   // `searchPlaceholder` retired May 2026 audit (search palette removed; the
@@ -219,7 +221,8 @@ export function Navbar({ strings, localePrefix = "", user = null, className }: N
       items: [
         { label: strings.best,         href: `${localePrefix}/best` },
         { label: strings.alternatives, href: `${localePrefix}/alternatives` },
-        // Extension slot — Pricing cluster, Discount, etc. land here.
+        { label: strings.pricing,      href: `${localePrefix}/pricing` },
+        // Extension slot — Discount, etc. land here.
       ],
     },
     // Future top-level leaves (News, Blog) — add as `{ kind: "leaf", … }`.

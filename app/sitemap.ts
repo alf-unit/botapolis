@@ -51,6 +51,10 @@ const STATIC_ROUTES: Array<{
   // Phase A+B hubs (2026-06-03) — close the orphans flagged in the nav audit.
   { path: "/best",         changeFrequency: "weekly",  priority: 0.85 },
   { path: "/alternatives", changeFrequency: "weekly",  priority: 0.85 },
+  // /pricing hub added 2026-06-03 (session 3) — closes the orphan for the
+  // 16 /pricing/{slug} deep-dives shipped earlier today. Same priority as
+  // /best and /alternatives since pricing is a high-commercial-intent hub.
+  { path: "/pricing",      changeFrequency: "weekly",  priority: 0.85 },
   { path: "/about",        changeFrequency: "monthly", priority: 0.5 },
   // Block B (May 2026) — trust signals + contact surface.
   { path: "/methodology",  changeFrequency: "monthly", priority: 0.6 },

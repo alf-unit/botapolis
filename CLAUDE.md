@@ -226,6 +226,7 @@ botapolis/
 - **Все секретные значения через `process.env.*`**, никогда hardcoded.
 - **Banned phrases enforced.** Глобальный список — `/config/banned-phrases.json`. Per-packet — в writer-queue packet'е.
 - **EN+RU в одной сессии (hard rule, 2026-06-03).** Любой EN-контент (MDX, DB-driven, гибрид) → RU twin создаётся Claude Code в той же сессии. Movement движок — сам Claude Code (Opus/Max, бесплатно), НЕ Haiku/OpenRouter (этот путь удалён). Pre-commit валидатор обходит весь `content/*/{en,ru}/` tree и проверяет pairing. Детали — раздел 3 "Локализация" в `CONTENT-WRITING.md`. Opt-out через `noRuPair: true` во frontmatter для редких EN-only случаев.
+- **DEFINITION OF DONE (hard rule, 2026-06-03).** Страница любого типа НЕ готова и НЕ публикуется пока не выполнено ВСЁ: (1) EN+RU контент; (2) FINDABLE — страница в хабе своего типа И в Navbar/Footer (не орфан); (3) в `app/sitemap.ts` (оба языка); (4) перелинкована (Related + PartnerAlts + внутренние ссылки + backlinks с `/compare/`); (5) валидатор `npm run validate:content -- --strict-pairing` зелёный. Type-agnostic — применяется к pricing/guide/comparison/alternatives/best/review/news и всем будущим типам. При генерации пачки контента навигация/хаб/sitemap/перелинковка делаются в том же заходе, не postfactum. Детали — раздел "DEFINITION OF DONE" в `CONTENT-WRITING.md`.
 
 ## When you need to know more
 

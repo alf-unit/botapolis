@@ -167,6 +167,30 @@ const BACKLINKS: BacklinkConfig[] = [
     ruSentence:
       "Полный разбор цен Northbeam ($1,500/мес минимум + математика MMM+ для enterprise) — /ru/pricing/northbeam.",
   },
+  {
+    slug: "gorgias",
+    name: "Gorgias",
+    enSentence:
+      "For the full Gorgias pricing breakdown (ticket caps + AI Agent double-billing + cap-creep math), see /pricing/gorgias.",
+    ruSentence:
+      "Полный разбор цен Gorgias (кэп тикетов + double-billing AI Agent + математика кэп-крипа) — /ru/pricing/gorgias.",
+  },
+  {
+    slug: "klaviyo",
+    name: "Klaviyo",
+    enSentence:
+      "For the full Klaviyo pricing breakdown (active-profiles billing trap + Customer Agent $200/mo), see /pricing/klaviyo.",
+    ruSentence:
+      "Полный разбор цен Klaviyo (ловушка active profiles + Customer Agent $200/мес) — /ru/pricing/klaviyo.",
+  },
+  {
+    slug: "recharge",
+    name: "Recharge",
+    enSentence:
+      "For the full Recharge pricing breakdown (hidden $25 tier + 1.49% rate hike + Skio outlook), see /pricing/recharge.",
+    ruSentence:
+      "Полный разбор цен Recharge (скрытый $25 тариф + рост ставки до 1.49% + outlook после Skio) — /ru/pricing/recharge.",
+  },
 ]
 
 const APPLY = process.argv.includes("--apply")

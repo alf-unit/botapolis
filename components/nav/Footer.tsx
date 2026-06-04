@@ -86,6 +86,7 @@ export interface FooterStrings {
     allComparisons:      string
     bestHub:             string
     alternativesHub:     string
+    pricingHub:          string
     allGuides:           string
     about:               string
     catalog:             string
@@ -150,6 +151,7 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
       items: [
         { label: links.bestHub,         href: `${localePrefix}/best` },
         { label: links.alternativesHub, href: `${localePrefix}/alternatives` },
+        { label: links.pricingHub,      href: `${localePrefix}/pricing` },
         { label: links.allGuides,       href: `${localePrefix}/guides` },
       ],
     },

@@ -446,7 +446,7 @@ async function main() {
   const slugs = [...reviewRatings.keys()]
   const slugList = slugs.map((s) => `"${s.replace(/"/g, '\\"')}"`).join(",")
   const restUrl =
-    `${url.replace(/\/$/, "")}/rest/v1/tools` +
+    `${url!.replace(/\/$/, "")}/rest/v1/tools` +
     `?select=slug,rating&slug=in.(${encodeURIComponent(slugList)})`
 
   type ToolRow = { slug: string; rating: number | null }
@@ -454,8 +454,8 @@ async function main() {
   try {
     const res = await fetch(restUrl, {
       headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
+        apikey: key!,
+        Authorization: `Bearer ${key!}`,
         Accept: "application/json",
       },
     })

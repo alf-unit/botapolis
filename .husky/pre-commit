@@ -30,7 +30,7 @@ echo ""
 echo "[pre-commit] validating staged MDX (schema + safety + fence + pairing):"
 echo "$staged_mdx" | sed 's/^/  /'
 
-if ! npm run --silent validate:content -- $staged_mdx; then
+if ! npm run --silent validate:content -- --strict-pairing $staged_mdx; then
   echo ""
   echo "[pre-commit] content validation failed — commit aborted"
   exit 1

@@ -129,7 +129,7 @@ Supabase Studio. Запись ДАННЫХ в существующие поля 
      pool_number=NULL}` — страница live сразу.
    - **В drip-очередь** (капельная публикация по расписанию):
      `{content_type, slug, visible_at=NULL, pool_number=<следующий по
-     порядку>}` — Vercel-cron `/api/cron/drip-publish` (`0 9 * * *` UTC = 02:00 LA)
+     порядку>}` — Vercel-cron `/api/cron/drip-publish` (01:00 LA круглый год: два UTC-слота `0 8`+`0 9` + DST-guard в хендлере)
      флипнет её в `visible_at=now()` когда дойдёт очередь по `pool_number`
      (N/день, эскалация 4→7→10/мес через `computeRate`).
 

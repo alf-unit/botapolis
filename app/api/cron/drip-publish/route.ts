@@ -1,11 +1,14 @@
 /**
  * GET /api/cron/drip-publish — Vercel cron (daily)
  * ----------------------------------------------------------------------------
- * Schedule: `0 9 * * *` in vercel.json = 09:00 UTC = 02:00 LA (PDT). Vercel
- * cron is UTC-only (no timezone field — docs: "The timezone is always UTC"),
- * so in winter (PST) this lands at 01:00 LA. The ±1h seasonal drift is
- * immaterial for a nightly publisher; we deliberately avoid a seasonal-switch
- * hack.
+ * Schedule: fires at 01:00 America/Los_Angeles YEAR-ROUND, self-correcting
+ * across DST. Vercel cron is UTC-only (docs: "The timezone is always UTC"),
+ * so vercel.json registers TWO UTC slots — `0 8 * * *` and `0 9 * * *` — one
+ * of which always maps to 01:00 LA (08:00 UTC in PDT summer, 09:00 UTC in PST
+ * winter). The handler's laHour()===1 guard lets only that slot act and skips
+ * the other; the IANA tz database applies the DST rule, so there's NO seasonal
+ * switch in our code. Hobby's ±59min imprecision is fine — the guard reads the
+ * actual LA hour at execution. Manual on-demand run: append `?force=1`.
  * ----------------------------------------------------------------------------
  * The drip executor. Flips the next N hidden+numbered rows in
  * `page_publications` to visible_at=now(), in pool_number order, then
@@ -48,6 +51,17 @@ function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
   if (!secret) return true // local dev — allow manual curl
   return req.headers.get("authorization") === `Bearer ${secret}`
+}
+
+/** Current hour (0-23) in America/Los_Angeles via the IANA tz database, which
+ *  applies DST automatically — no seasonal switch in our code. */
+function laHour(now = new Date()): number {
+  const h = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour: "2-digit",
+    hour12: false,
+  }).format(now)
+  return parseInt(h, 10) % 24 // some runtimes render midnight as "24"
 }
 
 /* ----------------------------------------------------------------------------
@@ -193,7 +207,37 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
+  // `?force=1` bypasses both scheduling guards (for manual on-demand runs).
+  const force = new URL(req.url).searchParams.get("force") === "1"
+
+  // DST-aware fixed-local-time guard. vercel.json registers TWO UTC slots
+  // (08:00 + 09:00) so one of them always maps to 01:00 LA whether it's PST
+  // or PDT; this guard lets only that one proceed. Result: the drip fires at
+  // 01:00 LA year-round, self-correcting across DST changes, with no seasonal
+  // UTC switch in code. The off-hour slot returns here cheaply (no DB hit).
+  if (!force && laHour() !== 1) {
+    return NextResponse.json({ ok: true, skipped: "outside_01h_LA", la_hour: laHour() })
+  }
+
   const supabase = createServiceClient()
+
+  // Exactly-once-per-day guard. Covers the once-a-year fall-back morning where
+  // both UTC slots momentarily map to 01:00 LA, and any accidental double
+  // trigger. 20h lookback < the ~23h min gap between daily runs, > the 1h gap
+  // between the two slots — so it blocks an intra-day repeat without ever
+  // skipping the next day.
+  if (!force) {
+    const since = new Date(Date.now() - 20 * 3_600_000).toISOString()
+    const { count } = await supabase
+      .from("agent_logs")
+      .select("*", { count: "exact", head: true })
+      .eq("event_type", "drip_published")
+      .gte("created_at", since)
+    if (count && count > 0) {
+      return NextResponse.json({ ok: true, skipped: "already_ran_today", since })
+    }
+  }
+
   const { rate, monthIndex, source: rateSource } = await computeRate(supabase)
 
   // 1. Pull the next N hidden + numbered rows, in pool order.

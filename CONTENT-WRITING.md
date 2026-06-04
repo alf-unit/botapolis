@@ -118,6 +118,20 @@ Supabase Studio. Запись ДАННЫХ в существующие поля 
 5. **Прошла валидатор** (`npm run validate:content -- --strict-pairing`):
    frontmatter по схеме (description ≤220, etc.), нет голых `<>` перед
    цифрой/`$` в body, EN↔RU pairing зелёный, code-fence lang-tags на месте.
+6. **Gate-строка в `page_publications`** (с 2026-06-04 — флаг
+   `DRIP_GATE_ENABLED=true` включён и **авторитетен**). Страница **БЕЗ
+   gate-строки = невидима**: 404 на детальном роуте, нет в хабе, нет в
+   sitemap, нет в поиске — даже если контент и навигация готовы. Это часть
+   DoD: нет gate-строки = НЕ готово, так же как нет RU или нет навигации.
+   Ключ строки `(content_type, slug)` — locale-agnostic, одна строка на
+   EN+RU. Два варианта:
+   - **Немедленная публикация:** `{content_type, slug, visible_at=now(),
+     pool_number=NULL}` — страница live сразу.
+   - **В drip-очередь** (капельная публикация по расписанию):
+     `{content_type, slug, visible_at=NULL, pool_number=<следующий по
+     порядку>}` — Vercel-cron `/api/cron/drip-publish` (`0 13 * * *`)
+     флипнет её в `visible_at=now()` когда дойдёт очередь по `pool_number`
+     (N/день, эскалация 4→7→10/мес через `computeRate`).
 
 **Правило type-agnostic** — применяется к pricing, guide, comparison,
 alternatives, best, review и **всем будущим типам**. При генерации любой

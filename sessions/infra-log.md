@@ -2007,3 +2007,49 @@ Squash источники (в feat/pricing-bulk до squash): sample wave (mailc
 - **Sitemap** включает `/pricing` хаб (priority 0.85) + per-slug loop для обоих языков.
 - **`/compare/{X-vs-Y}` verdict** содержит backlinks на `/pricing/{X}` и `/pricing/{Y}` для всех 16 pricing-tools (14 newly applied + 40 already linked + 8 no-verdict skipped).
 - **`CONTENT-WRITING.md` + `CLAUDE.md`** прописывают **Definition of Done** type-agnostic правило: страница не готова без хаба + Navbar/Footer + sitemap + перелинковки + валидатора.
+
+---
+
+## 2026-06-04 — капельный механизм отложенной публикации (Vercel-cron + DB-гейт)
+
+### Commits
+- `feat(drip): DB-backed page-visibility gate behind DRIP_GATE_ENABLED flag`
+- `feat(drip): monthly rate escalation (4→7→10) + pool counters in cron`
+- `feat(drip): gate-row in Definition-of-Done + session log` (этот close-коммит)
+
+(Идентификация по subject, не по hash — см. правило в CLAUDE.md.)
+
+### Задача
+Собрать капельный механизм отложенной публикации: контролировать КОГДА готовая страница становится публично видимой, дозировать N/день с эскалацией по месяцам, чтобы не ловить Google velocity-flag при массовой генерации pSEO-контента.
+
+### Сделано
+- **Вариант A — единый DB-гейт `page_publications`** (миграция `020_page_publications.sql`), type-agnostic. Ключ `(content_type, slug)` БЕЗ locale → enforce'ит DoD-инвариант «нет полу-опубликованной локали» (EN+RU атомарно). Поля: `pool_number` (сквозной номер пула, Этап H), `visible_at` (NULL=скрыта). Partial-индексы (uniq pool_number, visible-by-type, drip-queue). RLS on, service-role-only. Применена оператором в Studio.
+- **Backfill** (`scripts/backfill-page-publications.ts`): 116 live-страниц засеяны `visible_at=now()`, `pool_number=NULL` (16 pricing + 5 guides + 8 best + 30 tools + 30 alternatives + 27 comparisons). Verify: `gate_tools=db_tools=30`, `gate_cmp=db_cmp=27`.
+- **Гейт фильтрует во ВСЕХ точках** (`lib/content/visibility.ts` — `getVisibleSet`/`filterVisible*`, React-cache, fail-open): MDX-слой (`getMdxContent` + `getAllMdxSlugs` → хабы/sitemap/staticParams наследуют), DB-хабы (tools/compare/alternatives), DB-детальные (notFound), related-blocks, PartnerAlternatives, homepage, compare-OG, sitemap (tools/alternatives/comparisons петли), Pagefind (guides/tools/comparisons) — EN+RU. `RecommendedTools` (/go-редирект, не страница) и `RelatedArticles` (наследует через `getAllMdxFrontmatter`) — намеренно без гейта.
+- **`DRIP_GATE_ENABLED=true` живой** в Production. Проверено: скрытая страница (visible_at=NULL) → 404, видимая → 200.
+- **Vercel-cron `/api/cron/drip-publish`** (`0 13 * * *` = 06:00 LA) под `CRON_SECRET`. Флипает next N numbered+hidden по `pool_number` ASC → `visible_at=now()` + `revalidatePath` (EN+RU детальный + хаб + sitemap + homepage) + best-effort semantic_core sync (exact path-match) + `agent_logs.drip_published`. Race-safe (`.is(visible_at,null)` guard).
+- **Эскалация N 4→7→10/мес** (`computeRate`): `monthIndex = floor(daysElapsed/30)+1` от `system_config.publishing_start_date`; кривая из `publishing_ramp` (дефолт зашит, миграция не нужна); override `publishing_rate_override` (0=пауза). Растёт сам.
+- **Счётчик** `{total, published, remaining}` среди пронумерованных — в ответе крона каждый запуск + SQL для Studio.
+- **Финальный тест 404→200 по pool_number пройден**: 2 застейдженные страницы (yotpo#9001, triple-whale#9002) → очередь выбрана по порядку 9001→9002 → flip → revalidate → 200. Подчищено (pool_number=NULL), очередь пуста, тест-скрипт удалён.
+- **DoD-правило обновлено** (`CONTENT-WRITING.md`, пункт 6): новая страница без gate-строки = не готова.
+
+**РЕШЕНИЕ:** публикация целиком на **Vercel-cron + БД**, агенты НЕ участвуют. CHIEF из схемы публикации убран (рассматривали вариант «CHIEF дёргает curl» — отклонён: упрощение, политика в DB переживает любую перестройку агентов).
+
+### Обнаружено
+- **Vercel умеет нативные cron'ы** (`vercel.json` crons + `/api/cron/*` + авто-`CRON_SECRET`) — публикация **не требует агентов вообще**. Это меняет роль/необходимость OpenClaw-агентов (пересмотр предстоит — см. follow-ups).
+- `CRON_SECRET` помечен Sensitive в Vercel → значение не достать ни оператору (пустой Edit-плейсхолдер), ни Claude Code (нет в `.env.local`). Ручной curl на cron невозможен с обеих сторон; финальный flip доказан зеркалом алгоритма крона через service-role + `REVALIDATE_SECRET`. HTTP-путь крона подтверждён живым косвенно (401 secured; ранее `queue_empty` 200).
+- Реальный тулсет CHIEF (`ags/chf/TOOLS.md`) = bash + curl + `source ~/.openclaw/credentials/*.env` — агенты МОГУТ HTTP (спека «нет HTTP» была stale). Но для drip это неактуально (Схема 1).
+- Node24/Windows: inline `tsx -e` с Supabase-fetch + неявный exit глотает stdout (drain-quirk) — в скриптах нужен явный `setTimeout` drain перед exit.
+
+### Fixes
+- `lib/supabase/types.ts` — добавлен `page_publications` Row/Insert в Database (иначе typed service-client не видит таблицу).
+- Rollout под env-флагом (`DRIP_GATE_ENABLED`, дефолт no-op) — деплой гейт-кода НЕ менял прод до бэкфилла; флаг включён только после verify покрытия. Пустой гейт + включённый фильтр = весь сайт 404 — флаг это предотвратил.
+
+### Open follow-ups
+- **Этап H** — проставить `pool_number` пронумерованным заготовкам пула (создать gate-строки `visible_at=NULL` + `pool_number` по порядку).
+- **`publishing_start_date`** — поставить в `system_config` когда стартуем реальную рампу (SQL в коде/чате есть).
+- **Остальные buckets 2-й волны** — guide+how-to ~34, vs-comparison 29, best-for 29, alternatives 20, review 6. Метод data-first + realtime web, каждая по Definition of Done (вкл. **gate-строку**).
+- **ПЕРЕСМОТР АГЕНТОВ (отдельная сессия):** убрать OPS; сократить до 1-2 агентов; SCOUT без RSS — по новым каналам; CHIEF опционально как мониторинг + GSC-отчёт + быстрый доступ, **НЕ публикация**; GSC-статистику может тянуть и Claude Code.
+- **Pagefind** — расширить покрытие на pricing/best (сейчас индексит только guides/tools/comparisons).
+- **Homepage «Latest reviews»** сломан post-merge `/reviews/`→`/tools/` (`getAllMdxFrontmatter("reviews")` пуст).
+- **`FINAL-ARCHITECTURE-V4.md` rewrite** — накопленный drift, особенно секции про агентов и публикацию (устарели после Схемы 1).

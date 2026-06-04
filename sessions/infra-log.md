@@ -1955,6 +1955,24 @@ Squash источники (в feat/pricing-bulk до squash): sample wave (mailc
 
 **Open follow-ups — обновлённый список (после orphan-fix):**
 
+- **15 RU pricing страниц требуют РЕБИЛДА СТИЛЯ** — приоритет наравне с капельным механизмом. Backfill в session 3 получился transliterated jargon (operator-цитаты, billable-контактов, lookback, deflection, passthrough — латиницей где есть нормальный русский эквивалент; гибриды с дефисом «latin-кириллица»; служебные англицизмы). Owner оценил как «каша из англо-русских слов» не понятная читателю без знания английской SaaS-терминологии. **Анти-правило зафиксировано** в `CONTENT-WRITING.md` раздел «RU style — ЧТО НЕЛЬЗЯ ДЕЛАТЬ» (запрещённая калька AOV/churn/retention/lookback/deflection/overage/sunset/etc., запрет гибридных дефисных конструкций, кавычки «ёлочки», главный тест «понимает ли русскоязычный без английского»). Файлы под ребилд:
+  - `/content/pricing/ru/aftership.mdx`
+  - `/content/pricing/ru/attentive.mdx`
+  - `/content/pricing/ru/gorgias.mdx`
+  - `/content/pricing/ru/inventory-planner.mdx`
+  - `/content/pricing/ru/mailchimp.mdx`
+  - `/content/pricing/ru/manychat.mdx`
+  - `/content/pricing/ru/northbeam.mdx`
+  - `/content/pricing/ru/omnisend.mdx`
+  - `/content/pricing/ru/postscript.mdx`
+  - `/content/pricing/ru/rebuy.mdx`
+  - `/content/pricing/ru/recharge.mdx`
+  - `/content/pricing/ru/signifyd.mdx`
+  - `/content/pricing/ru/tidio.mdx`
+  - `/content/pricing/ru/triple-whale.mdx`
+  - `/content/pricing/ru/yotpo.mdx`
+  - (15 файлов; klaviyo RU был сделан в прошлой сессии и тоже имеет hybrid-стиль — стоит ребилднуть тоже = 16 total)
+  - На проде сейчас читаемые англофоном (SEO + читатели с английским не страдают), но не nation-quality RU. **Не блокер прода, но долг к закрытию до серьёзного RU-трафика.**
 - **КАПЕЛЬНЫЙ МЕХАНИЗМ отложенной публикации** — НЕ СДЕЛАН, следующая задача. `published: false` boolean во frontmatter / DB columns, скрывает из роутов + sitemap, CHIEF (или Claude Code helper) флипает N штук/день по priority-списку. Общий type-agnostic — pricing/guide/comparison/best/alternatives. Без этого механизма следующие массовые публикации = velocity-flag риск.
 - **~34 оставшихся pricing-ключей** из 2-й волны Etap J. Метод data-first + realtime web (CONTENT-WRITING.md раздел 2). По Definition of Done — каждая страница EN+RU + hub auto-update (уже type-agnostic) + sitemap (loop уже type-agnostic) + перелинковка + `/compare/` backlinks (BACKLINKS array расширять при добавлении новых tools).
 - **Остальные buckets 2-й волны — все по Definition of Done:**

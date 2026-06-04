@@ -2059,7 +2059,7 @@ Squash источники (в feat/pricing-bulk до squash): sample wave (mailc
 ## 2026-06-04 (close) — финал сессии + cron 01:00 LA + точка входа
 
 ### Сделано сегодня
-Капельный механизм **полностью**: `page_publications` gate type-agnostic (миграция 020); 116 страниц live (backfill `visible_at`); `DRIP_GATE_ENABLED=true`; Vercel-cron `/api/cron/drip-publish` под `CRON_SECRET`, расписание **`0 8 * * *` UTC = 01:00 LA** (Vercel cron UTC-only — таймзоны нет, зимой сдвиг на 00:00 LA, для ночного публикатора несущественно); эскалация N **4→7→10/мес** (`computeRate`, 30-дн блоки); счётчик `{total,published,remaining}` в ответе крона; finalize-тест **404→200 по pool_number пройден**.
+Капельный механизм **полностью**: `page_publications` gate type-agnostic (миграция 020); 116 страниц live (backfill `visible_at`); `DRIP_GATE_ENABLED=true`; Vercel-cron `/api/cron/drip-publish` под `CRON_SECRET`, расписание **`0 9 * * *` UTC = 02:00 LA** (Vercel cron UTC-only — таймзоны нет, зимой сдвиг на 01:00 LA, для ночного публикатора несущественно); эскалация N **4→7→10/мес** (`computeRate`, 30-дн блоки); счётчик `{total,published,remaining}` в ответе крона; finalize-тест **404→200 по pool_number пройден**.
 
 **РЕШЕНИЕ:** публикация на **Vercel-cron + БД**, агенты НЕ участвуют.
 

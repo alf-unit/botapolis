@@ -225,6 +225,7 @@ botapolis/
 - **Все affiliate URLs в коде идут через `/go/[slug]` pattern.** Никогда прямые vendor ссылки.
 - **Все секретные значения через `process.env.*`**, никогда hardcoded.
 - **Banned phrases enforced.** Глобальный список — `/config/banned-phrases.json`. Per-packet — в writer-queue packet'е.
+- **EN+RU в одной сессии (hard rule, 2026-06-03).** Любой EN-контент (MDX, DB-driven, гибрид) → RU twin создаётся Claude Code в той же сессии. Movement движок — сам Claude Code (Opus/Max, бесплатно), НЕ Haiku/OpenRouter (этот путь удалён). Pre-commit валидатор обходит весь `content/*/{en,ru}/` tree и проверяет pairing. Детали — раздел 3 "Локализация" в `CONTENT-WRITING.md`. Opt-out через `noRuPair: true` во frontmatter для редких EN-only случаев.
 
 ## When you need to know more
 

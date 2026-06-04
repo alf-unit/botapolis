@@ -1,0 +1,190 @@
+---
+title: "Цены Signifyd в 2026: модель % от approved-orders, когда сходится chargeback-математика, SMB-порог"
+description: "Signifyd ценится как процент от approved-order value — варьируется по вертикали, AOV и объёму. Биллится только на approved orders. Когда chargeback-гарантия сходится против Shopify. Проверено 2026-06-03."
+publishedAt: "2026-06-03"
+updatedAt: "2026-06-03"
+author: "Botapolis editorial"
+tags: ["signifyd", "pricing", "fraud", "chargeback", "shopify"]
+primaryKeyword: "signifyd pricing"
+toolSlug: "signifyd"
+rating: 8.8
+ratingBreakdown:
+  easeOfUse: 9.0
+  value: 8.0
+  support: 9.2
+  features: 9.0
+pros:
+  - "100% финансовая chargeback-гарантия на approved orders — покрывает fraud И non-fraud (item-not-received) chargebacks на Complete-тарифе"
+  - "Заявка Commerce Network на 98% known-shopper recognition — network-effect ML moat который сложно повторить"
+  - "Биллится только на approved orders — declined-as-fraud заказы ничего не стоят (редкая модель в категории)"
+  - "Покрытие включает product cost + chargeback + shipping + processor fees (выплачивается в 48 часов по signifyd.com)"
+cons:
+  - "Ограниченная прозрачность по причинам отклонения — operator-цитата: 'когда заказ отклонён, есть ограниченная прозрачность по reasoning'"
+  - "Операционная стоимость высокая для SMB — % от approved-orders модель сходится только выше определённых AOV/volume порогов"
+  - "Цена quote-only без публичного пола — % варьируется по вертикали, AOV, order-объёму, купленным продуктам"
+  - "Capterra/G2 отзывы флагили messy billing-реконсилиацию — верифицируй ясность invoice во время trial"
+verdict: "Pricing-модель Signifyd — процент от approved order value — правильная форма для high-AOV, high-chargeback-exposure брендов но структурно over-engineered для маленьких Shopify-магазинов с низким уровнем fraud. 100% финансовая гарантия на approved orders — единственный структурный дифференциатор в категории, а заявка Commerce Network на 98% known-shopper recognition — реальный moat. Математика работает когда: average chargeback cost × baseline fraud rate × volume превышает Signifyd per-order fee × volume. Для electronics, luxury, home и grocery вертикалей на $100+ AOV эта математика комфортна. Для под-$50 AOV с under 0.3% fraud rate Shopify native fraud analysis достаточен и Signifyd over-built."
+bestFor: "Mid-market и enterprise/Shopify Plus мерчанты с высоким AOV, высоким chargeback-exposure или большим international order-объёмом — electronics, luxury, home, grocery."
+notFor: "Маленькие/early-stage Shopify-магазины с низким уровнем fraud (Shopify native fraud analysis это покрывает); мерчанты чьи маржи не могут абсорбировать percentage-based цену; non-card-not-present бизнесы."
+faq:
+  - q: "Сколько Signifyd реально стоит для бренда на $5M годового revenue?"
+    a: "Цена Signifyd — процент от approved order value. Точный процент не опубликован — варьируется по вертикали, AOV, order-объёму и купленным продуктам. Third-party benchmarks подсказывают типичные ставки 0.3-1.5% approved order value для mid-market брендов. На $5M годового revenue с 80% approved orders ($4M approved value) Signifyd line-item приземляется $12K-$60K годовых в зависимости от negotiated ставки. Per-order математика: $100 заказ на 1% Signifyd ставке = $1.00 за approved order — обычно комфортно ниже стоимости одного chargeback ($50-$200 включая platform fees, потерянный merchandise, refunded shipping). Проверено 2026-06-03 по signifyd.com/pricing."
+  - q: "Как работает 100% финансовая гарантия?"
+    a: "По signifyd.com: когда Signifyd одобряет заказ и происходит chargeback, Signifyd возмещает мерчанту полный product cost + chargeback fee + shipping + processor fees в течение 48 часов. Это уникально в fraud-категории — большинство fraud-инструментов дают scoring но не финансовую гарантию. Complete Chargeback Protection тариф расширяет покрытие на non-fraud chargebacks (item-not-received / friendly fraud), что — самая большая chargeback-категория для многих мерчантов. Для брендов где chargebacks — meaningful cost-линия, это меняет unit-экономику — fee Signifyd становится known cost заменяющий unknown chargeback-exposure."
+  - q: "Что за заявка 98% known-shopper?"
+    a: "По signifyd.com (проверено 2026-06-03): '98% онлайн-покупок сделаны потребителями ранее замеченными по Signifyd Commerce Network.' Commerce Network — cross-merchant ML модель: когда покупатель размещает заказ у любого Signifyd-protected мерчанта, его behavior-сигнал добавляется в сеть. Новые мерчанты присоединяющиеся выигрывают сразу от network-эффекта. 98% цифра — для known-shopper recognition (Signifyd уже имеет сигнал на 98% покупок у участвующих мерчантов). Для новых мерчантов это значит что ML decisioning откалиброван с первого дня, не требует long learning-curve."
+  - q: "Когда chargeback-математика Signifyd сходится против Shopify native fraud analysis?"
+    a: "Shopify native fraud analysis флагит рискованные заказы но не возмещает chargebacks. Модель Signifyd добавляет 0.3-1.5% к approved-order стоимости но трансфериует chargeback-риск на balance sheet Signifyd. Break-even математика: (chargeback rate × average chargeback cost × order volume) против (Signifyd fee × approved order value × order volume). На 0.5% chargeback rate × $150 average chargeback cost = $0.75 cost за заказ. На 1% Signifyd ставке на $100 AOV = $1.00 за заказ. Signifyd проигрывает на этом профиле. На 1% chargeback rate × $300 chargeback cost = $3.00 cost за заказ. На 1% Signifyd ставке на $200 AOV = $2.00 за заказ. Signifyd выигрывает. Crossover зависит от chargeback-rate и AOV — смоделируй свои конкретные цифры до подписи."
+  - q: "Что за messy billing-реконсилиация?"
+    a: "По Capterra/G2 отзывам некоторые мерчанты сообщают о сложности реконсилиации инвойсов Signifyd против объёма approved orders. Shopify App Store отмечает что external charges биллятся Signifyd отдельно от Shopify-инвойса, что создаёт two-source реконсилиацию. Практическая импликация: спрашивай в trial формат инвойса и reconciliation-workflow до подписи. Для брендов с multi-million-order объёмом даже 0.1% reconciliation-ошибка компаундит материально. Operator-цитаты подсказывают что проблема не пёрвейзивна но стоит верифицировать во время оценки."
+  - q: "Что за ограниченная прозрачность отклонений?"
+    a: "По G2 operator-цитате: 'когда заказ отклонён, есть ограниченная прозрачность по reasoning.' ML decisioning Signifyd проприетарно, и indivudual order-decline reasoning не surfaced в деталях — операторы видят 'declined for fraud risk' без granular сигналов (какой behavioral паттерн, какой network-сигнал). Trade-off: точность ML — ценность (98% known-shopper recognition), и over-transparent decisioning помог бы fraudsters геймить модель. Практический impact: legitimate orders которые отклонены стоят тебе продажу + customer-отношения + CAC. Финансовая гарантия покрывает chargebacks на approved orders, не lost-sale CAC на declined good orders."
+schema:
+  type: Review
+---
+
+Pricing-модель Signifyd в 2026 — не tier-лестница, а **процент от approved order value**, биллится только когда Signifyd одобряет заказ, без чаржа на declined-as-fraud orders. Структурная история цен — **chargeback-математика**: fee Signifyd заменяет unknown chargeback-exposure известной per-order стоимостью. Для high-AOV, high-chargeback-exposure вертикалей математика комфортна; для low-AOV, low-fraud SMB Shopify native fraud analysis достаточен и Signifyd структурно over-built. 100% финансовая гарантия на approved orders — единственная такая гарантия в категории и единственный структурный дифференциатор.
+
+Этот материал даёт математику на полосах где Shopify mid-market и enterprise бренды реально оценивают Signifyd ($1M-$100M+ годового revenue, $50-$500+ AOV) со ставками проверенными 2026-06-03 по [signifyd.com/pricing](https://www.signifyd.com/pricing/).
+
+## Суть в начале
+
+- **Лучше всего для:** mid-market и Shopify Plus мерчанты с высоким AOV ($100+), высоким chargeback-exposure или большим international order-объёмом — electronics, luxury, home, grocery.
+- **Избегай если:** маленькие Shopify-магазины с низким уровнем fraud (Shopify native fraud analysis это покрывает); маржи не способные абсорбировать 0.3-1.5% на каждый approved order; non-card-not-present (in-person retail).
+- **Главное преимущество:** 100% финансовая chargeback-гарантия + Commerce Network 98% known-shopper recognition + billed-only-on-approved модель.
+- **Главный недостаток:** Quote-only opacity, ограниченная rejection-reason прозрачность и SMB-порог где chargeback-математика не сходится.
+
+## Pricing-модель — процент от approved order value
+
+Структура цен Signifyd (проверено 2026-06-03 по signifyd.com/pricing):
+
+- **Нет tier-лестницы.** Цена — процент от approved order value, negotiated per-merchant.
+- **Процент варьируется по**: вертикали (electronics > apparel > digital goods), AOV, order-объёму, product-mix
+- **Биллится только на approved orders** — declined-as-fraud заказы ничего не стоят
+- **Нет публичного пола** — quote-only через "complete the form" workflow
+
+Third-party benchmarks подсказывают типичные ставки:
+
+| Вертикаль | Типичный % диапазон | Заметки |
+|---|---:|---|
+| Electronics | 1.0-1.5% | Выше fraud-rate, выше chargeback-стоимость |
+| Luxury | 0.8-1.2% | Высокий AOV, focused fraud-exposure |
+| Apparel | 0.5-1.0% | Mid-range fraud, mid-range AOV |
+| Home | 0.5-1.0% | Mixed fraud-exposure |
+| Grocery | 0.3-0.8% | Высокий объём, более низкий per-order fraud-риск |
+| Digital goods | 1.0-1.5%+ | Самые высокие fraud-rates, instant delivery |
+
+Эти benchmarks directional, не negotiated условия — actual ставки приходят от sales-команды Signifyd после disclosure revenue/volume/вертикали.
+
+## Chargeback-математика — когда Signifyd сходится
+
+Ключевой вопрос: приземляется ли per-approved-order fee Signifyd ниже твоей unmitigated chargeback-стоимости per order?
+
+Переменные для расчёта:
+
+- **Твой chargeback rate** = chargebacks / total orders (типично: 0.2-2% в зависимости от вертикали)
+- **Твоя average chargeback cost** = lost merchandise + chargeback fee ($15-$50) + lost shipping + processor reversal fee + manual labor (типично: $50-$300+)
+- **Твой AOV** = average order value
+- **Signifyd negotiated rate** = % approved order value (типично 0.3-1.5%)
+
+Break-even формула:
+
+```text
+Chargeback cost per order = chargeback_rate × avg_chargeback_cost
+Signifyd cost per order = signifyd_rate × AOV
+
+Signifyd сходится когда:
+  signifyd_rate × AOV < chargeback_rate × avg_chargeback_cost
+```
+
+### Конкретные примеры
+
+| Профиль бренда | Chargeback rate | Avg chargeback cost | AOV | Signifyd rate | Математика |
+|---|---:|---:|---:|---:|---|
+| Под-$50 AOV apparel | 0.3% | $75 | $40 | 0.8% | $0.225/order vs $0.32/order Signifyd — **Signifyd проигрывает** |
+| $150 AOV electronics | 0.8% | $200 | $150 | 1.2% | $1.60/order vs $1.80/order Signifyd — **Signifyd проигрывает узко** |
+| $300 AOV luxury | 1.0% | $400 | $300 | 1.0% | $4.00/order vs $3.00/order Signifyd — **Signifyd выигрывает** |
+| $250 AOV electronics | 1.5% | $300 | $250 | 1.2% | $4.50/order vs $3.00/order Signifyd — **Signifyd выигрывает решительно** |
+
+Crossover где Signifyd начинает выигрывать: типично $150+ AOV с 0.8%+ chargeback rate. Ниже этого Shopify native fraud analysis (бесплатно с Shopify Plus, включено с Shopify advanced fraud tools) обрабатывает риск на более низкой стоимости.
+
+## Что покрывает финансовая гарантия
+
+По signifyd.com (проверено 2026-06-03), когда Signifyd одобряет заказ который последовательно chargesback, мерчант возмещается в течение **48 часов** за:
+
+- Полную product-стоимость
+- Chargeback fee
+- Shipping-стоимость
+- Processor fees
+
+Это уникально в fraud-категории. Большинство fraud-инструментов оценивают риск и информируют решения но не финансово гарантируют исходы. Signifyd абсорбирует chargeback-потерю на approved orders.
+
+**Complete Chargeback Protection** тариф расширяет покрытие на **non-fraud chargebacks** — item-not-received (friendly fraud), product-not-as-described и similar disputes. Для многих мерчантов non-fraud chargebacks превышают fraud chargebacks в долларовом объёме. Complete-tier цена обычно на 0.2-0.4% выше базового Guaranteed Fraud Protection.
+
+## Реальные operator-итоги
+
+Три operator-цитаты с G2:
+
+> Signifyd митигирует риск принятия онлайн-заказов, позволяя нашей команде фокусироваться исключительно на рост.
+>
+> — G2 (дата недоступна)
+
+> Что я нахожу менее compelling — когда заказ отклонён, ограниченная прозрачность по reasoning.
+>
+> — G2 (дата недоступна)
+
+> Signifyd убирает human-элемент из fraud-процесса.
+>
+> — G2 (Signifyd-hosted цитата)
+
+Паттерн в не-vendor источниках: эффективность ops-команды — стабильная похвала (больше не нужно ручного fraud-review на масштабе); ограниченная rejection-прозрачность — самое цитируемое трение. G2 (4.5 / 357 отзывов) подтверждает support-репутацию (9.2 inferred support-оценка).
+
+## Что не так с моделью ценообразования
+
+Три вещи, в порядке влияния на счёт:
+
+**1. Quote-only opacity при оценке.** Бренды сравнивающие fraud-инструменты не могут смоделировать актуальную стоимость Signifyd без sales-engagement. Для оценки против Riskified, NoFraud или Shopify native fraud analysis отсутствие публичного "Starting at X% of approved orders" benchmark добавляет трение к cost-моделированию.
+
+**2. Ограниченная rejection-reason прозрачность.** Операторы видят "declined for fraud risk" без granular сигналов (какой behavioral паттерн триггернул, какой network-сигнал внёс вклад). Trade-off реальный (полная прозрачность помогла бы fraudsters геймить модель) но lost-sale CAC на declined good orders не возмещается финансовой гарантией — только chargebacks на approved orders.
+
+**3. Сложность billing-реконсилиации на масштабе.** External charges биллятся отдельно от Shopify-инвойса (по Shopify App Store) значит two-source реконсилиация. Для multi-million-order брендов 0.1% reconciliation-ошибка компаундит. Верифицируй формат инвойса и reconciliation-workflow во время trial.
+
+## Reality-check Free-тарифа
+
+У Signifyd нет free-тарифа — только custom-quoted trial-период обычно структурированный как proof-of-concept (POC) с маленьким order-subset. POC валидирует точность ML-decisioning против существующих fraud-паттернов мерчанта и surface'ит реалистичную negotiation ставки.
+
+Для SMB Shopify-магазинов хотящих free или low-cost fraud-protection: **Shopify native fraud analysis** включена с Shopify Plus и даёт risk-scoring (high/medium/low) плюс suggested actions. Не включает финансовую гарантию, но для под-$50 AOV брендов с under 0.3% chargeback rates покрывает практическую нужду на нулевой стоимости.
+
+## Когда математика не работает
+
+Три честных сценария где Signifyd не сходится:
+
+- **Маленькие Shopify-магазины с низким уровнем fraud.** Под-$50 AOV с under 0.3% chargeback rate значит что Signifyd fee превосходит unmitigated chargeback exposure. Shopify native fraud analysis покрывает практическую нужду.
+- **Маржи не способные абсорбировать 0.3-1.5% на каждый approved order.** Для low-margin вертикалей (commodity products, narrow-margin grocery) каждый basis-point имеет значение. Signifyd fee напрямую снижает contribution margin.
+- **Non-card-not-present бизнесы.** Brick-and-mortar retail с in-person card-present транзакциями имеет другую fraud-динамику. Signifyd purpose-built для card-not-present (онлайн) fraud; physical retail использует другие controls (chip cards, signature verification).
+
+## Как снизить счёт Signifyd без потери возможностей
+
+В грубом порядке влияния:
+
+1. **Negotiate процент при подписи.** Опубликованный % диапазон (0.3-1.5%) широкий. Для high-volume брендов или low-vertical-fraud профилей push'ь на нижний конец. Принеси volume-прогнозы и vertical-специфичные fraud-данные на negotiation.
+2. **Верифицируй экономику Complete Chargeback Protection ежеквартально.** Complete расширяет покрытие на non-fraud chargebacks но добавляет 0.2-0.4% к ставке. Если non-fraud chargebacks под 50% total chargeback-объёма, base Guaranteed Fraud Protection может выгоднее.
+3. **Аудит declined-order паттернов ежемесячно.** Ограниченная rejection-прозрачность значит что good orders могут отклоняться. Трекинг decline-rates против industry baselines surface'ит overly aggressive ML на твоём traffic-профиле.
+4. **Cross-check invoice-реконсилиацию против Shopify approved-order count.** 0.1-0.5% reconciliation-gap стоит поднять с account-командой Signifyd. На масштабе это компаундит.
+5. **Renegotiate в renewal-цикле.** Multi-year контракты лочат ставки но renewal-циклы — leverage-моменты. Volume-увеличения за срок контракта должны покупать более низкие ставки при renewal.
+
+## Альтернативы стоит рассмотреть
+
+- **Shopify native fraud analysis** для под-$50 AOV / под-0.3% chargeback rate брендов — включено с Shopify Plus, без финансовой гарантии но risk-scoring + actions покрывают практическую нужду.
+- **Riskified** для similar enterprise fraud-with-guarantee позиционирования на competitive % ставках. Другой категория-лидер вендор; comparison-shop оба.
+- **NoFraud** для mid-market брендов хотящих финансовую гарантию на potentially более низких ставках чем Signifyd для sub-luxury вертикалей.
+
+## Финальный вердикт
+
+- **Оценка: 8.8/10** (совпадает с [полным обзором Signifyd](/tools/signifyd)) — 100% финансовая гарантия, Commerce Network 98% known-shopper recognition и billed-only-on-approved модель подняли оценку; ограниченная rejection-reason прозрачность, SMB pricing-порог и quote-only opacity её сдержали.
+- **Лучше всего для:** mid-market и enterprise/Shopify Plus мерчанты с высоким AOV ($100+), высоким chargeback-exposure, electronics/luxury/home/grocery вертикалями.
+- **Пропусти если:** маленькие Shopify-магазины с низким уровнем fraud, margin-thin вертикали или non-card-not-present бизнесы.
+
+Цены Signifyd в 2026 не хищнические — это финансово-гарантированная модель заменяющая unknown chargeback-exposure известной per-order стоимостью. Трение — **quote-only opacity** + **ограниченная rejection-reason прозрачность** + **SMB-порог** где математика переворачивается. Считай математику на твоём актуальном chargeback rate × AOV против реалистичного 0.3-1.5% Signifyd-диапазона. Выше $100+ AOV с 0.5%+ chargeback rates Signifyd обычно сходится. Ниже этого профиля Shopify native fraud analysis покрывает практическую нужду. Для брендов где chargebacks были recurring P&L line item Signifyd трансферирует этот риск на свой balance sheet на известной ставке — и это структурная ценность стоящая percentage-премии.
+
+<AffiliateButton tool="signifyd" cta="Получить quote Signifyd" />

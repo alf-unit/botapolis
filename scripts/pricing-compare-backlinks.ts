@@ -79,6 +79,94 @@ const BACKLINKS: BacklinkConfig[] = [
     ruSentence:
       "Полный разбор цен Attentive ($2-3K минимум в квартал, структура контракта) — /ru/pricing/attentive.",
   },
+  {
+    slug: "manychat",
+    name: "ManyChat",
+    enSentence:
+      "For the full ManyChat pricing breakdown (March 2 2026 free-tier cut + AI add-on math), see /pricing/manychat.",
+    ruSentence:
+      "Полный разбор цен ManyChat (срез Free-тарифа 2 марта 2026 + математика AI-аддона) — /ru/pricing/manychat.",
+  },
+  {
+    slug: "omnisend",
+    name: "Omnisend",
+    enSentence:
+      "For the full Omnisend pricing breakdown (billable-contacts denominator + MCP on Free), see /pricing/omnisend.",
+    ruSentence:
+      "Полный разбор цен Omnisend (биллинг по всем contacts + MCP на Free) — /ru/pricing/omnisend.",
+  },
+  {
+    slug: "yotpo",
+    name: "Yotpo",
+    enSentence:
+      "For the full Yotpo pricing breakdown (post-sunset Reviews + Loyalty only, $278 bundle floor), see /pricing/yotpo.",
+    ruSentence:
+      "Полный разбор цен Yotpo (после sunset только Reviews + Loyalty, $278 минимум за bundle) — /ru/pricing/yotpo.",
+  },
+  {
+    slug: "postscript",
+    name: "Postscript",
+    enSentence:
+      "For the full Postscript pricing breakdown ($49 Starter minimum + platform-fee shift), see /pricing/postscript.",
+    ruSentence:
+      "Полный разбор цен Postscript ($49 минимум на Starter + переход на platform fee) — /ru/pricing/postscript.",
+  },
+  {
+    slug: "tidio",
+    name: "Tidio",
+    enSentence:
+      "For the full Tidio pricing breakdown (Growth→Plus 12x cliff + three-quota meter), see /pricing/tidio.",
+    ruSentence:
+      "Полный разбор цен Tidio (12x скачок Growth→Plus + три параллельных квоты) — /ru/pricing/tidio.",
+  },
+  {
+    slug: "inventory-planner",
+    name: "Inventory Planner",
+    enSentence:
+      "For the full Inventory Planner pricing breakdown (post-Sage 3x renewal increases + sync risk), see /pricing/inventory-planner.",
+    ruSentence:
+      "Полный разбор цен Inventory Planner (3x повышения после Sage + риски синхронизации) — /ru/pricing/inventory-planner.",
+  },
+  {
+    slug: "triple-whale",
+    name: "Triple Whale",
+    enSentence:
+      "For the full Triple Whale pricing breakdown (Free tier usable + GMV-scaled paid tiers), see /pricing/triple-whale.",
+    ruSentence:
+      "Полный разбор цен Triple Whale (Free тариф рабочий + платные масштабируются по GMV) — /ru/pricing/triple-whale.",
+  },
+  {
+    slug: "signifyd",
+    name: "Signifyd",
+    enSentence:
+      "For the full Signifyd pricing breakdown (% of approved-orders model + chargeback math), see /pricing/signifyd.",
+    ruSentence:
+      "Полный разбор цен Signifyd (% от одобренных заказов + математика chargeback'ов) — /ru/pricing/signifyd.",
+  },
+  {
+    slug: "aftership",
+    name: "AfterShip",
+    enSentence:
+      "For the full AfterShip pricing breakdown ($11→$119 Tracking cliff + Tracking/Returns split), see /pricing/aftership.",
+    ruSentence:
+      "Полный разбор цен AfterShip (скачок $11→$119 + раздельные Tracking и Returns) — /ru/pricing/aftership.",
+  },
+  {
+    slug: "rebuy",
+    name: "Rebuy",
+    enSentence:
+      "For the full Rebuy pricing breakdown (package-based math + RGR scaling above $40K), see /pricing/rebuy.",
+    ruSentence:
+      "Полный разбор цен Rebuy (модульная цена + RGR-масштабирование выше $40K) — /ru/pricing/rebuy.",
+  },
+  {
+    slug: "northbeam",
+    name: "Northbeam",
+    enSentence:
+      "For the full Northbeam pricing breakdown ($1,500/mo Starter floor + MMM+ enterprise math), see /pricing/northbeam.",
+    ruSentence:
+      "Полный разбор цен Northbeam ($1,500/мес минимум + математика MMM+ для enterprise) — /ru/pricing/northbeam.",
+  },
 ]
 
 const APPLY = process.argv.includes("--apply")

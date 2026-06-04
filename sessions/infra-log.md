@@ -2053,3 +2053,36 @@ Squash источники (в feat/pricing-bulk до squash): sample wave (mailc
 - **Pagefind** — расширить покрытие на pricing/best (сейчас индексит только guides/tools/comparisons).
 - **Homepage «Latest reviews»** сломан post-merge `/reviews/`→`/tools/` (`getAllMdxFrontmatter("reviews")` пуст).
 - **`FINAL-ARCHITECTURE-V4.md` rewrite** — накопленный drift, особенно секции про агентов и публикацию (устарели после Схемы 1).
+
+---
+
+## 2026-06-04 (close) — финал сессии + cron 01:00 LA + точка входа
+
+### Сделано сегодня
+Капельный механизм **полностью**: `page_publications` gate type-agnostic (миграция 020); 116 страниц live (backfill `visible_at`); `DRIP_GATE_ENABLED=true`; Vercel-cron `/api/cron/drip-publish` под `CRON_SECRET`, расписание **`0 8 * * *` UTC = 01:00 LA** (Vercel cron UTC-only — таймзоны нет, зимой сдвиг на 00:00 LA, для ночного публикатора несущественно); эскалация N **4→7→10/мес** (`computeRate`, 30-дн блоки); счётчик `{total,published,remaining}` в ответе крона; finalize-тест **404→200 по pool_number пройден**.
+
+**РЕШЕНИЕ:** публикация на **Vercel-cron + БД**, агенты НЕ участвуют.
+
+Ранее в серии (контекст): **content-gate v2** (валидатор type-agnostic — overflow description / голый `<>` перед цифрой-$ / EN↔RU pairing; Haiku/OpenRouter путь удалён; перевод EN+RU в одной сессии движком Claude Code; **definition-of-done** как hard-rule).
+
+### ФАКТ на конец сессии
+- **116 страниц live** (оба класса):
+  - MDX **29**: pricing 16 / guides 5 / best 8 (+ RU-пары).
+  - DB **87**: tools 30 / comparisons 27 / alternatives 30.
+- **Drip-очередь: 0** — `pool_number` нигде не проставлен (Этап H не сделан), cron сейчас отдаёт `queue_empty`.
+- **Почему прошлые волны ушли разом:** для DB-типов генерация = `status='published'` = **мгновенный live** (так было ДО гейта). Задним числом эти страницы **НЕ прячем** — Google уже проиндексил, скрытие навредит. Капельница — **для БУДУЩЕГО контента**, не ретроактивно.
+
+### Осталось написать
+**~205 активных ключей 2-й волны:** pricing 37, vs-comparison 29, best-for 29, guide 33, alternatives 20, review 6, how-to 1. (+44 `discount` отложены — ждут партнёрских промокодов.)
+
+### ТОЧКА ВХОДА — следующая сессия (Infrastructure)
+1. **Этап H** — проставить `pool_number` пулу по приоритету (создать gate-строки `visible_at=NULL` + `pool_number` по порядку для пронумерованных заготовок).
+2. **Наполнение buckets 2-й волны** (метод data-first + realtime web, см. `CONTENT-WRITING.md`), каждая страница строго по **definition-of-done**. **Новый контент создавать СКРЫТЫМ** (`visible_at=NULL` + `pool_number`) → в drip-очередь, **НЕ сразу live**.
+
+> **КРИТИЧНО (требование оператора, нарушалось в прошлых сессиях):** **НЕ публиковать пачками.** Весь новый контент → drip-очередь → cron капает 4/день (с эскалацией). Никаких массовых `status='published'` / `visible_at=now()` на пачку.
+
+### Прочее (follow-ups, без изменений)
+Пересмотр агентов (OPS убрать, SCOUT без RSS, CHIEF опц. мониторинг+GSC, НЕ публикация); Pagefind покрытие pricing/best; homepage «Latest reviews» сломан (`/reviews/`→`/tools/`); `FINAL-ARCHITECTURE-V4.md` rewrite (drift в секциях про агентов/публикацию).
+
+### Commits (этот close)
+- `feat(drip): cron 01:00 LA (0 8 UTC) + session close & entry point`

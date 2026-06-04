@@ -1,6 +1,12 @@
 /**
  * GET /api/cron/drip-publish — Vercel cron (daily)
  * ----------------------------------------------------------------------------
+ * Schedule: `0 8 * * *` in vercel.json = 08:00 UTC = 01:00 LA (PDT). Vercel
+ * cron is UTC-only (no timezone field — docs: "The timezone is always UTC"),
+ * so in winter (PST) this lands at 00:00 LA. The ±1h seasonal drift is
+ * immaterial for a nightly publisher; we deliberately avoid a seasonal-switch
+ * hack.
+ * ----------------------------------------------------------------------------
  * The drip executor. Flips the next N hidden+numbered rows in
  * `page_publications` to visible_at=now(), in pool_number order, then
  * revalidates their paths so they go live immediately.

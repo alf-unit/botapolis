@@ -176,3 +176,53 @@ For 007, Omnisend side was thinner — research has competing-ESP Omnisend prici
 - `lib/content/related-blocks.ts` — shared helpers `fetchRelatedComparisons` + `fetchBestMentions`
 - `/pricing/` hub + Resources nav sub-item НЕ создан, но **порог 5+ страниц достигнут** — можно делать
 - DB-driven `/compare/` rows: при content session edit MDX, но **финальные правки live verdict делай через loader, не через MDX edit** (webhook не overwrite'ит existing rows)
+
+---
+
+## 2026-06-04 — 2-я волна старт: pricing-bucket ЗАКРЫТ (14 скрытыми) + инфра-фиксы
+
+### Commits
+- `content: pricing wave 1 — loop-returns, loyaltylion, loox, pencil` (6c7c1a7)
+- `content: pricing wave 2 — judge-me, skio, loop-subscriptions, polar-analytics` (9fc26c4)
+- `content: pricing wave 3 — stay-ai, limespot, flair-ai, shopify-sidekick` (abbb113)
+- `fix(drip): gate hidden pricing pages' OG image (leak audit)` (cec797e)
+- `fix(drip): make article-published webhook drip-gate-aware` (2011a43)
+- `feat(drip): fixed 01:00 LA year-round via two UTC slots + DST guard` (d17175e)
+
+(Идентификация по subject, не по hash — см. CLAUDE.md.)
+
+### Задача
+Стартовать 2-ю волну наполнения. Закрыть pricing-bucket: написать все реально новые pricing-страницы СКРЫТЫМИ в drip-очередь (НЕ live разом), методом data-first + realtime web. Контроль-first на 2 страницах, затем пачка.
+
+### Сделано
+- **Pricing-bucket ЗАКРЫТ: 14 новых pricing-страниц (EN+RU) написаны СКРЫТЫМИ** методом data-first+web, в drip-очереди pool **#1-14** (`visible_at=NULL`, 404 на проде, ждут капельной публикации). Тулза: adcreative-ai, smile-io, loop-returns, loyaltylion, loox, pencil, judge-me, skio, loop-subscriptions, polar-analytics, stay-ai, limespot, flair-ai, shopify-sidekick.
+- **16 дублей-ключей зареконсилены** (вторичные ключи к существующим pricing: mailchimp cost→/pricing/mailchimp, klaviyo sms pricing→/pricing/klaviyo, attentive sms/mobile/cost→/pricing/attentive ×3, и т.д.) → `published` со ссылкой на существующую live-страницу, **НЕ переписаны**.
+- **База освежена** (офиц.цены разошлись): smile-io min 49→79 (Starter снят→Standard), loox 9.99→14 (Scale-тариф убран), limespot 18→150 (перешёл на единый Max revenue-tiered), flair-ai 10→8 (Pro entry) + pricing_notes/_ru. Остальные 10 — офиц.совпали с базой, без изменений.
+- **`second_wave` pricing-ключей = 0** — bucket закрыт (16 оригиналов published + 16 дублей published + 21 ключ новых тулзов ready_to_publish).
+- Каждая страница: валидатор `--strict-pairing` зелёный, banned-phrases чисто, /go/ где affiliate (loox), judge-me carve-out (нет партнёрки — честно без CTA), honest framing.
+
+### Инфра-фиксы
+- **OG-роут скрытых страниц светился 200 → починен (cec797e):** `isSlugVisible` guard → `notFound()`, теперь 404 для скрытых, динамически следует за гейтом (EN+RU). Полный аудит утечек: скрытое НЕ палится нигде — sitemap исключает (gated на генерации), generateStaticParams не пререндерит, внутренние ссылки/хаб/Pagefind/feed/OG чисто. Sitemap-латентность опубликованного (до 24ч/деплоя) — НЕ утечка, оставлена (24ч revalidate ради CPU).
+- **Webhook post-commit стал drip-aware (2011a43):** помечает semantic_core `published` ТОЛЬКО если страница видима (`page_publications.visible_at IS NOT NULL`); скрытая/нет gate-строки → `ready_to_publish`. `published_article_path` нормализован в канонический `/{seg}/{slug}` (cron-sync матчит). Comparison-bridge НЕ тронут (там `comparisons.status='published'` нужен чтобы роут рендерил, видимость гейтится отдельно). **Систематический drift устранён — ручной reconcile каждую волну больше НЕ нужен, покроет и comparisons.**
+
+### Обнаружено
+- **post-commit webhook исторически флипал semantic_core в `published` при КОММИТЕ, игнорируя drip-гейт** — каждый коммит скрытого контента создавал drift (14 primary-ключей новых тулзов ушли в published с RU-путём). Это неавторитетный drift (гейт `page_publications` — истина видимости, страницы 404), но искажал трекинг. Пофикшено №2 выше.
+- OG-роут метадата (как и sitemap) НЕ пробивается `revalidatePath` промптно через CDN Vercel — догоняет на деплое/24ч ISR. Для скрытия это безопасно (гейт применяется на генерации). Логика гейта в OG/sitemap корректна (видимая klaviyo OG=200, скрытая=404 — доказано флип-тестом).
+- Cron 01:00 LA круглый год: два UTC-слота `0 8`+`0 9` + DST-guard `laHour()===1` в хендлере + 20ч дубль-защита (d17175e).
+
+### Fixes
+- `app/pricing/[slug]/opengraph-image.tsx` — `isSlugVisible("pricing", slug)` → `notFound()` для скрытых (RU ре-экспортит default, наследует).
+- `app/api/agents/article-published/route.ts` — `isPageVisibleNow()` guard перед status-флипом; helpers `parseRepoPath` / `canonicalPublicPath` / `GATED_TYPES`; fail-open на transient DB error (гейт всё равно контролирует реальную видимость).
+
+### Open follow-ups / ТОЧКА ВХОДА — следующая сессия (наполнение 2-й волны)
+**СЛЕДУЮЩИЙ BUCKET — vs-comparison** (29 ключей, `template='vs-comparison'` `status='second_wave'`). DB-driven, роут `/compare/` существует.
+- **Контроль-first:** СНАЧАЛА 1-2 контрольные comparison → проверить связку MDX→`public.comparisons` bridge + gate-строку `content_type='comparisons'` + **RU-row ВРУЧНУЮ** (translate-script comparisons НЕ покрывает — писать RU сразу как часть DoD) + страница скрыта (404). Потом пачка.
+- **СКРЫТЫМИ:** `visible_at=NULL` + `pool_number` продолжать **от 15** (pricing занял 1-14), по `priority_score`.
+- Метод data-first+web, definition-of-done (EN+RU, навигация, sitemap, перелинковка, валидатор, gate-строка).
+- **webhook-drift уже пофикшен — reconcile НЕ нужен.**
+
+**Дальше по порядку:** best-for (29, `/best/` гибрид) → guide+how-to (34, `/guides/` MDX) → alternatives (20, `/alternatives/` DB jsonb) → review (6, `/tools/` DB). Все СКРЫТЫМИ в очередь, нумерация сквозная по `priority_score`, капают 4/день (мес1) → 7 (мес2) → 10 (мес3).
+
+**КРИТИЧНО:** весь новый контент СКРЫТЫМ в drip-очередь, НЕ live разом.
+
+Пауза НЕ ставится — drip капает штатно 4/день, #1/#2 (adcreative-ai, smile-io) выйдут ближайшей ночью 01:00 LA.

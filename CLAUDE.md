@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context (botapolis)
 
-Этот файл загружается автоматически в начале каждой Claude Code сессии в этом репо. Содержит только базовый контекст проекта. Mode-specific инструкции (CONTENT-WRITING / HANDOFF / FINAL-ARCHITECTURE-V4 / PHASE-0-BLUEPRINT) ты сам читаешь сразу после того как оператор подтвердил mode — см. секцию "Session continuity → В начале сессии".
+Этот файл загружается автоматически в начале каждой Claude Code сессии в этом репо. Содержит только базовый контекст проекта. Mode-specific инструкции (FINAL-ARCHITECTURE-V4 / CONTENT-WRITING) ты сам читаешь сразу после того как оператор подтвердил mode — см. секцию "Session continuity → В начале сессии".
 
 ## Project at a glance
 
@@ -13,48 +13,39 @@
 
 ## Operating modes
 
-У проекта четыре режима работы. Каждому соответствует свой instruction file, который ты обязан прочитать сразу после того как оператор выбрал mode (см. "Session continuity → В начале сессии" для точного порядка действий):
+У проекта **два режима работы**. Каждому соответствует обязательное чтение на старте (см. "Session continuity → В начале сессии" для точного порядка действий):
 
-| Mode | Когда применяется | Какой файл читать |
-|------|-------------------|-------------------|
-| **Content writing** | Написание статей по editorial workflow (per-article Deep Research, ручные правки) — **legacy режим, постепенно вытесняется CONTENT_WRITING_02** | `CONTENT-WRITING.md` (читай целиком) |
-| **Code/feature** | Развитие сайта, новые компоненты, фичи, баги | `HANDOFF.md` (читай целиком, дальше спроси оператора нужно ли углубиться в связанные файлы) |
-| **Infrastructure** | Setup новых агентов, миграции БД, новые скрипты | `FINAL-ARCHITECTURE-V4.md` (читай ПОЛНОСТЬЮ — см. "Infrastructure mode — mandatory reading protocol" ниже) |
-| **CONTENT_WRITING_02** | Data-first pSEO конвейер: column-wise ресёрчи → наполнение `tools` → программная генерация эшелонов 1-2-3 (reviews → comparisons/alternatives → listings) → передача пронумерованного пула CHIEF | `PHASE-0-BLUEPRINT.md` (читай ПОЛНОСТЬЮ — это единственный источник правды по новому пайплайну, заменяет editorial workflow для pSEO-контента) |
+| Mode | Когда применяется | Что читать на старте |
+|------|-------------------|----------------------|
+| **Infrastructure** | Агенты (CHIEF/SCOUT/OPS/OpenClaw), миграции/схема БД, скрипты, код сайта, компоненты, фичи, баги, перформанс | `FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ (см. "Infrastructure mode — mandatory reading protocol" ниже) |
+| **Content writing** | Контент: статьи, MDX, pSEO-страницы (reviews/comparisons/alternatives/listings/pricing/guides), RU-переводы, refresh | то же что Infrastructure (`FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ) **ПЛЮС** `CONTENT-WRITING.md` ПОЛНОСТЬЮ (см. "Content writing mode — mandatory reading protocol" ниже) |
+
+**Content writing — это надмножество Infrastructure:** тот же архитектурный контекст плюс контентные правила. В нём ты знаешь и инфраструктуру, и контент-пайплайн одновременно.
 
 В начале каждой сессии **обязательно вызови тул `AskUserQuestion`** — оператор выберет mode кнопкой, а не печатая ответ. Параметры вызова:
 - `question`: "В каком режиме сегодня работаем?"
 - `header`: "Mode"
 - `multiSelect`: false
-- `options`: четыре варианта в этом порядке:
-  1. label "Content writing", description "Статьи, MDX, refresh контента, RU переводы (legacy editorial)"
-  2. label "Code/feature", description "Развитие сайта, компоненты, фичи, баги"
-  3. label "Infrastructure", description "Агенты, миграции БД, скрипты, OpenClaw"
-  4. label "CONTENT_WRITING_02", description "Data-first pSEO конвейер: column-wise ресёрчи → база → программная генерация"
+- `options`: два варианта в этом порядке:
+  1. label "Infrastructure", description "Агенты, миграции БД, скрипты, код сайта, фичи, баги"
+  2. label "Content writing", description "Контент/MDX/pSEO/RU — Infrastructure + CONTENT-WRITING.md"
 
-Не перечисляй mode простым текстом, не задавай вопрос словами — только через тул. Не пытайся одновременно "и контент и код".
+Не перечисляй mode простым текстом, не задавай вопрос словами — только через тул.
 
 ## Session continuity
 
-В проекте ведётся **shared memory между сессиями** через append-only логи:
+В проекте ведётся **shared memory между сессиями** через **единый append-only лог**:
 
-- `/sessions/writer-log.md` — для **Content writing** и **CONTENT_WRITING_02** сессий
-- `/sessions/infra-log.md` — для **Code/feature** и **Infrastructure** сессий
+- `/sessions/session-log.md` — **один лог для всех типов сессий**. Каждый блок помечен тегом типа в заголовке: `[writer]` (контент/MDX/RU), `[code]` (код сайта/фичи/баги), `[infra]` (агенты/миграции/схема/скрипты); смешанные — составной тег. Лента хронологическая (старые сверху, новые снизу). Раньше было два файла (`writer-log.md` + `infra-log.md`) — слиты в один 2026-06-05.
 
 ### В начале сессии
 
 После того как оператор подтвердил mode — **выполни ДВА действия в одном сообщении (параллельные tool calls), до любого другого ответа оператору:**
 
-1. **Прочитай mode-specific instruction file ПОЛНОСТЬЮ** (из таблицы Operating modes выше):
-   - Content writing → `CONTENT-WRITING.md`
-   - Code/feature → `HANDOFF.md`
+1. **Прочитай mode-specific instruction file(ы) ПОЛНОСТЬЮ** (из таблицы Operating modes выше):
    - Infrastructure → `FINAL-ARCHITECTURE-V4.md` (особый pagination protocol — см. ниже)
-   - CONTENT_WRITING_02 → `PHASE-0-BLUEPRINT.md` (особый protocol — см. "CONTENT_WRITING_02 mode — mandatory reading protocol" ниже)
-2. **Прочитай последние 2-3 блока соответствующего лога:**
-   - Content writing → `/sessions/writer-log.md`
-   - Code/feature → `/sessions/infra-log.md`
-   - Infrastructure → `/sessions/infra-log.md`
-   - CONTENT_WRITING_02 → `/sessions/writer-log.md`
+   - Content writing → `FINAL-ARCHITECTURE-V4.md` **И** `CONTENT-WRITING.md` (оба ПОЛНОСТЬЮ — см. "Content writing mode — mandatory reading protocol" ниже)
+2. **Прочитай последние 3-4 блока единого лога `/sessions/session-log.md`** — **независимо от выбранного mode**. Типы сессий перемешаны по дате, и контекст последней работы (а также точка входа следующей сессии) может быть из сессии любого типа. Читать только «свой» тип нельзя — именно так возникал баг рассинхрона (заходишь в Infrastructure, а свежая работа была в writer-сессии, и ты её не видишь).
 
 Instruction file даёт детальные операционные правила для mode'а. Лог даёт контекст последних работ: что было сделано, какие quirks обнаружены, какие fixes применены, open follow-ups которые могут быть релевантны текущей задаче.
 
@@ -74,47 +65,29 @@ Instruction file даёт детальные операционные прави
    - `offset=601, limit=600`
    - `offset=1201, limit=600`
 3. **НИКОГДА не пропускай файл из-за token-limit ошибки.** Это паттерн нарушения зафиксирован в memory (`feedback_infra-mode-collaboration`, `feedback_act-on-source-not-theorize`). Token limit — это сигнал "разбей на страницы", а не "забей".
-4. Только после полного прочтения architecture + последних 2-3 блоков `infra-log.md` — спрашивай "что делаем сегодня?".
+4. Только после полного прочтения architecture + последних 3-4 блоков `session-log.md` — спрашивай "что делаем сегодня?".
 
-**Если файл переименовали или вынесли** — найди актуальный (Glob `**/FINAL-ARCHITECTURE*.md` или ищи в `/sessions/infra-log.md` упоминания) и прочитай его. Не работай без architecture context.
+**Если файл переименовали или вынесли** — найди актуальный (Glob `**/FINAL-ARCHITECTURE*.md` или ищи в `/sessions/session-log.md` упоминания) и прочитай его. Не работай без architecture context.
 
-### CONTENT_WRITING_02 mode — mandatory reading protocol
+### Content writing mode — mandatory reading protocol
 
-**При выборе оператором CONTENT_WRITING_02 mode ты ОБЯЗАН прочитать `PHASE-0-BLUEPRINT.md` ПОЛНОСТЬЮ до того как задашь "что делаем сегодня?" или начнёшь любую работу.**
+**При выборе оператором Content writing mode ты ОБЯЗАН прочитать ДВА файла ПОЛНОСТЬЮ до того как задашь "что делаем сегодня?" или начнёшь любую работу:**
 
-Этот файл — единственный источник правды по новой data-first pSEO модели производства контента. Он заменяет editorial workflow (`CONTENT-WRITING.md`) для всех pSEO-страниц (reviews, comparisons, alternatives, listings). Без полного прочтения ты будешь предлагать решения противоречащие новой модели — например, генерить отдельные Deep Research под каждую статью, писать руками по одной странице, пропускать column-wise сбор данных.
+1. **`FINAL-ARCHITECTURE-V4.md`** — то же что в Infrastructure mode (тот же pagination protocol при token-limit, см. выше). Контент-сессии тоже трогают БД, миграции, агентов, роуты и drip-гейт — без архитектурного контекста будешь предлагать решения противоречащие спеке.
+2. **`CONTENT-WRITING.md`** — операционные правила производства контента: data-first + realtime web метод, banned phrases, `/go/[slug]`, JSON-LD, honest framing, EN+RU same-session, Definition of Done, RU style anti-rules, gate-строка drip-очереди.
 
-**Что фиксирует Blueprint (high-level, читай файл целиком — детали критичны):**
+**Protocol чтения:** оба файла Read'ятся ПОЛНОСТЬЮ. **Если "File content exceeds maximum allowed tokens"** — paginate (offset/limit, параллельные вызовы в одном сообщении), НИКОГДА не skip (зафиксированный паттерн нарушения, memory `feedback_infra-mode-read-architecture-fully.md`). Только после обоих файлов + последних 3-4 блоков `session-log.md` — спрашивай "что делаем сегодня?".
 
-- **Список тулзов:** 14 существующих + ~20 новых = ~32-34 монетизируемых; фильтр "живая партнёрка обязательна" (раздел 1).
-- **6 типов pSEO страниц в 3 эшелонах** (раздел 2): Эшелон 1 — tool reviews (фундамент); Эшелон 2 — comparisons + alternatives (зависят от Э1); Эшелон 3 — best-for/by-integration/by-pricing листинги (агрегируют Э1+Э2).
-- **6 column-wise срезов данных** (разделы 3-4): identity, pricing, features, integrations, reviews&ratings, monetization. Каждый = ОДИН Deep Research проход по ВСЕМ ~34 тулзам сразу, не per-tool. Промпты раздела 4 готовы к копированию в Web Chat as-is.
-- **Supabase изменения** (раздел 5): `semantic_core_entries.related_tool_slugs TEXT[]`, дозаполнение `comparisons` контент-полей, INSERT новых tools как заготовок.
-- **Последовательность исполнения** (раздел 6): A (анализ ✓) → B (заготовки tools) → C (6 ресёрчей оператором) → D (наполнение базы Claude Code) → E/F/G (генерация эшелонов) → H (нумерация пула) → I (капельная публикация CHIEF) → J (добивка ключей 102-427).
-- **Shopify Partner Program кластер** (раздел 7) — отдельный кластер `shopify-platform`, страницы в `/guides/` до достижения 5+ страниц + GSC-трафика, потом вынос в hub `/shopify/`.
-- **Что меняется в CONTENT-WRITING.md** (раздел 8): убираем per-page Deep Research, per-page operator quotes, per-page согласование. Оставляем banned phrases, /go/[slug], JSON-LD, honest framing + новый quality gate "профиль тулза неполный → страница не генерится".
-
-**Protocol чтения:**
-
-1. Сделай `Read` на `PHASE-0-BLUEPRINT.md`.
-2. **Если получаешь ошибку "File content exceeds maximum allowed tokens"** — paginate (offset/limit, параллельные вызовы в одном сообщении). Token limit — сигнал "разбей на страницы", не "забей". Тот же урок что для FINAL-ARCHITECTURE.
-3. **НИКОГДА не пропускай файл из-за token-limit ошибки.** Зафиксированный паттерн нарушения (см. memory `feedback_infra-mode-read-architecture-fully.md`).
-4. Только после полного прочтения Blueprint + последних 2-3 блоков `writer-log.md` — спрашивай "что делаем сегодня?".
-
-**Editorial vs data-first разделение:**
-
-- `CONTENT-WRITING.md` остаётся для **уникальных editorial-страниц**, которые не вписываются в pSEO-шаблоны (например, longread-гайды с операторской экспертизой, news-разборы, custom essay-форматы). Это меньшая доля контента.
-- `PHASE-0-BLUEPRINT.md` обслуживает **весь pSEO-контент** (reviews/comparisons/alternatives/listings) — то есть основной объём страниц.
-- Если оператор не уверен какой режим — спрашивай: статья шаблонная (генерится из данных tools) или уникальная (требует своего ресёрча и authorial voice)? Шаблонная → CONTENT_WRITING_02. Уникальная → Content writing.
+**Content writing = Infrastructure + контент-слой.** Весь pSEO-контент (reviews/comparisons/alternatives/listings/pricing/guides) и уникальные editorial-страницы делаются в этом режиме; метод — в `CONTENT-WRITING.md`. Историческая data-first спека `PHASE-0-BLUEPRINT.md` — read-on-demand reference (её рабочая часть уже перенесена в `CONTENT-WRITING.md`).
 
 ### В конце сессии (когда оператор просит сохраниться)
 
-Когда оператор говорит "сохрани сессию", "закроемся", "запиши лог" или аналогичное — **append новый блок** в конец соответствующего лога. Формат блока:
+Когда оператор говорит "сохрани сессию", "закроемся", "запиши лог" или аналогичное — **append новый блок** в конец единого лога `/sessions/session-log.md`. В заголовке блока ставь **тег типа сессии** (`[writer]` / `[code]` / `[infra]`, или составной для смешанной). Формат блока:
 
 ```markdown
 ---
 
-## YYYY-MM-DD — краткое описание сессии
+## YYYY-MM-DD — [тип] краткое описание сессии
 
 ### Commits
 - <commit subject 1>
@@ -147,9 +120,9 @@ Instruction file даёт детальные операционные прави
 
 - `BOTAPOLIS-PLAYBOOK-V2.md` — стратегия, монетизация, позиционирование, бизнес-логика. Читай когда нужно понять why behind decisions.
 - `FINAL-ARCHITECTURE-V4.md` — техническая архитектура multi-agent системы (3 OpenClaw агента + Web Chat + Claude Code). Читай когда нужно понять как агенты взаимодействуют или работаешь с инфраструктурой.
-- `PHASE-0-BLUEPRINT.md` — data-first pSEO конвейер: column-wise ресёрчи, наполнение `tools`, программная генерация эшелонов, передача пула CHIEF. Mandatory read для CONTENT_WRITING_02 mode; ссылайся на него всегда когда обсуждение касается массовой генерации reviews/comparisons/alternatives/listings.
-- `CONTENT-WRITING.md` — детальные операционные инструкции для editorial-написания контента (legacy per-article workflow). Читай когда оператор переключает на content mode (уникальные longread'ы, news-разборы, custom essays).
-- `HANDOFF.md` — операционный контекст для Code/feature сессий. Читай при переключении в этот mode.
+- `CONTENT-WRITING.md` — детальные операционные правила производства контента (data-first + realtime web метод, banned phrases, /go/, JSON-LD, EN+RU same-session, Definition of Done, RU style anti-rules, drip gate-строка). **Mandatory read в Content writing mode.**
+- `PHASE-0-BLUEPRINT.md` — историческая data-first pSEO спека (column-wise ресёрчи, генерация эшелонов, нумерация пула). Read-on-demand reference; рабочая часть метода перенесена в `CONTENT-WRITING.md`.
+- `HANDOFF.md` — историч. операционный контекст для кодовых работ. Read-on-demand (режим Code/feature упразднён — код-работа идёт в Infrastructure mode).
 - `/semantic-core/full-core.csv` — 427 keywords ядро. Не читай целиком, обращайся к нужным entries через Supabase когда требуется.
 
 ## Repo structure (top-level)
@@ -166,18 +139,14 @@ botapolis/
 │   ├── news/{en,ru}/
 │   └── best/{en,ru}/
 ├── content-templates/          — шаблоны структур статей
-├── research/                   — Deep Research отчёты от Web Chat
-├── writer-queue/               — task packets для контент-сессий
-│   ├── pending/
-│   └── done/
+├── research/                   — column-wise ресёрчи (R1-R6) + content-flags, baseline данные
 ├── semantic-core/              — 427 keywords ядро
 ├── agent-snapshots/            — отчёты от OpenClaw агентов
 │   ├── chief/
 │   ├── scout/
 │   └── ops/
-├── sessions/                   — shared memory логи между Claude Code сессиями
-│   ├── writer-log.md           — content writing сессии
-│   └── infra-log.md            — code/feature + infrastructure сессии
+├── sessions/                   — shared memory лог между Claude Code сессиями
+│   └── session-log.md          — единый лог всех сессий (writer/code/infra, теги типа)
 ├── config/                     — конфиги (vendor feeds, banned phrases, etc.)
 ├── scripts/                    — helper скрипты
 ├── supabase/                   — миграции БД
@@ -185,20 +154,19 @@ botapolis/
 └── lib/                        — utilities, Supabase clients, etc.
 ```
 
-## Content workflow (writer queue → publish)
+## Content workflow (data-first → hidden → drip publish)
 
-В content-сессиях Claude Code пишет по task packets, подготовленным OPS-агентом. Источник правды — `/writer-queue/`.
+Контент производится **data-first методом**. Источник правды — `CONTENT-WRITING.md` (mandatory read в Content writing mode). Старый packet / OPS / writer-queue пайплайн **упразднён** — task packets, `next-task.sh`, ручная очередь больше не используются.
 
-1. Посмотри что в очереди: `sh scripts/claude-code-helpers/current-queue.sh`
-2. Вытащи следующий packet: `sh scripts/claude-code-helpers/next-task.sh`
-3. Открой packet (`writer-queue/pending/NNN-<slug>.md`) — там полный brief: keyword, angle, research file, screenshots, internal links, banned phrases, quality gates.
-4. Следуй структуре из `/content-templates/<template>.md` (vs-comparison, deep-review, how-to, guide, news).
-5. Пиши MDX в путь, указанный в packet (`output_path`).
-6. Quality checklist перед `git add` (см. ниже).
-7. `git commit` — pre-commit hook авто-переводит EN→RU, post-commit hook пингует `/api/agents/article-published`, который флипает status в Supabase и revalidate-ит страницу.
-8. После `git push` запусти `sh scripts/claude-code-helpers/after-publish.sh NNN-<slug>.md` — перемещает packet в `/done/` и обновляет `writer-queue/index.md`.
+Высокоуровнево (детали — в `CONTENT-WRITING.md`):
 
-Если packet ссылается на research, который не существует (`research_file: /research/...md` отсутствует) — НЕ выдумывай данные. Останови работу и пингуй оператора, пусть подгрузит research через CHIEF.
+1. **База:** `tools` row в Supabase (заполнен 6 column-wise ресёрчами R1-R6) + при необходимости `/research/*` baseline.
+2. **Realtime веб-добор:** WebFetch vendor pricing/features page + WebSearch top third-party math + свежие operator quotes. Baseline устаревает за дни — realtime augmentation per-article обязателен.
+3. **Синтез в MDX / DB-row** (тип определяет surface: reviews/comparisons/alternatives → DB-driven; pricing/guides/best → MDX+DB hybrid). Расхождения веба с базой → UPDATE существующих полей БД (НЕ новые миграции; в commit-summary "тул: было→стало, источник"). `/compare/` live-правки — только через loader, не MDX-edit (webhook не overwrite'ит existing rows).
+4. **EN + RU в одной сессии** (hard rule — см. ниже + CONTENT-WRITING.md).
+5. **Definition of Done** (hard rule — см. ниже): хаб + Navbar/Footer + sitemap + перелинковка + валидатор зелёный.
+6. **Новый контент создаётся СКРЫТЫМ** (`page_publications.visible_at=NULL` + `pool_number`) → drip-очередь. Vercel-cron `/api/cron/drip-publish` (01:00 LA) раскрывает N/день (эскалация 4→7→10/мес). **НЕ публиковать пачками** — velocity-flag риск (требование оператора).
+7. `git commit` — pre-commit валидатор (`validate:content --strict-pairing`: schema + safety + EN↔RU pairing); post-commit webhook drip-aware флипает status только для видимых страниц.
 
 ## Quality gates (применяются ко всем статьям)
 
@@ -210,7 +178,7 @@ botapolis/
 - [ ] 2–5 internal links на existing strong pages
 - [ ] Все affiliate URLs через `/go/[slug]` — никогда прямые vendor ссылки
 - [ ] Pricing-клеймы датированы: "verified YYYY-MM-DD"
-- [ ] Нет banned phrases (см. `/config/banned-phrases.json`); per-packet bans — в самом packet
+- [ ] Нет banned phrases (см. `/config/banned-phrases.json`)
 - [ ] Image alt-text не тривиальный ("screenshot of pricing page" — плохо; "Klaviyo pricing page showing $0.70/conv tier" — хорошо)
 - [ ] Rating в frontmatter (если есть) совпадает с Supabase `tools.rating` — `npm run sync:ratings` проверяет
 - [ ] Для UI/JSX изменений — открыл `npm run dev` и проверил mobile preview
@@ -224,7 +192,7 @@ botapolis/
 - **Не модифицируй Supabase schema без апрува оператора.** Если кажется что нужна новая таблица или колонка — спроси.
 - **Все affiliate URLs в коде идут через `/go/[slug]` pattern.** Никогда прямые vendor ссылки.
 - **Все секретные значения через `process.env.*`**, никогда hardcoded.
-- **Banned phrases enforced.** Глобальный список — `/config/banned-phrases.json`. Per-packet — в writer-queue packet'е.
+- **Banned phrases enforced.** Список — `/config/banned-phrases.json`.
 - **EN+RU в одной сессии (hard rule, 2026-06-03).** Любой EN-контент (MDX, DB-driven, гибрид) → RU twin создаётся Claude Code в той же сессии. Movement движок — сам Claude Code (Opus/Max, бесплатно), НЕ Haiku/OpenRouter (этот путь удалён). Pre-commit валидатор обходит весь `content/*/{en,ru}/` tree и проверяет pairing. Детали — раздел 3 "Локализация" в `CONTENT-WRITING.md`. Opt-out через `noRuPair: true` во frontmatter для редких EN-only случаев.
 - **DEFINITION OF DONE (hard rule, 2026-06-03).** Страница любого типа НЕ готова и НЕ публикуется пока не выполнено ВСЁ: (1) EN+RU контент; (2) FINDABLE — страница в хабе своего типа И в Navbar/Footer (не орфан); (3) в `app/sitemap.ts` (оба языка); (4) перелинкована (Related + PartnerAlts + внутренние ссылки + backlinks с `/compare/`); (5) валидатор `npm run validate:content -- --strict-pairing` зелёный. Type-agnostic — применяется к pricing/guide/comparison/alternatives/best/review/news и всем будущим типам. При генерации пачки контента навигация/хаб/sitemap/перелинковка делаются в том же заходе, не postfactum. Детали — раздел "DEFINITION OF DONE" в `CONTENT-WRITING.md`.
 
@@ -232,7 +200,7 @@ botapolis/
 
 Если оператор начинает задачу и тебе непонятно в каком mode работать или какой контекст нужен — спроси через `AskUserQuestion` тул (см. "Operating modes"):
 
-> "В каком режиме сессия? Content writing / Code / Infrastructure / CONTENT_WRITING_02?
-> Подгрузить соответствующий instruction file?"
+> "В каком режиме сессия? Infrastructure / Content writing?
+> Подгрузить соответствующий instruction file(ы)?"
 
 Это лучше чем guess и потом переделывать.

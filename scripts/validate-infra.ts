@@ -52,13 +52,12 @@ async function exists(p: string): Promise<boolean> {
 async function checkDirs() {
   const required = [
     "research",
-    "writer-queue", "writer-queue/pending", "writer-queue/done", "writer-queue/archive",
     "content-templates",
     "semantic-core",
     "agent-snapshots/chief", "agent-snapshots/chief/scout-requests", "agent-snapshots/chief/ops-requests",
     "agent-snapshots/scout", "agent-snapshots/ops",
     "config",
-    "scripts/claude-code-helpers", "scripts/git-hooks",
+    "scripts/git-hooks",
     "content/reviews/en", "content/reviews/ru",
     "content/comparisons/en", "content/comparisons/ru",
     "content/alternatives/en", "content/alternatives/ru",
@@ -77,8 +76,6 @@ async function checkDirs() {
 async function checkFiles() {
   const files: Array<{ path: string; minBytes?: number }> = [
     { path: "research/_template.md", minBytes: 500 },
-    { path: "writer-queue/_template.md", minBytes: 500 },
-    { path: "writer-queue/index.md", minBytes: 100 },
     { path: "content-templates/vs-comparison.md", minBytes: 500 },
     { path: "content-templates/deep-review.md", minBytes: 500 },
     { path: "content-templates/how-to.md", minBytes: 500 },
@@ -92,9 +89,6 @@ async function checkFiles() {
     { path: "config/banned-phrases.json", minBytes: 500 },
     { path: "scripts/import-semantic-core.ts", minBytes: 1000 },
     { path: "scripts/git-hooks/post-commit.sh", minBytes: 500 },
-    { path: "scripts/claude-code-helpers/next-task.sh", minBytes: 200 },
-    { path: "scripts/claude-code-helpers/current-queue.sh", minBytes: 200 },
-    { path: "scripts/claude-code-helpers/after-publish.sh", minBytes: 200 },
     { path: ".husky/post-commit", minBytes: 500 },
     { path: "app/api/agents/article-published/route.ts", minBytes: 1000 },
     { path: "supabase/migrations/008_multi_agent_tables.sql", minBytes: 1000 },

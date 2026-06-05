@@ -1,0 +1,128 @@
+---
+title: "Polar Analytics pricing 2026: GMV-based, and what it really costs"
+description: "Polar Analytics prices on annual GMV, not a flat tier — entry lands around $300–400/mo and scales to ~$1,020/mo at $6M GMV with attribution. The real cost structure and where it pays. Verified 2026-06-04."
+publishedAt: "2026-06-04"
+updatedAt: "2026-06-04"
+author: "Botapolis editorial"
+tags: ["polar-analytics", "pricing", "analytics", "attribution", "shopify"]
+primaryKeyword: "polar analytics pricing"
+toolSlug: "polar-analytics"
+rating: 9.1
+pros:
+  - "Dedicated Snowflake warehouse per customer — full SQL ceiling without the data-engineering lift"
+  - "45+ native connectors plus included AI agents, Polar Pixel, and an MCP endpoint for Claude/LLM access"
+  - "Strong, frequently-praised support and unlimited users and historical data on every plan"
+cons:
+  - "Pricing is GMV-based and quote-gated — no flat public tier, so budgeting needs a GMV selection"
+  - "Scales with Monthly Tracked Orders; a $6M GMV brand with attribution lands near ~$1,020/mo"
+  - "Incrementality testing is a separate, expensive add-on; data-refresh latency is a recurring gripe"
+verdict: "Polar Analytics is priced like the warehouse-native BI platform it is — GMV-based, scaling with Monthly Tracked Orders, with entry around $300–400/mo and a $6M GMV brand landing near $1,020/mo with attribution. For mid-market and Shopify Plus brands running multi-channel acquisition that need a unified BI view, the dedicated Snowflake architecture earns the cost. Below roughly $1M revenue, Shopify's native analytics plus a Looker Studio dashboard usually suffice."
+bestFor: "Mid-market and Shopify Plus DTC brands ($1M+ revenue) running multi-channel paid acquisition that need a unified BI view beyond Shopify's native analytics."
+notFor: "Very small Shopify stores where native analytics suffice, non-Shopify merchants, and brands that won't use the warehouse depth they're paying for."
+faq:
+  - q: "How much does Polar Analytics cost per month?"
+    a: "Polar prices on annual GMV rather than a flat tier, and the public page gates exact figures behind a GMV selection (verified 2026-06-04 via polaranalytics.com/pricing). Third-party 2026 analyses put entry around $300–400/mo for the Analyze base, rising with revenue: roughly $720/mo at $5M GMV and ~$1,020/mo at $6M GMV with attribution add-ons. Brands over $20M GMV move to a custom Enterprise quote. There's a free trial but no free plan."
+  - q: "What scales Polar Analytics' price?"
+    a: "Monthly Tracked Orders (MTO) and the feature mix. The base Analyze tier covers the BI dashboards; add-ons like Polar Pixel attribution, the CAPI Enhancer, and the Klaviyo Flow Enricher raise the price, and the whole thing scales with order volume and GMV. The practical effect: a $6M GMV brand running attribution lands near $1,020/mo, while a smaller brand on the base tier sits closer to the $300–400 entry."
+  - q: "What do you get for the price that Shopify's native analytics can't do?"
+    a: "A dedicated Snowflake warehouse per customer with full SQL access, a pre-built ecommerce semantic layer for consistent metric definitions, 45+ native data connectors (Shopify, GA4, Meta, Google, TikTok, Klaviyo, Amazon), included AI agents (Ask Polar plus five role-based agents), a first-party Polar Pixel for server-side attribution, and an MCP endpoint that gives Claude and other LLMs real-time commerce data. Unlimited users and historical data on every plan."
+  - q: "Is Polar Analytics worth it for a small store?"
+    a: "Usually not. Below roughly $1M revenue, Shopify's native analytics plus a free Looker Studio dashboard cover most of what a small store needs, and the $300–400/mo entry doesn't clear on value. Polar pays back for mid-market and Shopify Plus brands running multi-channel paid acquisition where a unified BI view across ad platforms, email, and Shopify is the actual need — and where the dedicated Snowflake depth gets used."
+  - q: "What's the catch with Polar's pricing?"
+    a: "Two things. First, the quote-gated GMV model means you can't budget from a public flat price — you select your GMV band to see a figure, and add-ons stack. Second, incrementality testing is a separate, expensive product (first test priced in the thousands per month), not bundled into the base. Data-refresh latency is also a recurring operator gripe — verify refresh timing against your reporting cadence before committing."
+  - q: "Polar Analytics vs Triple Whale — which should I choose?"
+    a: "Both are multi-channel ecommerce analytics platforms for Shopify. Polar's differentiator is the dedicated-Snowflake-per-customer architecture (full SQL warehouse depth) and the AI/MCP layer; Triple Whale leans toward a more out-of-the-box attribution dashboard. The choice comes down to whether you want warehouse-grade flexibility (Polar) or a faster-to-value attribution-first dashboard. See both reviews to compare against your stack."
+schema:
+  type: Review
+---
+
+Polar Analytics doesn't have a price tag — it has a GMV selector. The pricing page asks you to pick your annual gross merchandise value before it shows a figure, because Polar is a warehouse-native BI platform priced on your scale, not a flat SaaS tier. That makes budgeting harder, so this page reconstructs the real cost structure: where entry lands, how it scales with Monthly Tracked Orders, and what the add-ons cost.
+
+Official figures are GMV-gated on polaranalytics.com/pricing (verified 2026-06-04); the scale estimates below come from third-party 2026 analyses and are dated as such.
+
+## Bottom line up front
+
+- **Best for:** mid-market and Shopify Plus DTC brands ($1M+ revenue) running multi-channel paid acquisition.
+- **Avoid if:** you're a small store where native analytics suffice, or you won't use the warehouse depth you're paying for.
+- **Standout strength:** a dedicated Snowflake warehouse per customer — full SQL ceiling without building a data team.
+- **Biggest weakness:** quote-gated GMV pricing that's hard to budget, plus a recurring data-refresh-latency gripe.
+
+## The pricing structure (verified 2026-06-04)
+
+| GMV band | Approximate monthly cost | Notes |
+|---|---|---|
+| Entry (Analyze base) | ~$300–400/mo | BI dashboards, connectors, AI agents, Polar Pixel |
+| Analyze + Enrich | ~$400/mo+ | + CAPI Enhancer, Klaviyo Flow Enricher, forecasts |
+| ~$5M GMV | ~$720/mo | Scales with Monthly Tracked Orders |
+| ~$6M GMV (with attribution) | ~$1,020/mo | Attribution add-ons included |
+| Over $20M GMV | Custom quote | Enterprise: intraday refresh, SLA |
+
+The official page gates the exact figure behind a GMV selection, so treat the band figures above (third-party 2026) as planning estimates and confirm your number by selecting your GMV on Polar's pricing page. The structural fact: **price scales with Monthly Tracked Orders and GMV**, not seats — users and historical data are unlimited on every plan.
+
+## What actually drives the price
+
+Two dimensions: your order/GMV scale, and your feature mix. The base Analyze tier is the BI dashboards and connectors. From there:
+
+- **Polar Pixel + attribution** — first-party server-side tracking, the most common add-on, and the reason a $6M GMV brand lands near $1,020/mo rather than the base.
+- **CAPI Enhancer and Klaviyo Flow Enricher** — data-activation add-ons.
+- **Incrementality testing** — a separate, expensive product (first test priced in the thousands per month, with quarterly options), not bundled.
+
+Budget the base plus the add-ons you'll actually use, and confirm the GMV band — the gap between entry and a fully-loaded mid-market setup is several hundred dollars a month.
+
+## What the money buys
+
+This is where Polar justifies the cost over a cheaper dashboard. Every plan includes:
+
+- **A dedicated Snowflake warehouse per customer** with full SQL access — the same ceiling as building your own warehouse, without the data-engineering lift.
+- **A pre-built ecommerce semantic layer** so metric definitions stay consistent across the team.
+- **45+ native connectors** — Shopify, GA4, Meta, Google, TikTok, Klaviyo, Amazon, and more.
+- **AI agents** — Ask Polar plus five role-based agents (Data Analyst, Media Buyer, Email Marketer, Inventory Planner).
+- **A first-party Polar Pixel** for server-side attribution and improved match quality.
+- **An MCP endpoint** that gives Claude and other LLMs real-time commerce data.
+- **Unlimited users and historical data** — no seat or data-retention caps.
+
+The Snowflake-per-customer architecture is the genuine differentiator — most analytics apps put you on shared infrastructure with a query ceiling; Polar gives you a real warehouse.
+
+## What operators actually say
+
+> Polar Analytics is the easiest to use analytics app I have found for Shopify.
+>
+> — Shopify App Store review
+
+> We went from having data in multiple different places; now we can get all of our key data in one.
+>
+> — G2 review
+
+The honest counterpoint — refresh latency:
+
+> Some data takes time to update, and some ratios are more difficult to understand.
+>
+> — G2 review
+
+Polar sits at 4.8 on both G2 (30 reviews) and the Shopify App Store (109 reviews), with the support team consistently praised. Data-refresh timing is the recurring friction point — if your team makes intraday decisions, verify the refresh cadence (intraday is an Enterprise feature) before committing.
+
+## When the math works — and when it doesn't
+
+**It pays back when:**
+- You're at $1M+ revenue running multi-channel paid acquisition and need a unified BI view.
+- You'd otherwise pay a data analyst or build a warehouse — Polar's Snowflake-per-customer undercuts that.
+- You'll actually use the SQL depth, the AI agents, or the MCP endpoint.
+
+**It doesn't pay back when:**
+- You're a small store — Shopify's native analytics plus a free Looker Studio dashboard cover the basics.
+- You won't touch the warehouse depth — you're paying for capability you won't use.
+- Your reporting needs are single-channel — the multi-channel unification is the value, and it's wasted on a Shopify-only view.
+
+## Alternatives worth considering
+
+- **[Triple Whale](/tools/triple-whale)** — a multi-channel analytics and attribution platform with a more out-of-the-box dashboard posture; compare on warehouse depth vs faster time-to-value.
+- **[Northbeam](/tools/northbeam)** — attribution-focused, worth a look if multi-touch attribution is the primary need.
+
+The full set is on the [Polar Analytics alternatives](/alternatives/polar-analytics) page, and the [full Polar Analytics review](/tools/polar-analytics) covers the warehouse architecture and connector depth.
+
+## Final verdict
+
+- **Rating: 9.1/10** (matches the [full review](/tools/polar-analytics)) — warehouse-native BI priced for brands at scale.
+- **Best for:** mid-market and Shopify Plus brands running multi-channel acquisition.
+- **The real cost:** GMV-based — roughly $300–400/mo entry, ~$1,020/mo at $6M GMV with attribution; confirm your band on Polar's pricing page.
+- **Before you commit:** budget the add-ons (attribution, incrementality is separate and pricey), and verify data-refresh timing against how fast your team makes decisions.

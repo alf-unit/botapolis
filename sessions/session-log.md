@@ -676,3 +676,41 @@
 1. alternatives тонкие-категории грид (`pool.length===1` → closest-in-category вместо cross-category по рейтингу).
 
 **КРИТИЧНО:** весь НОВЫЙ контент (tool-страницы, comparisons) — СКРЫТЫМ в drip-очередь, pool продолжать от 48. alternatives/review-паттерн (enrich/reconcile live) — только для уже-существующих страниц.
+
+---
+
+## 2026-06-05 (session 2) — [infra] унификация логов + 2 режима + упразднение packet-пайплайна + реконсиляция архитектуры + Resources/
+
+### Commits
+- `docs(sessions+arch): unify session logs, retire packet pipeline, reconcile FINAL-ARCHITECTURE-V4` (dc2d5bc)
+- `docs: consolidate operator instruction/reference docs into Resources/` (04affd6)
+- `chore: relocate New_Design/ + ags/ into Resources/, fix references` (94fc6f1)
+
+### Задача
+Навести порядок в «рабочей папке»: слить разрозненные логи в один, убрать мёртвое/дублирующее, привести спеку к реальности, собрать операторские доки в одно место.
+
+### Сделано
+- **Единый `sessions/session-log.md`**: слиты `infra-log.md` + `writer-log.md` + `NEXT-SESSION-START.md`. Хронологически, теги типа `[writer]`/`[code]`/`[infra]`, хвост-5 verbatim, остальное скомпакчено. Старые 3 файла удалены.
+- **CLAUDE.md: 4 режима → 2.** Остались **Infrastructure** и **Content writing** (= Infrastructure + `Resources/CONTENT-WRITING.md`). Code/feature и CONTENT_WRITING_02 упразднены. Протокол старта читает единый лог **независимо от mode** (фикс структурного бага рассинхрона: mode-specific лог скрывал свежую работу другого типа — проявлялся «второй раз» в начале сессии).
+- **Упразднён packet/OPS контент-пайплайн**: удалён `writer-queue/` целиком + 3 helper-скрипта (`next-task`/`current-queue`/`after-publish`); из `validate-infra.ts` вычеркнуты только их проверки (живое оставлено); CLAUDE.md content-workflow переписан на data-first → hidden → drip.
+- **`Resources/FINAL-ARCHITECTURE-V4.md` реконсилирована** к состоянию 2026-06-05: баннер дельт; публикация = Vercel-cron + `page_publications` (без агентов); контент data-first; reviews→/tools (DB); добавлены `page_publications` + сводка миграций 009-020; OPS=gpt-5.5; удалены выполненные setup-фазы (Phase 1 mega-prompt, Phase 3/4) и стартовый план; Q&A/weekly-flow/Flows переписаны.
+- **Операторские доки собраны в `Resources/`**: 9 доков (6 через git mv + 3 untracked) + `New_Design/` + `ags/`. Пути обновлены в `CLAUDE.md` (+пометка «доки оператора в Resources/, туда же новые файлы»), `tsconfig.json` (exclude), комментах компонентов/скриптов, `config/partner-list.json`, session-log, памяти `ags-drop-folder`.
+
+### Обнаружено
+- **Рассинхрон логов был структурным**, не разовым: протокол велел читать только mode-specific лог → свежая работа другого типа невидима. Лечится единым логом + чтением независимо от mode.
+- `validate-infra.ts` завязан на `writer-queue/`/`content-templates/`/helper-скрипты — при удалении надо синхронно чистить его проверки, иначе `npm run validate:infra` падает.
+- `tsconfig.json` исключает `New_Design` из компиляции — переезд папки требует правки exclude (иначе билд начнёт компилировать вложенный Next-проект). Build-critical.
+- **`agent-snapshots/` нельзя просто перенести**: живые агенты (CHIEF/OPS на Mac Mini) пишут туда ежедневно через GitHub API по захардкоженному пути; перенос без правки их AGENTS.md на Mac Mini → они пересоздадут папку в корне + дубль. Оставлена в корне.
+- Pre/post-commit хуки не сработали (нет staged MDX под content/) — безопасно для не-контентных коммитов.
+
+### Fixes
+- Единый лог + read-regardless-of-mode протокол (фикс рассинхрона).
+- validate-infra.ts: убраны проверки мёртвого packet-пайплайна.
+- tsconfig exclude New_Design → Resources/New_Design.
+
+### Open follow-ups
+- **agent-snapshots/ перенос в Resources/** — отложен до пересмотра roster агентов (нужна синхронная правка путей у агентов на Mac Mini + validate-infra).
+- **PHASE-0-BLUEPRINT.md** — оператор: файл мёртв, ждёт удаления, никто не пользуется. Правки оставлены локально незакоммиченными (на GitHub чистая версия); в CLAUDE.md помечен историческим. Не реанимировать как актуальный.
+- **4 untracked-дока в Resources/** (BOTAPOLIS-PLAYBOOK-V2, INSTRUCTIONS, TRI-AGENT-ARCHITECTURE, Extra_Tools) — оставлены локальными по решению оператора. Следствие: ссылка CLAUDE.md → BOTAPOLIS-PLAYBOOK-V2 битая в свежем клоне (оператор принял).
+- **Контент 2-й волны (актуальная точка входа из блока 2026-06-05 выше):** Часть 2 — залить 19 внешних туллов в каталог (`Resources/Extra_Tools.md`); Часть 3 — 19 tool-страниц + 24 vs-comparison, скрытыми в drip-очередь, pool от #48.
+- Прочее без изменений: Pagefind покрытие pricing/best; homepage «Latest reviews» сломан; roster агентов под пересмотром (OPS убрать и т.д.).

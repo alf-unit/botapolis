@@ -9,4 +9,7 @@ export {
 } from "@/app/guides/[slug]/page"
 
 export const revalidate = 86400
-export const dynamicParams = false
+// Mirror /guides/[slug]: dynamicParams=true so drip-revealed RU guides render
+// on-demand without a redeploy (the getMdxContent gate is the visibility
+// authority). See the EN route for the full rationale.
+export const dynamicParams = true

@@ -28,7 +28,13 @@ import { absoluteUrl } from "@/lib/utils"
 ---------------------------------------------------------------------------- */
 
 export const revalidate = 86400
-export const dynamicParams = false
+// `true` so a drip-revealed guide renders on-demand the moment its
+// page_publications gate flips visible — mirrors /pricing, /best, /tools.
+// With `false`, getAllMdxSlugs filters hidden slugs out of
+// generateStaticParams, so a drip-flipped guide would stay 404 until the next
+// full deploy. dynamicParams=true lets the getMdxContent gate be the single
+// visibility authority: hidden → 404, flip + revalidate → 200, no redeploy.
+export const dynamicParams = true
 
 interface PageProps {
   params: Promise<{ slug: string }>

@@ -97,6 +97,74 @@ function repoPathToPublicUrl(p: string): string | null {
 }
 
 /* ============================================================================
+   Drip-gate awareness (2026-06-04)
+   ----------------------------------------------------------------------------
+   The status='published' flip below must reflect ACTUAL public visibility, not
+   the mere fact of a commit. A page committed while hidden (page_publications
+   .visible_at IS NULL, awaiting the drip cron) must NOT mark its semantic_core
+   key published — otherwise reporting shows pages "published" that 404. Before
+   this guard, every hidden-content commit flipped the key to published, forcing
+   a manual reconcile each wave. Now: published ONLY when the gate says visible;
+   otherwise ready_to_publish. The drip cron flips it to published when it makes
+   the page visible (matching the canonical published_article_path we set here).
+============================================================================ */
+const GATED_TYPES = new Set([
+  "pricing",
+  "guides",
+  "best",
+  "tools",
+  "comparisons",
+  "alternatives",
+])
+
+function parseRepoPath(
+  p: string,
+): { type: string; locale: "en" | "ru"; slug: string } | null {
+  const m = p.match(/^content\/([^/]+)\/(en|ru)\/(.+)\.mdx$/)
+  if (!m) return null
+  return { type: m[1], locale: m[2] as "en" | "ru", slug: m[3] }
+}
+
+/** Locale-agnostic canonical public path (e.g. /pricing/klaviyo, /compare/x-vs-y).
+ *  Matches the drip cron's semanticPathCandidates[0] so a later visibility flip
+ *  syncs the same row. */
+function canonicalPublicPath(type: string, slug: string): string {
+  const seg = type === "comparisons" ? "compare" : type
+  return `/${seg}/${slug}`
+}
+
+/** Is the page publicly visible RIGHT NOW (so its key may be marked published)?
+ *  - gate flag off → visible (legacy behavior, no drip in play)
+ *  - type not drip-managed (e.g. news) → visible
+ *  - else visible IFF a page_publications row exists with visible_at NOT NULL.
+ *    No row, or visible_at NULL → hidden (mirrors lib/content/visibility.ts).
+ *  Fails OPEN on a transient DB error — at worst a key is marked published a
+ *  little early; the page-gate still controls real visibility, so a hidden page
+ *  is never leaked by this. */
+async function isPageVisibleNow(
+  supabase: ReturnType<typeof createServiceClient>,
+  type: string,
+  slug: string,
+): Promise<boolean> {
+  if (process.env.DRIP_GATE_ENABLED !== "true") return true
+  if (!GATED_TYPES.has(type)) return true
+  const { data, error } = await supabase
+    .from("page_publications")
+    .select("visible_at")
+    .eq("content_type", type as "pricing")
+    .eq("slug", slug)
+    .maybeSingle()
+  if (error) {
+    console.error(
+      `[article-published] gate check failed for ${type}/${slug} — failing open:`,
+      error.message,
+    )
+    return true
+  }
+  return data?.visible_at != null
+}
+
+/* ============================================================================
    Comparison MDX → public.comparisons bridge (Phase 3 finding 2026-05-26)
    ----------------------------------------------------------------------------
    Reviews/guides are served from MDX directly. Comparisons however are
@@ -331,13 +399,40 @@ export async function POST(req: NextRequest) {
       continue
     }
 
+    // Drip-aware status flip. A page committed while hidden (gate visible_at
+    // NULL) is queued, not live — mark ready_to_publish, NOT published. The
+    // drip cron promotes it to published when it flips visibility. The path is
+    // the locale-agnostic canonical form so the cron's exact-path sync matches.
+    const parsedPath = parseRepoPath(f.path)
+    const repoType = parsedPath?.type ?? ""
+    const pageSlug = parsedPath?.slug ?? f.slug ?? ""
+    const canonicalPath = parsedPath
+      ? canonicalPublicPath(parsedPath.type, parsedPath.slug)
+      : `/${f.path}`
+    const visibleNow = parsedPath
+      ? await isPageVisibleNow(supabase, repoType, pageSlug)
+      : true
+    const nowIso = new Date().toISOString()
+
     const { error: updErr } = await supabase
       .from("semantic_core_entries")
-      .update({
-        status: "published",
-        published_at: new Date().toISOString(),
-        published_article_path: `/${f.path}`,
-      })
+      .update(
+        visibleNow
+          ? {
+              status: "published",
+              published_at: nowIso,
+              status_changed_at: nowIso,
+              published_article_path: canonicalPath,
+            }
+          : {
+              // Hidden / drip-queued — do NOT mark published, do NOT stamp
+              // published_at. The cron sets both when the page goes live.
+              status: "ready_to_publish",
+              published_at: null,
+              status_changed_at: nowIso,
+              published_article_path: canonicalPath,
+            },
+      )
       .eq("id", rowId)
 
     if (updErr) {
@@ -349,13 +444,21 @@ export async function POST(req: NextRequest) {
       agent_name: "CLAUDE_CODE",
       event_type: "task_completed",
       severity: "info",
-      message: `article published: ${f.path}`,
-      context: { commit_sha: body.commit_sha, match: matchReason, public_url: publicUrl },
+      message: visibleNow
+        ? `article published: ${f.path}`
+        : `article queued (hidden, drip): ${f.path}`,
+      context: {
+        commit_sha: body.commit_sha,
+        match: matchReason,
+        public_url: publicUrl,
+        visible_now: visibleNow,
+        new_status: visibleNow ? "published" : "ready_to_publish",
+      },
       related_entity_type: "semantic_core_entries",
       related_entity_id: rowId,
     })
 
-    results.push({ path: f.path, matched: true, bridged: bridgeNote })
+    results.push({ path: f.path, matched: true, bridged: bridgeNote, reason: visibleNow ? "published" : "queued_hidden" })
   }
 
   return NextResponse.json({

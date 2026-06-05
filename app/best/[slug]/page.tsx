@@ -41,7 +41,15 @@ import type { ToolRow } from "@/lib/supabase/types"
 ---------------------------------------------------------------------------- */
 
 export const revalidate = 86400
-export const dynamicParams = false
+// `true` so a drip-revealed listing renders on-demand the moment its
+// page_publications gate flips visible — mirrors /pricing/[slug] and
+// /tools/[slug]. With `false`, generateStaticParams is frozen at build time
+// (and getAllMdxSlugs filters hidden slugs out of it), so a slug flipped
+// visible by the drip cron would stay 404 until the next full deploy because
+// revalidatePath can't add a param to a closed set. `true` lets the
+// getMdxContent drip gate be the single visibility authority: hidden → 404,
+// flip + revalidate → 200, no redeploy. Unknown slugs still 404 via notFound().
+export const dynamicParams = true
 
 interface PageProps {
   params: Promise<{ slug: string }>

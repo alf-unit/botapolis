@@ -226,3 +226,64 @@ For 007, Omnisend side was thinner — research has competing-ESP Omnisend prici
 **КРИТИЧНО:** весь новый контент СКРЫТЫМ в drip-очередь, НЕ live разом.
 
 Пауза НЕ ставится — drip капает штатно 4/день, #1/#2 (adcreative-ai, smile-io) выйдут ближайшей ночью 01:00 LA.
+
+---
+
+## 2026-06-05 — 2-я волна ЧАСТЬ 1 ЗАКРЫТА (best-for + guide/how-to + alternatives + review)
+
+### Commits
+- `fix(best): dynamicParams=true so drip reveals best pages without redeploy`
+- `content(best): 2 control best-for listings — subscription + review apps (EN+RU, hidden/drip)`
+- `content(best): 7 best-for-segment listings batch (EN+RU, hidden/drip pool 17-23)`
+- `fix(guides): dynamicParams=true so drip reveals guides without redeploy`
+- `content(guides): 2 control guides — Yotpo Loyalty + Klaviyo for Shopify (EN+RU, hidden/drip)`
+- `content(guides): 22 guide+how-to pages batch (EN+RU, hidden/drip pool 26-47)`
+- `docs(session): writer-log — Часть 1 2-й волны закрыта` (this commit)
+
+(alternatives + review — DB-only, без коммитов: editorial jsonb + semantic_core reconcile.)
+
+### Задача
+Закрыть Часть 1 второй волны: best-for-segment (29 ключей), guide+how-to (34), alternatives (20), review (6). Контроль-first на каждом новом типе, потом пачка. Всё новое — СКРЫТЫМ в drip-очередь; alternatives/review — особый случай (страницы уже live).
+
+### Сделано — ЧАСТЬ 1 ЗАКРЫТА
+- **best-for-segment: 9 страниц написано СКРЫТЫМИ** (EN+RU), drip pool **#15-23**. 29 ключей: 12 → 7 новых + 2 контрольных (multi-keyword поглощение), 11 → существующие 8 best (published), 4 → 2 контрольных (ready). `second_wave best-for = 0`.
+- **guide+how-to: 24 страницы написано СКРЫТЫМИ** (EN+RU), drip pool **#24-47**. 34 ключа: 32 → 22 страницы (2 контроль + 22 батч... = 24 страницы; multi-keyword: loyalty 4, sidekick 3, и т.д.). `second_wave guide/how-to = 0`. Метод: tool rows + vendor docs (Klaviyo/AfterShip/Yotpo/Sidekick help-centers) + WebSearch.
+- **alternatives: 14 страниц ОБОГАЩЕНО editorial (enrich-in-place, остались LIVE)**. 20 ключей → published. `tools.alternatives_editorial` jsonb (intro/verdict EN+RU + perCardContext на 6). Честность: partner-first грид, но verdict честно ставит бесплатное/нативное #1 по фиту где правда (yotpo/loox→judge-me, mailchimp→omnisend free tier) с явной оговоркой про комиссию. `second_wave alternatives = 0`.
+- **review: 6 ключей РЕКОНСИЛЕНО → published** на существующие live /tools/ обзоры. «is X worth it» варианты для mailchimp/triple-whale/adcreative-ai/klaviyo/yotpo — уже полные обзоры, writing не требовался. `second_wave review = 0`.
+
+### Drip-очередь итого
+`pool total=47, visible=4, hidden=43`: pricing #1-14 (4 visible), best #15-23, guides #24-47 — все hidden, капают 4/день 01:00 LA. alternatives+review — live (не в очереди).
+
+### Сверка second_wave (по всем типам Части 1 = 0)
+`SELECT template,count(*) WHERE status='second_wave'`: остаток **только** `vs-comparison 29` (Часть 3, не делали) + `discount 44` (deferred до партнёрок). Все типы Части 1 (pricing/best-for/guide/how-to/alternatives/review) = 0. ✓
+
+### Фиксы сессии
+- **dynamicParams=false → true на `/best/[slug]` + `/guides/[slug]`** (оба + RU mirror). Был баг: `getAllMdxSlugs` фильтрует скрытые слаги из `generateStaticParams`, при `dynamicParams=false` drip-флип не раскрыл бы страницу (404 до деплоя, т.к. revalidatePath не перезапускает generateStaticParams). Доказано на проде: флип visible+revalidate → 200 без редеплоя. pricing/tools/alternatives уже были true.
+- **recharge `pricing_min` 25→99** (публичный Starter; скрытый $25-тариф для new merchants ≤50 подписчиков описан в pricing_notes/_ru как off-page sandbox, $99 = устойчивый пол). Vendor TODAY (getrecharge.com 2026-06-05) публично показывает $99.
+
+### Обнаружено
+- **alternatives тонкие-категории грид-fallback (CODE-ДОЛГ).** 8 из 14 alternatives-страниц (manychat, tidio, aftership, attentive, adcreative-ai, signifyd, loyaltylion, pencil) имеют категорию из 1-2 тулзов → `fetchAlternatives` падает в fallback на топ-по-рейтингу ЛЮБОЙ категории (показывает judge-me/loop-subscriptions/loox вместо релевантных). Editorial intro/verdict честно это обрабатывают (называют реальную альтернативу + помечают broad list), но грид нерелевантен. **Фикс на потом:** при `pool.length===1` показывать единственного category-mate + «closest in category», не cross-category по рейтингу; либо `alternatives_to` для пина.
+- **alternatives + review — НЕ drip-юниты.** Страницы уже live с Etap F (auto-grid/обзоры), pool_number нет. 2-я волна для них = enrich/reconcile-in-place (правка живого, не новая публикация → velocity-риска нет). Не прятать. Та же логика что 116 первой волны.
+- **Multi-keyword поглощение** (как best-for): несколько ключей про один тул → одна страница. guide: loyalty(4)/sidekick(3)/omnisend,attentive,manychat,recharge,smile-io,aftership,loop-subs,loop-returns(2). alternatives: mailchimp(4)/adcreative-ai(3)/omnisend(2). Объясняет «недостачу» при наивном счёте страниц.
+
+### Fixes
+- `app/best/[slug]/page.tsx` + `app/ru/best/[slug]/page.tsx` — dynamicParams=true.
+- `app/guides/[slug]/page.tsx` + `app/ru/guides/[slug]/page.tsx` — dynamicParams=true.
+- `tools.alternatives_editorial` для 14 тулзов (mailchimp, yotpo, omnisend, northbeam, loox, judge-me, manychat, tidio, aftership, attentive, adcreative-ai, signifyd, loyaltylion, pencil).
+- `tools.pricing_min`/`pricing_notes`/`pricing_notes_ru` для recharge (25→99 + hidden-$25 framing).
+
+### Open follow-ups / ТОЧКА ВХОДА — следующая сессия (Content writing)
+
+**ЧАСТЬ 2 — залить 19 внешних туллов в каталог:**
+- Источник Deep Research: `/mnt/user-data/uploads/Extra_Tools.md` (19 внешних конкурентов из Часть-2-анализа). Отдать Claude Code → INSERT 19 `tools`-строк (БЕЗ миграций, существующие поля).
+- **affiliate_url где партнёрка есть:** Constant Contact, ActiveCampaign, Brevo, Hyros, Chatfuel, LiveChat, Help Scout, ShipStation, Bazaarvoice.
+- **carve-out (нет CTA, /go/→/tools) где нет:** Zendesk, Intercom, Riskified, ParcelLab, Route, Google Analytics, Rockerbox, Stamped + слабые Bold Subscriptions, Returnly.
+
+**ЧАСТЬ 3 — генерация по новым туллам:**
+- (6) **19 tool-страниц** новых туллов → `/tools/` СКРЫТЫМИ, pool продолжать **от 48**, по priority внешнего (Constant Contact → Bazaarvoice → ActiveCampaign → Hyros → Chatfuel → Brevo → Stamped → хвост). Контроль-first.
+- (7) **24 vs-comparison** → `/compare/` DB-driven СКРЫТЫМИ, по priority ключа (`mailchimp vs constant contact` ps1170 первый). **Контроль-first для comparison** (DB-bridge MDX→`public.comparisons` + gate-строка `content_type='comparisons'` + **RU-row ВРУЧНУЮ** — translate-script comparisons НЕ покрывает). webhook drip-aware уже пофикшен — reconcile не нужен.
+
+**CODE-долги (когда дойдём до кода):**
+1. alternatives тонкие-категории грид (`pool.length===1` → closest-in-category вместо cross-category по рейтингу).
+
+**КРИТИЧНО:** весь НОВЫЙ контент (tool-страницы, comparisons) — СКРЫТЫМ в drip-очередь, pool продолжать от 48. alternatives/review-паттерн (enrich/reconcile live) — только для уже-существующих страниц.

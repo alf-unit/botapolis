@@ -2,7 +2,7 @@
   "$schema": "./partner-list.schema.json",
   "version": 2,
   "updated_at": "2026-05-20",
-  "description": "Affiliate / partner relationships. The Supabase tools table is source-of-truth for runtime URLs (so /go/[slug] resolves quickly); this JSON is the auditable source-of-truth for terms, contacts, and contractual notes that don't belong in a DB row. Entries seeded from BOTAPOLIS-PLAYBOOK-V2.md Part 4.1 — commission rates and tracking_provider values are PLACEHOLDERS UNTIL OPERATOR SIGNS THE PROGRAM; affiliate_url stays NULL until approval lands.",
+  "description": "Affiliate / partner relationships. The Supabase tools table is source-of-truth for runtime URLs (so /go/[slug] resolves quickly); this JSON is the auditable source-of-truth for terms, contacts, and contractual notes that don't belong in a DB row. Entries seeded from Resources/BOTAPOLIS-PLAYBOOK-V2.md Part 4.1 — commission rates and tracking_provider values are PLACEHOLDERS UNTIL OPERATOR SIGNS THE PROGRAM; affiliate_url stays NULL until approval lands.",
   "field_rules": {
     "status": "pending_approval = applied but no contract yet | active = signed and tracking | paused = active but we're not driving traffic | declined = they said no | terminated = we left or they kicked us",
     "commission_rate_pct": "NULL until contract is signed and we've seen the actual ledger rate (vendor public claims are routinely different from real payout). Do NOT use the playbook's 'expected' rate here — that lives in notes.",

@@ -21,7 +21,7 @@ import { formatPrice } from "@/lib/utils"
    Localisation: helpers accept a `locale` arg. We only render in EN or
    RU; the RU output keeps acronyms / product names / metrics in English
    (MRR, AOV, ROI, SMS, AI) per the project translation convention
-   documented in HANDOFF.md.
+   documented in Resources/HANDOFF.md.
 ---------------------------------------------------------------------------- */
 
 type Locale = "en" | "ru"

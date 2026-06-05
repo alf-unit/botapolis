@@ -1,7 +1,7 @@
 /**
  * pricing-bulk-db-sync.ts
  * ----------------------------------------------------------------------------
- * Per CONTENT-WRITING.md rule: when realtime web finds fresh official data
+ * Per Resources/CONTENT-WRITING.md rule: when realtime web finds fresh official data
  * that differs from the base, update existing fields in tools row. No new
  * fields, no migrations.
  *

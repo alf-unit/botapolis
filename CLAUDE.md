@@ -17,8 +17,8 @@
 
 | Mode | Когда применяется | Что читать на старте |
 |------|-------------------|----------------------|
-| **Infrastructure** | Агенты (CHIEF/SCOUT/OPS/OpenClaw), миграции/схема БД, скрипты, код сайта, компоненты, фичи, баги, перформанс | `FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ (см. "Infrastructure mode — mandatory reading protocol" ниже) |
-| **Content writing** | Контент: статьи, MDX, pSEO-страницы (reviews/comparisons/alternatives/listings/pricing/guides), RU-переводы, refresh | то же что Infrastructure (`FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ) **ПЛЮС** `CONTENT-WRITING.md` ПОЛНОСТЬЮ (см. "Content writing mode — mandatory reading protocol" ниже) |
+| **Infrastructure** | Агенты (CHIEF/SCOUT/OPS/OpenClaw), миграции/схема БД, скрипты, код сайта, компоненты, фичи, баги, перформанс | `Resources/FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ (см. "Infrastructure mode — mandatory reading protocol" ниже) |
+| **Content writing** | Контент: статьи, MDX, pSEO-страницы (reviews/comparisons/alternatives/listings/pricing/guides), RU-переводы, refresh | то же что Infrastructure (`Resources/FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ) **ПЛЮС** `Resources/CONTENT-WRITING.md` ПОЛНОСТЬЮ (см. "Content writing mode — mandatory reading protocol" ниже) |
 
 **Content writing — это надмножество Infrastructure:** тот же архитектурный контекст плюс контентные правила. В нём ты знаешь и инфраструктуру, и контент-пайплайн одновременно.
 
@@ -28,7 +28,7 @@
 - `multiSelect`: false
 - `options`: два варианта в этом порядке:
   1. label "Infrastructure", description "Агенты, миграции БД, скрипты, код сайта, фичи, баги"
-  2. label "Content writing", description "Контент/MDX/pSEO/RU — Infrastructure + CONTENT-WRITING.md"
+  2. label "Content writing", description "Контент/MDX/pSEO/RU — Infrastructure + Resources/CONTENT-WRITING.md"
 
 Не перечисляй mode простым текстом, не задавай вопрос словами — только через тул.
 
@@ -43,8 +43,8 @@
 После того как оператор подтвердил mode — **выполни ДВА действия в одном сообщении (параллельные tool calls), до любого другого ответа оператору:**
 
 1. **Прочитай mode-specific instruction file(ы) ПОЛНОСТЬЮ** (из таблицы Operating modes выше):
-   - Infrastructure → `FINAL-ARCHITECTURE-V4.md` (особый pagination protocol — см. ниже)
-   - Content writing → `FINAL-ARCHITECTURE-V4.md` **И** `CONTENT-WRITING.md` (оба ПОЛНОСТЬЮ — см. "Content writing mode — mandatory reading protocol" ниже)
+   - Infrastructure → `Resources/FINAL-ARCHITECTURE-V4.md` (особый pagination protocol — см. ниже)
+   - Content writing → `Resources/FINAL-ARCHITECTURE-V4.md` **И** `Resources/CONTENT-WRITING.md` (оба ПОЛНОСТЬЮ — см. "Content writing mode — mandatory reading protocol" ниже)
 2. **Прочитай последние 3-4 блока единого лога `/sessions/session-log.md`** — **независимо от выбранного mode**. Типы сессий перемешаны по дате, и контекст последней работы (а также точка входа следующей сессии) может быть из сессии любого типа. Читать только «свой» тип нельзя — именно так возникал баг рассинхрона (заходишь в Infrastructure, а свежая работа была в writer-сессии, и ты её не видишь).
 
 Instruction file даёт детальные операционные правила для mode'а. Лог даёт контекст последних работ: что было сделано, какие quirks обнаружены, какие fixes применены, open follow-ups которые могут быть релевантны текущей задаче.
@@ -53,13 +53,13 @@ Instruction file даёт детальные операционные прави
 
 ### Infrastructure mode — mandatory reading protocol
 
-**При выборе оператором Infrastructure mode ты ОБЯЗАН прочитать `FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ до того как задашь "что делаем сегодня?" или начнёшь любую работу.**
+**При выборе оператором Infrastructure mode ты ОБЯЗАН прочитать `Resources/FINAL-ARCHITECTURE-V4.md` ПОЛНОСТЬЮ до того как задашь "что делаем сегодня?" или начнёшь любую работу.**
 
 Этот файл — единственный источник правды по multi-agent системе (CHIEF/SCOUT/OPS/CLAUDE_CODE, схема Supabase, HEARTBEAT cron'ы, Deep Research format, setup phases). Без него ты будешь предлагать решения противоречащие спеке, и оператору придётся всё переобъяснять.
 
 **Protocol чтения:**
 
-1. Сделай `Read` на `FINAL-ARCHITECTURE-V4.md`.
+1. Сделай `Read` на `Resources/FINAL-ARCHITECTURE-V4.md`.
 2. **Если получаешь ошибку "File content exceeds maximum allowed tokens"** — это ожидаемо, файл ~1771 строк / ~28k токенов. Read'ни постранично через `offset`/`limit`, три параллельных вызова в одном сообщении:
    - `offset=1, limit=600`
    - `offset=601, limit=600`
@@ -73,12 +73,12 @@ Instruction file даёт детальные операционные прави
 
 **При выборе оператором Content writing mode ты ОБЯЗАН прочитать ДВА файла ПОЛНОСТЬЮ до того как задашь "что делаем сегодня?" или начнёшь любую работу:**
 
-1. **`FINAL-ARCHITECTURE-V4.md`** — то же что в Infrastructure mode (тот же pagination protocol при token-limit, см. выше). Контент-сессии тоже трогают БД, миграции, агентов, роуты и drip-гейт — без архитектурного контекста будешь предлагать решения противоречащие спеке.
-2. **`CONTENT-WRITING.md`** — операционные правила производства контента: data-first + realtime web метод, banned phrases, `/go/[slug]`, JSON-LD, honest framing, EN+RU same-session, Definition of Done, RU style anti-rules, gate-строка drip-очереди.
+1. **`Resources/FINAL-ARCHITECTURE-V4.md`** — то же что в Infrastructure mode (тот же pagination protocol при token-limit, см. выше). Контент-сессии тоже трогают БД, миграции, агентов, роуты и drip-гейт — без архитектурного контекста будешь предлагать решения противоречащие спеке.
+2. **`Resources/CONTENT-WRITING.md`** — операционные правила производства контента: data-first + realtime web метод, banned phrases, `/go/[slug]`, JSON-LD, honest framing, EN+RU same-session, Definition of Done, RU style anti-rules, gate-строка drip-очереди.
 
 **Protocol чтения:** оба файла Read'ятся ПОЛНОСТЬЮ. **Если "File content exceeds maximum allowed tokens"** — paginate (offset/limit, параллельные вызовы в одном сообщении), НИКОГДА не skip (зафиксированный паттерн нарушения, memory `feedback_infra-mode-read-architecture-fully.md`). Только после обоих файлов + последних 3-4 блоков `session-log.md` — спрашивай "что делаем сегодня?".
 
-**Content writing = Infrastructure + контент-слой.** Весь pSEO-контент (reviews/comparisons/alternatives/listings/pricing/guides) и уникальные editorial-страницы делаются в этом режиме; метод — в `CONTENT-WRITING.md`. Историческая data-first спека `PHASE-0-BLUEPRINT.md` — read-on-demand reference (её рабочая часть уже перенесена в `CONTENT-WRITING.md`).
+**Content writing = Infrastructure + контент-слой.** Весь pSEO-контент (reviews/comparisons/alternatives/listings/pricing/guides) и уникальные editorial-страницы делаются в этом режиме; метод — в `Resources/CONTENT-WRITING.md`. Историческая data-first спека `Resources/PHASE-0-BLUEPRINT.md` — read-on-demand reference (её рабочая часть уже перенесена в `Resources/CONTENT-WRITING.md`).
 
 ### В конце сессии (когда оператор просит сохраниться)
 
@@ -118,11 +118,13 @@ Instruction file даёт детальные операционные прави
 
 ## Key documents (read on demand)
 
-- `BOTAPOLIS-PLAYBOOK-V2.md` — стратегия, монетизация, позиционирование, бизнес-логика. Читай когда нужно понять why behind decisions.
-- `FINAL-ARCHITECTURE-V4.md` — техническая архитектура multi-agent системы (3 OpenClaw агента + Web Chat + Claude Code). Читай когда нужно понять как агенты взаимодействуют или работаешь с инфраструктурой.
-- `CONTENT-WRITING.md` — детальные операционные правила производства контента (data-first + realtime web метод, banned phrases, /go/, JSON-LD, EN+RU same-session, Definition of Done, RU style anti-rules, drip gate-строка). **Mandatory read в Content writing mode.**
-- `PHASE-0-BLUEPRINT.md` — историческая data-first pSEO спека (column-wise ресёрчи, генерация эшелонов, нумерация пула). Read-on-demand reference; рабочая часть метода перенесена в `CONTENT-WRITING.md`.
-- `HANDOFF.md` — историч. операционный контекст для кодовых работ. Read-on-demand (режим Code/feature упразднён — код-работа идёт в Infrastructure mode).
+> **Все инструкционные / справочные доки оператора лежат в `Resources/`** (туда же оператор кладёт новые файлы, которые передаёт Claude). В корне репо остаются только `CLAUDE.md`, `AGENTS.md`, `README.md` + проектные config/code файлы.
+
+- `Resources/BOTAPOLIS-PLAYBOOK-V2.md` — стратегия, монетизация, позиционирование, бизнес-логика. Читай когда нужно понять why behind decisions.
+- `Resources/FINAL-ARCHITECTURE-V4.md` — техническая архитектура multi-agent системы (3 OpenClaw агента + Web Chat + Claude Code). Читай когда нужно понять как агенты взаимодействуют или работаешь с инфраструктурой.
+- `Resources/CONTENT-WRITING.md` — детальные операционные правила производства контента (data-first + realtime web метод, banned phrases, /go/, JSON-LD, EN+RU same-session, Definition of Done, RU style anti-rules, drip gate-строка). **Mandatory read в Content writing mode.**
+- `Resources/PHASE-0-BLUEPRINT.md` — историческая data-first pSEO спека (column-wise ресёрчи, генерация эшелонов, нумерация пула). Read-on-demand reference; рабочая часть метода перенесена в `Resources/CONTENT-WRITING.md`.
+- `Resources/HANDOFF.md` — историч. операционный контекст для кодовых работ. Read-on-demand (режим Code/feature упразднён — код-работа идёт в Infrastructure mode).
 - `/semantic-core/full-core.csv` — 427 keywords ядро. Не читай целиком, обращайся к нужным entries через Supabase когда требуется.
 
 ## Repo structure (top-level)
@@ -138,6 +140,7 @@ botapolis/
 │   ├── guides/{en,ru}/
 │   ├── news/{en,ru}/
 │   └── best/{en,ru}/
+├── Resources/                  — доки-инструкции/справки оператора (+ новые передаваемые файлы)
 ├── content-templates/          — шаблоны структур статей
 ├── research/                   — column-wise ресёрчи (R1-R6) + content-flags, baseline данные
 ├── semantic-core/              — 427 keywords ядро
@@ -156,14 +159,14 @@ botapolis/
 
 ## Content workflow (data-first → hidden → drip publish)
 
-Контент производится **data-first методом**. Источник правды — `CONTENT-WRITING.md` (mandatory read в Content writing mode). Старый packet / OPS / writer-queue пайплайн **упразднён** — task packets, `next-task.sh`, ручная очередь больше не используются.
+Контент производится **data-first методом**. Источник правды — `Resources/CONTENT-WRITING.md` (mandatory read в Content writing mode). Старый packet / OPS / writer-queue пайплайн **упразднён** — task packets, `next-task.sh`, ручная очередь больше не используются.
 
-Высокоуровнево (детали — в `CONTENT-WRITING.md`):
+Высокоуровнево (детали — в `Resources/CONTENT-WRITING.md`):
 
 1. **База:** `tools` row в Supabase (заполнен 6 column-wise ресёрчами R1-R6) + при необходимости `/research/*` baseline.
 2. **Realtime веб-добор:** WebFetch vendor pricing/features page + WebSearch top third-party math + свежие operator quotes. Baseline устаревает за дни — realtime augmentation per-article обязателен.
 3. **Синтез в MDX / DB-row** (тип определяет surface: reviews/comparisons/alternatives → DB-driven; pricing/guides/best → MDX+DB hybrid). Расхождения веба с базой → UPDATE существующих полей БД (НЕ новые миграции; в commit-summary "тул: было→стало, источник"). `/compare/` live-правки — только через loader, не MDX-edit (webhook не overwrite'ит existing rows).
-4. **EN + RU в одной сессии** (hard rule — см. ниже + CONTENT-WRITING.md).
+4. **EN + RU в одной сессии** (hard rule — см. ниже + Resources/CONTENT-WRITING.md).
 5. **Definition of Done** (hard rule — см. ниже): хаб + Navbar/Footer + sitemap + перелинковка + валидатор зелёный.
 6. **Новый контент создаётся СКРЫТЫМ** (`page_publications.visible_at=NULL` + `pool_number`) → drip-очередь. Vercel-cron `/api/cron/drip-publish` (01:00 LA) раскрывает N/день (эскалация 4→7→10/мес). **НЕ публиковать пачками** — velocity-flag риск (требование оператора).
 7. `git commit` — pre-commit валидатор (`validate:content --strict-pairing`: schema + safety + EN↔RU pairing); post-commit webhook drip-aware флипает status только для видимых страниц.
@@ -193,8 +196,8 @@ botapolis/
 - **Все affiliate URLs в коде идут через `/go/[slug]` pattern.** Никогда прямые vendor ссылки.
 - **Все секретные значения через `process.env.*`**, никогда hardcoded.
 - **Banned phrases enforced.** Список — `/config/banned-phrases.json`.
-- **EN+RU в одной сессии (hard rule, 2026-06-03).** Любой EN-контент (MDX, DB-driven, гибрид) → RU twin создаётся Claude Code в той же сессии. Movement движок — сам Claude Code (Opus/Max, бесплатно), НЕ Haiku/OpenRouter (этот путь удалён). Pre-commit валидатор обходит весь `content/*/{en,ru}/` tree и проверяет pairing. Детали — раздел 3 "Локализация" в `CONTENT-WRITING.md`. Opt-out через `noRuPair: true` во frontmatter для редких EN-only случаев.
-- **DEFINITION OF DONE (hard rule, 2026-06-03).** Страница любого типа НЕ готова и НЕ публикуется пока не выполнено ВСЁ: (1) EN+RU контент; (2) FINDABLE — страница в хабе своего типа И в Navbar/Footer (не орфан); (3) в `app/sitemap.ts` (оба языка); (4) перелинкована (Related + PartnerAlts + внутренние ссылки + backlinks с `/compare/`); (5) валидатор `npm run validate:content -- --strict-pairing` зелёный. Type-agnostic — применяется к pricing/guide/comparison/alternatives/best/review/news и всем будущим типам. При генерации пачки контента навигация/хаб/sitemap/перелинковка делаются в том же заходе, не postfactum. Детали — раздел "DEFINITION OF DONE" в `CONTENT-WRITING.md`.
+- **EN+RU в одной сессии (hard rule, 2026-06-03).** Любой EN-контент (MDX, DB-driven, гибрид) → RU twin создаётся Claude Code в той же сессии. Movement движок — сам Claude Code (Opus/Max, бесплатно), НЕ Haiku/OpenRouter (этот путь удалён). Pre-commit валидатор обходит весь `content/*/{en,ru}/` tree и проверяет pairing. Детали — раздел 3 "Локализация" в `Resources/CONTENT-WRITING.md`. Opt-out через `noRuPair: true` во frontmatter для редких EN-only случаев.
+- **DEFINITION OF DONE (hard rule, 2026-06-03).** Страница любого типа НЕ готова и НЕ публикуется пока не выполнено ВСЁ: (1) EN+RU контент; (2) FINDABLE — страница в хабе своего типа И в Navbar/Footer (не орфан); (3) в `app/sitemap.ts` (оба языка); (4) перелинкована (Related + PartnerAlts + внутренние ссылки + backlinks с `/compare/`); (5) валидатор `npm run validate:content -- --strict-pairing` зелёный. Type-agnostic — применяется к pricing/guide/comparison/alternatives/best/review/news и всем будущим типам. При генерации пачки контента навигация/хаб/sitemap/перелинковка делаются в том же заходе, не postfactum. Детали — раздел "DEFINITION OF DONE" в `Resources/CONTENT-WRITING.md`.
 
 ## When you need to know more
 

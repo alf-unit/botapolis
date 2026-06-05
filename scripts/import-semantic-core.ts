@@ -164,7 +164,7 @@ async function main() {
   if (!supabaseUrl || !serviceKey) {
     console.error(
       "[import] missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. " +
-        "Check .env.local; vercel env pull returns empty strings on this account — see HANDOFF.md.",
+        "Check .env.local; vercel env pull returns empty strings on this account — see Resources/HANDOFF.md.",
     )
     process.exit(2)
   }

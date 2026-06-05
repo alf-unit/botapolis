@@ -2,7 +2,7 @@
 /* ----------------------------------------------------------------------------
    validate-infra — sanity check for the multi-agent infrastructure
    ----------------------------------------------------------------------------
-   Walks the checklist from FINAL-ARCHITECTURE-V4.md Phase 1 and reports
+   Walks the checklist from Resources/FINAL-ARCHITECTURE-V4.md Phase 1 and reports
    which pieces are wired, which are missing, and which are loosely
    configured (e.g. JSON files that parse but contain only sample data).
 

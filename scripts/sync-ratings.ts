@@ -16,7 +16,7 @@
    Requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY; the
    service-role key is needed because RLS would otherwise block the
    UPDATE. The known-bad-env case (vercel env pull returning empty
-   strings on this account — see HANDOFF.md) surfaces as a clear "no key"
+   strings on this account — see Resources/HANDOFF.md) surfaces as a clear "no key"
    error rather than a silent no-op.
 ---------------------------------------------------------------------------- */
 
@@ -71,7 +71,7 @@ async function main() {
     console.error(
       "[sync] missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. " +
         "Inline them (OPENROUTER-style) or fix .env.local; vercel env pull " +
-        "returns empty strings on this account — see HANDOFF.md.",
+        "returns empty strings on this account — see Resources/HANDOFF.md.",
     )
     process.exit(2)
   }

@@ -10,9 +10,11 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 import matter from "gray-matter"
+import { notFound } from "next/navigation"
 import { ImageResponse } from "next/og"
 
 import { getAllMdxSlugs } from "@/lib/content/mdx"
+import { isSlugVisible } from "@/lib/content/visibility"
 import { createServiceClient } from "@/lib/supabase/service"
 
 export const alt = "Pricing · Botapolis"
@@ -72,6 +74,15 @@ async function fetchToolPrice(toolSlug: string): Promise<{ priceMin: number | nu
 
 export default async function Image({ params }: ImageProps) {
   const { slug } = await params
+  // Drip gate — a hidden pricing page must be invisible EVERYWHERE, including
+  // its OG sub-resource. generateStaticParams (gated) already excludes hidden
+  // slugs from the prerendered set, but dynamicParams defaults to true so an
+  // on-demand request to /pricing/{hidden}/opengraph-image would otherwise
+  // render from the on-disk frontmatter and 200. Gate it at runtime so the OG
+  // image dynamically follows the gate: 404 while hidden, renders once the
+  // drip flip makes the page visible (no rebuild needed). EN + RU share this
+  // default export, so both locales inherit the gate.
+  if (!(await isSlugVisible("pricing", slug))) notFound()
   const fm = (await readFrontmatter(slug)) ?? { title: "Pricing", toolSlug: "" }
   const { priceMin, model } = await fetchToolPrice(fm.toolSlug)
 

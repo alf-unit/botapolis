@@ -225,7 +225,7 @@ export function Footer({ strings, localePrefix = "", className }: FooterProps) {
               language={localePrefix === "/ru" ? "ru" : "en"}
               className="mt-6 w-full max-w-[480px]"
               // design-v.026 newsletter geometry, copied verbatim from
-              // New_Design/mockups/styles.css `.input` + `.btn` (both
+              // Resources/New_Design/mockups/styles.css `.input` + `.btn` (both
               // height:40px, radius-md). ROOT CAUSE of the "thin strip"
               // bug: NewsletterForm's base input carries `flex-1`
               // (flex-basis:0%). On mobile the form is `flex-col`, so on

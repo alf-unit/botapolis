@@ -10,7 +10,7 @@ import { getAllMdxFrontmatter } from "@/lib/content/mdx"
    Server component that surfaces the three newest *other* MDX entries of
    the same type (reviews ↔ reviews, guides ↔ guides) under the current
    article. Mirrors the "Related reviews" / "Related guides" 3-card row
-   from the New_Design mockups.
+   from the Resources/New_Design mockups.
 
    Wave 3 audit alignment (Botapolis design v.026). Sits beneath the article
    body and above the footer so readers who finished one piece have an

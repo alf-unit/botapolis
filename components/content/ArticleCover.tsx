@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
      • <ReviewCardCover> — 16:9 full-bleed on the homepage review cards
    plus helpers `coverGradient` / `COVER_STRIPE` / `reviewOgCoverHref`.
 
-   Mirrors the `.cover-img` / `.review-cover` blocks from the New_Design
+   Mirrors the `.cover-img` / `.review-cover` blocks from the Resources/New_Design
    mockups (review-klaviyo.html, guide.html, homepage.html) — same
    gradient-into-bg-muted tint + diagonal stripe texture.
 

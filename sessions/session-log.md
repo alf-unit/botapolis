@@ -516,7 +516,7 @@
 ### Обнаружено
 - **Vercel умеет нативные cron'ы** (`vercel.json` crons + `/api/cron/*` + авто-`CRON_SECRET`) — публикация **не требует агентов вообще**. Это меняет роль/необходимость OpenClaw-агентов (пересмотр предстоит — см. follow-ups).
 - `CRON_SECRET` помечен Sensitive в Vercel → значение не достать ни оператору (пустой Edit-плейсхолдер), ни Claude Code (нет в `.env.local`). Ручной curl на cron невозможен с обеих сторон; финальный flip доказан зеркалом алгоритма крона через service-role + `REVALIDATE_SECRET`. HTTP-путь крона подтверждён живым косвенно (401 secured; ранее `queue_empty` 200).
-- Реальный тулсет CHIEF (`ags/chf/TOOLS.md`) = bash + curl + `source ~/.openclaw/credentials/*.env` — агенты МОГУТ HTTP (спека «нет HTTP» была stale). Но для drip это неактуально (Схема 1).
+- Реальный тулсет CHIEF (`Resources/ags/chf/TOOLS.md`) = bash + curl + `source ~/.openclaw/credentials/*.env` — агенты МОГУТ HTTP (спека «нет HTTP» была stale). Но для drip это неактуально (Схема 1).
 - Node24/Windows: inline `tsx -e` с Supabase-fetch + неявный exit глотает stdout (drain-quirk) — в скриптах нужен явный `setTimeout` drain перед exit.
 
 ### Fixes

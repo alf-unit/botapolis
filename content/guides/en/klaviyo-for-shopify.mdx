@@ -1,0 +1,71 @@
+---
+title: "Klaviyo for Shopify: how to set it up and when it's worth it (2026)"
+description: "A step-by-step guide to connecting Klaviyo to Shopify in 2026 — installation, data sync, the first flows to build, and an honest read on the active-profiles billing and when Klaviyo actually pays off. Verified June 2026."
+publishedAt: "2026-06-05"
+updatedAt: "2026-06-05"
+author: "Botapolis editorial"
+tags: ["email", "klaviyo", "shopify", "automation", "setup"]
+category: "email"
+steps:
+  - name: "Create your Klaviyo account with your store email"
+    text: "Sign up at klaviyo.com using the email tied to your Shopify store and select Shopify as your platform. Using the store email keeps the OAuth handshake clean in the next step."
+  - name: "Install the Klaviyo app from the Shopify App Store"
+    text: "In Shopify, go to Apps, search for Klaviyo, click Install, and approve the requested permissions. Klaviyo then prompts you to authorize the connection — click Connect and approve the OAuth flow to establish the two-way sync."
+  - name: "Turn on subscriber sync"
+    text: "Check 'Sync your Shopify email subscribers to Klaviyo' to add checkout opt-ins to a chosen list, and 'Sync your Shopify SMS subscribers' if you collect SMS consent. This is where most setups silently lose subscribers — confirm both boxes."
+  - name: "Let the historical sync finish"
+    text: "Klaviyo first pulls the last 90 days, then runs a full historical sync that can take minutes to days depending on order volume. After that, purchases, browsing, cart activity, product views, and customer properties sync in real time."
+  - name: "Build the core flows before any campaign"
+    text: "Start with Welcome, Abandoned Cart, Abandoned Checkout, Post-Purchase, and Win-Back. Automations earn compounding revenue; build them before you send a single broadcast campaign."
+---
+
+[Klaviyo](/tools/klaviyo) is the default email and SMS platform for serious Shopify stores in 2026 — but it is also one of the easier integrations to set up wrong, and one of the easier bills to let run away from you. This guide covers the clean setup path and an honest read on when Klaviyo actually pays off.
+
+## Step 1–2: Connect Klaviyo to Shopify
+
+The connection is an OAuth two-way sync, and the order matters:
+
+1. **Create your Klaviyo account** at klaviyo.com using the email associated with your Shopify store, and select Shopify as your e-commerce platform.
+2. **Install the Klaviyo app** from the Shopify App Store: in Shopify go to Apps → search "Klaviyo" → Install → approve the permissions. Klaviyo then asks you to authorize the connection — click Connect and approve the OAuth flow.
+
+That handshake establishes a live, two-way link between Shopify and Klaviyo. You do not need any code or a developer.
+
+## Step 3–4: Configure the data sync
+
+This is the step that quietly breaks setups. During the connection flow:
+
+- Check **"Sync your Shopify email subscribers to Klaviyo"** so customers who accept email marketing at checkout flow into a list you choose.
+- Check **"Sync your Shopify SMS subscribers"** if you collect SMS consent in Shopify.
+
+Klaviyo first syncs the **last 90 days** of Shopify data, then begins a **full historical sync** that can take anywhere from a few minutes to several days depending on your order volume. After the backfill, Klaviyo pulls **purchase history, browsing behavior, cart activity, product views, and customer properties** in real time — the behavioral data that makes its segmentation and flows worth the price.
+
+## Step 5: Build the core flows first
+
+Do not send a broadcast campaign before your automations are live — automation revenue compounds, campaigns do not. Build these in order:
+
+| # | Flow | Trigger |
+|---|------|---------|
+| 1 | Welcome | New subscriber |
+| 2 | Abandoned Cart | Item in cart, no checkout |
+| 3 | Abandoned Checkout | Reached checkout, no purchase |
+| 4 | Post-Purchase | Placed order (review request + cross-sell) |
+| 5 | Win-Back | No purchase in 90–120 days |
+
+Our [Shopify email automation playbook](/guides/how-to-set-up-shopify-email-automation) covers the timing, exit conditions, and segmentation for each of these in depth — set exit conditions on every flow so a customer who converts mid-sequence stops getting reminders.
+
+## The honest caveat: active-profiles billing
+
+Two things to model before you scale:
+
+- **Klaviyo bills on active profiles, not emails sent** (a shift made February 18, 2025). If you have a "sticky list" — a long tail of inactive contacts — you pay for that tail. Prune inactive profiles regularly, or the bill grows faster than your revenue.
+- **Klaviyo One adds a ~20% surcharge above roughly $10K/mo in standard spend.** If you are modeling a 12-month spend that crosses that threshold, fold the surcharge into the forecast before you commit.
+
+Pricing starts free (250 active profiles, 500 emails/mo) and scales with profile count — Email from $20/mo at 251–500 profiles up to roughly $2,300/mo at 250K profiles. The [Klaviyo pricing breakdown](/pricing/klaviyo) does the math at real contact bands.
+
+## When Klaviyo is worth it
+
+Klaviyo earns its premium above roughly **$50K/mo in revenue**, where you will actually use the predictive analytics, deep segmentation, and CDP-backed flow engine that justify the cost. Below that band, a leaner tool is often the more honest call — we lay out the alternatives in the [best AI email roundup](/best/best-ai-email-tool-shopify), and the head-to-heads at [Klaviyo vs Mailchimp](/compare/klaviyo-vs-mailchimp) and [Klaviyo vs Omnisend](/compare/klaviyo-vs-omnisend) cover the sub-$50K decision.
+
+<AffiliateButton tool="klaviyo" cta="Start with Klaviyo" />
+
+Set it up once, build the core flows, watch the active-profile count, and Klaviyo becomes the retention engine it is priced to be.

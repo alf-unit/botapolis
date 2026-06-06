@@ -20,7 +20,6 @@ import { ComparisonCard } from "@/components/tools/ComparisonCard"
 import { ReviewCardCover, reviewOgCoverHref } from "@/components/content/ArticleCover"
 import { getLocale } from "@/lib/i18n/get-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getAllMdxFrontmatter } from "@/lib/content/mdx"
 import { createServiceClient } from "@/lib/supabase/service"
 import { filterVisibleRows } from "@/lib/content/visibility"
 import {
@@ -32,15 +31,16 @@ import type { ComparisonRow, ToolRow } from "@/lib/supabase/types"
 /* ----------------------------------------------------------------------------
    Homepage Wave 1 data fetches
    ----------------------------------------------------------------------------
-   `fetchHomeComparisons` — 4 latest published comparisons in the active
-   locale, joined with their two referenced tools. Mirrors the two-step
-   pattern from /compare/page.tsx (Postgres "Relationships: NoRels" in our
-   handwritten types makes embed-syntax collapse to never, so we fan-out
-   the tool IDs and resolve in-memory).
+   `fetchHomeComparisons` — 4 latest VISIBLE published comparisons in the
+   active locale, joined with their two referenced tools. Mirrors the
+   two-step pattern from /compare/page.tsx (Postgres "Relationships: NoRels"
+   in our handwritten types makes embed-syntax collapse to never, so we
+   fan-out the tool IDs and resolve in-memory). The drip gate is applied
+   BEFORE the slice to 4 so hidden wave-N comparisons can't blank the row.
 
-   `fetchLatestReviews` — 3 newest published MDX reviews via the shared
-   loader. `getAllMdxFrontmatter` already sorts by publishedAt DESC and
-   skips drafts, so we just slice the head.
+   `fetchLatestReviews` — 3 freshest VISIBLE published tool reviews from the
+   `tools` table (the /reviews/ MDX tree was merged into /tools/[slug] at
+   Etap E). Filtered to rows with an editorial verdict, drip-gated, sliced.
 
    Both helpers swallow errors → empty array. Homepage never 500s because
    the operational store table isn't ready yet — the section simply hides
@@ -64,11 +64,14 @@ async function fetchHomeComparisons(
       .eq("status", "published")
       .eq("language", language)
       .order("updated_at", { ascending: false })
-      .limit(4)
+      .limit(60)
     if (cmpErr || !cmps || cmps.length === 0) return []
 
-    // Drip gate — drop comparisons not yet publicly visible.
-    const visibleCmps = await filterVisibleRows("comparisons", cmps)
+    // Drip gate — filter to publicly visible BEFORE slicing to 4. Wave-2 added
+    // ~21 hidden comparisons (visible_at=NULL); ordered by updated_at they're
+    // the freshest rows, so a limit(4)-then-filter grabbed 4 hidden ones and
+    // blanked the section. Over-fetch, drop hidden, then take the visible head.
+    const visibleCmps = (await filterVisibleRows("comparisons", cmps)).slice(0, 4)
     if (visibleCmps.length === 0) return []
 
     const ids = Array.from(
@@ -103,39 +106,54 @@ async function fetchHomeComparisons(
   }
 }
 
-async function fetchLatestReviews(locale: "en" | "ru") {
-  try {
-    const all = await getAllMdxFrontmatter("reviews", locale)
-    return all.slice(0, 3)
-  } catch (err) {
-    console.error("[homepage] reviews fetch threw:", err)
-    return []
-  }
+// Latest deep reviews now come from the `tools` table — the /reviews/ MDX
+// tree was merged into DB-driven /tools/[slug] (Etap E flip). We surface the
+// freshest PUBLISHED tools that carry an editorial verdict (real reviews, not
+// the interactive calculator routes), drip-gated to visible rows only, and
+// localized per locale. Failures degrade to [] → the section hides.
+type HomeReview = {
+  slug: string
+  name: string
+  title: string
+  description: string | null
+  rating: number | null
+  logo_url: string | null
 }
 
-// Logo + name + rating for the reviews' tools, so each homepage review
-// card can build the SAME /api/og?variant=cover URL the article page
-// builds — i.e. the card shows the real article cover, not a generic
-// gradient. Keyed by tool slug. Failures degrade to the gradient tier.
-type ReviewTool = Pick<ToolRow, "slug" | "name" | "logo_url" | "rating">
-
-async function fetchReviewTools(
-  slugs: string[],
-): Promise<Map<string, ReviewTool>> {
-  const unique = Array.from(new Set(slugs.filter(Boolean)))
-  if (unique.length === 0) return new Map()
+async function fetchLatestReviews(locale: "en" | "ru"): Promise<HomeReview[]> {
   try {
     const supabase = createServiceClient()
     const { data, error } = await supabase
       .from("tools")
-      .select("slug, name, logo_url, rating")
-      .in("slug", unique)
+      .select(
+        "slug, name, name_ru, description, description_ru, meta_title, meta_title_ru, rating, logo_url, updated_at, verdict",
+      )
       .eq("status", "published")
-    if (error || !data) return new Map()
-    return new Map(data.map((t) => [t.slug, t]))
+      .not("verdict", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(60)
+    if (error || !data) return []
+    // Drip gate — only publicly visible tool reviews, freshest 3. Over-fetch
+    // (60 covers all verdict-bearing tools) so freshly-written HIDDEN reviews
+    // dominating updated_at can't starve the visible head below 3.
+    const visible = (await filterVisibleRows("tools", data)).slice(0, 3)
+    return visible.map((t) => {
+      const name = locale === "ru" ? (t.name_ru ?? t.name) : t.name
+      return {
+        slug: t.slug,
+        name,
+        title:
+          locale === "ru"
+            ? (t.meta_title_ru ?? t.meta_title ?? `${name} — обзор`)
+            : (t.meta_title ?? `${name} review`),
+        description: locale === "ru" ? (t.description_ru ?? t.description) : t.description,
+        rating: t.rating,
+        logo_url: t.logo_url,
+      }
+    })
   } catch (err) {
-    console.error("[homepage] review tools fetch threw:", err)
-    return new Map()
+    console.error("[homepage] reviews fetch threw:", err)
+    return []
   }
 }
 
@@ -156,11 +174,6 @@ export default async function HomePage() {
     fetchLatestReviews(locale),
   ])
 
-  // Hydrate the reviews' tools so each card's cover === the article's
-  // cover (same /api/og params → same OG cache entry, no second render).
-  const reviewToolBySlug = await fetchReviewTools(
-    latestReviews.map((r) => r.frontmatter.toolSlug),
-  )
   const reviewEyebrow = locale === "ru" ? "Обзор" : "Review"
 
   // Featured-tool icon map. Keys MUST mirror `dict.tools.items` and the
@@ -267,10 +280,11 @@ export default async function HomePage() {
                     <ArrowRight className="size-4" data-icon="inline-end" />
                   </Link>
                   <Link
-                    // Sprint 2 (May 2026) shipped the MDX pipeline, so /reviews
-                    // now resolves to a real index. Restored the design-intent
-                    // CTA target — Wave 1 audit alignment (Botapolis design v.026).
-                    href={`${localePrefix}/reviews`}
+                    // "Browse reviews" → /tools. The /reviews/ MDX index was
+                    // merged into DB-driven /tools/[slug] (Etap E); the /reviews
+                    // route no longer exists, so the secondary CTA points at the
+                    // tools catalog, which is now the reviews surface.
+                    href={`${localePrefix}/tools`}
                     className={cn(
                       buttonVariants({ variant: "outline", size: "lg" }),
                       "h-12 px-5 text-base border-[var(--border-base)]",
@@ -478,18 +492,17 @@ export default async function HomePage() {
               </div>
 
               <ul role="list" className="grid gap-4 md:grid-cols-3">
-                {latestReviews.map(({ slug, frontmatter }) => {
-                  const tool = reviewToolBySlug.get(frontmatter.toolSlug)
+                {latestReviews.map((review) => {
                   const ogCoverHref = reviewOgCoverHref({
-                    toolName: tool?.name,
-                    logoUrl: tool?.logo_url,
-                    rating: frontmatter.rating ?? tool?.rating ?? null,
+                    toolName: review.name,
+                    logoUrl: review.logo_url,
+                    rating: review.rating,
                     eyebrowWord: reviewEyebrow,
                   })
                   return (
-                  <li key={slug}>
+                  <li key={review.slug}>
                     <Link
-                      href={`${localePrefix}/tools/${slug}`}
+                      href={`${localePrefix}/tools/${review.slug}`}
                       className={cn(
                         "group relative flex h-full flex-col overflow-hidden rounded-2xl",
                         "border border-[var(--border-base)] bg-[var(--bg-surface)]",
@@ -498,33 +511,31 @@ export default async function HomePage() {
                       )}
                     >
                       {/* Cover — design-v.026 homepage.html `.review-cover`
-                          at 16:9. Same <CoverFill> tiers as the article
-                          page: real photo → programmatic OG (tool logo on
-                          the brand atmosphere) → deterministic gradient.
-                          Same OG params as /reviews/[slug] → same image. */}
+                          at 16:9. Programmatic OG (tool logo on the brand
+                          atmosphere) → deterministic gradient fallback. Same
+                          OG params as /tools/[slug] → same image. */}
                       <ReviewCardCover
-                        slug={slug}
-                        coverImage={frontmatter.coverImage}
+                        slug={review.slug}
                         ogCoverHref={ogCoverHref}
                       />
 
                       <div className="flex flex-1 flex-col gap-4 p-6">
                       <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-                        <span>{frontmatter.publishedAt}</span>
-                        {frontmatter.rating != null && (
+                        <span>{reviewEyebrow}</span>
+                        {review.rating != null && (
                           <>
                             <span className="opacity-50">·</span>
                             <span className="text-[var(--brand)]">
-                              {frontmatter.rating.toFixed(1)}/10
+                              {review.rating.toFixed(1)}/10
                             </span>
                           </>
                         )}
                       </div>
                       <h3 className="text-h4 font-semibold tracking-[-0.015em] text-[var(--text-primary)]">
-                        {frontmatter.title}
+                        {review.title}
                       </h3>
                       <p className="text-sm leading-[1.55] text-[var(--text-secondary)] line-clamp-3">
-                        {frontmatter.description}
+                        {review.description}
                       </p>
                       <span className="mt-auto inline-flex items-center gap-1 text-[13px] font-medium text-[var(--brand)]">
                         {dict.reviewsSection.readMore}

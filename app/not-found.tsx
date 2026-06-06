@@ -87,8 +87,8 @@ export default async function NotFound() {
     },
     {
       title:    locale === "ru" ? "Свежие глубокие обзоры"  : "Latest deep reviews",
-      path:     `${localePrefix}/reviews`,
-      pathLabel: "/reviews",
+      path:     `${localePrefix}/tools`,
+      pathLabel: "/tools",
       Icon:     Star,
     },
     {

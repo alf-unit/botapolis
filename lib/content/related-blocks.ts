@@ -35,8 +35,9 @@ export interface RelatedBestMention {
  * Comparisons featuring this tool — for the curated Related block.
  *
  * Curation logic:
- *   1. Over-fetch 8 published same-language comparisons where this tool is
- *      on either side, ordered by updated_at DESC.
+ *   1. Over-fetch 40 published same-language comparisons where this tool is
+ *      on either side, ordered by updated_at DESC (generous so drip-hidden
+ *      rows can't starve the visible head after the gate filter).
  *   2. Hydrate the OTHER tool of each pair (id, slug, name, name_ru,
  *      logo_url, category).
  *   3. Split into same-category pairs and cross-category pairs (preserving
@@ -63,10 +64,12 @@ export async function fetchRelatedComparisons(
       .eq("language", language)
       .or(`tool_a_id.eq.${currentToolId},tool_b_id.eq.${currentToolId}`)
       .order("updated_at", { ascending: false })
-      .limit(8)
+      .limit(40)
     if (rowsErr || !rows || rows.length === 0) return []
 
-    // Drip gate — drop comparisons not yet publicly visible before hydrating.
+    // Drip gate — drop comparisons not yet publicly visible BEFORE the slice.
+    // Over-fetch 40 (a tool is rarely in that many comparisons) so the freshest
+    // rows being hidden (wave-N drip queue) can't starve the visible head.
     const visibleRows = await filterVisibleRows("comparisons", rows)
     if (visibleRows.length === 0) return []
 

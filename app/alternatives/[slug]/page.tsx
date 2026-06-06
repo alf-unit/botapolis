@@ -102,7 +102,7 @@ async function fetchAlternatives(source: ToolRow, limit = 8): Promise<AltCard[]>
       .neq("slug", source.slug)
       .not("affiliate_url", "is", null)
       .order("rating", { ascending: false, nullsFirst: false })
-      .limit(limit),
+      .limit(40),
     supabase
       .from("tools")
       .select(select)
@@ -111,14 +111,15 @@ async function fetchAlternatives(source: ToolRow, limit = 8): Promise<AltCard[]>
       .neq("slug", source.slug)
       .is("affiliate_url", null)
       .order("rating", { ascending: false, nullsFirst: false })
-      .limit(limit),
+      .limit(40),
   ])
 
   const partners = partnerRes.data ?? []
   const nonPartners = nonPartnerRes.data ?? []
   // Drip gate — never list/link an alternative whose tool page isn't visible
-  // yet. Filter BEFORE slicing so `limit` counts visible tools only. No-op
-  // when the flag is off.
+  // yet. Each query over-fetches 40 (not `limit`) so drip-hidden tools ranked
+  // high by rating can't consume the slots; we filter visible THEN slice to
+  // `limit`, preserving partner-first order. No-op when the flag is off.
   const visiblePool = await filterVisibleRows("tools", [...partners, ...nonPartners])
   const pool: AltCard[] = visiblePool.slice(0, limit)
   if (pool.length >= 2) return pool
@@ -132,9 +133,9 @@ async function fetchAlternatives(source: ToolRow, limit = 8): Promise<AltCard[]>
     .eq("status", "published")
     .neq("slug", source.slug)
     .order("rating", { ascending: false, nullsFirst: false })
-    .limit(limit)
+    .limit(40)
 
-  return filterVisibleRows("tools", anyOther ?? [])
+  return (await filterVisibleRows("tools", anyOther ?? [])).slice(0, limit)
 }
 
 // --------------------------------------------------------------------------

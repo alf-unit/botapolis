@@ -97,9 +97,12 @@ async function fetchPartnerAlternatives(
   try {
     const sb = createServiceClient()
     const excludeSet = new Set(excludeSlugs)
-    // Over-fetch by excludeSlugs.length so we still hit `limit` after filtering
-    // out the current tool (and on /compare/[slug] also the other side).
-    const fetchLimit = limit + excludeSlugs.length
+    // Over-fetch generously (NOT `limit`): cards are ranked by rating, and the
+    // drip queue now hides many high-rated affiliate tools (constant-contact,
+    // brevo, activecampaign, bazaarvoice, shipstation…). Fetching only `limit`
+    // rows then gating let those hidden tools consume the slots and under-fill
+    // the block. Fetch wide, gate to VISIBLE, THEN slice to `limit`.
+    const OVERFETCH = 50
 
     // Pass 1 — exact category match. Highest relevance, ranked by rating.
     const { data: same, error: sameErr } = await sb
@@ -109,21 +112,25 @@ async function fetchPartnerAlternatives(
       .eq("category", category)
       .not("affiliate_url", "is", null)
       .order("rating", { ascending: false, nullsFirst: false })
-      .limit(fetchLimit)
+      .limit(OVERFETCH)
     if (sameErr) {
       console.error("[PartnerAlternatives] same-category fetch failed:", sameErr.message)
       return []
     }
-    let pool: AlternativeCard[] = (same ?? []).filter((t) => !excludeSet.has(t.slug))
+    // Drip gate applied HERE (before the slice) so hidden tools never eat slots.
+    let pool: AlternativeCard[] = await filterVisibleRows(
+      "tools",
+      (same ?? []).filter((t) => !excludeSet.has(t.slug)),
+    )
     if (pool.length >= limit) return pool.slice(0, limit)
 
-    // Pass 2 — subcategory overlap fallback. Triggered when same-category
-    // pool is thin (single-member categories like `support`, `inventory`,
-    // `fraud`). Honest-by-relevance: a tool that shares at least one
-    // subcategory is a reasonable alternative even when its primary
+    // Pass 2 — subcategory overlap fallback. Triggered when the same-category
+    // visible pool is thin (single-member categories like `support`,
+    // `inventory`, `fraud`). Honest-by-relevance: a tool that shares at least
+    // one subcategory is a reasonable alternative even when its primary
     // category differs. Example: Gorgias[support, subcat=helpdesk] →
     // Tidio[chat, subcat=helpdesk] surfaces as a credible alt.
-    if (subcategories.length === 0) return pool
+    if (subcategories.length === 0) return pool.slice(0, limit)
 
     const seenSlugs = new Set([...excludeSlugs, ...pool.map((t) => t.slug)])
     const { data: overlap, error: overlapErr } = await sb
@@ -134,13 +141,16 @@ async function fetchPartnerAlternatives(
       .neq("category", category)               // already covered by pass 1
       .overlaps("subcategories", subcategories as string[])
       .order("rating", { ascending: false, nullsFirst: false })
-      .limit(fetchLimit)
+      .limit(OVERFETCH)
     if (overlapErr) {
       console.error("[PartnerAlternatives] subcategory fetch failed:", overlapErr.message)
       return pool.slice(0, limit)
     }
-    const overlapFiltered = (overlap ?? []).filter((t) => !seenSlugs.has(t.slug))
-    pool = [...pool, ...overlapFiltered]
+    const overlapVisible = await filterVisibleRows(
+      "tools",
+      (overlap ?? []).filter((t) => !seenSlugs.has(t.slug)),
+    )
+    pool = [...pool, ...overlapVisible]
     return pool.slice(0, limit)
   } catch (err) {
     console.error("[PartnerAlternatives] tools fetch threw:", err)

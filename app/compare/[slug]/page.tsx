@@ -185,12 +185,14 @@ async function fetchRelatedComparisons(
         `tool_a_id.eq.${toolAId},tool_a_id.eq.${toolBId},tool_b_id.eq.${toolAId},tool_b_id.eq.${toolBId}`,
       )
       .order("updated_at", { ascending: false })
-      .limit(limit)
+      .limit(40)
 
     if (error || !rows || rows.length === 0) return []
 
-    // Drip gate — drop related comparisons not yet publicly visible.
-    const visibleRows = await filterVisibleRows("comparisons", rows)
+    // Drip gate — filter to visible BEFORE slicing to `limit`. Over-fetch 40
+    // so drip-hidden comparisons (the freshest by updated_at) can't consume
+    // all the slots and blank the related row.
+    const visibleRows = (await filterVisibleRows("comparisons", rows)).slice(0, limit)
     if (visibleRows.length === 0) return []
 
     const ids = Array.from(

@@ -714,3 +714,66 @@
 - **4 untracked-дока в Resources/** (BOTAPOLIS-PLAYBOOK-V2, INSTRUCTIONS, TRI-AGENT-ARCHITECTURE, Extra_Tools) — оставлены локальными по решению оператора. Следствие: ссылка CLAUDE.md → BOTAPOLIS-PLAYBOOK-V2 битая в свежем клоне (оператор принял).
 - **Контент 2-й волны (актуальная точка входа из блока 2026-06-05 выше):** Часть 2 — залить 19 внешних туллов в каталог (`Resources/Extra_Tools.md`); Часть 3 — 19 tool-страниц + 24 vs-comparison, скрытыми в drip-очередь, pool от #48.
 - Прочее без изменений: Pagefind покрытие pricing/best; homepage «Latest reviews» сломан; roster агентов под пересмотром (OPS убрать и т.д.).
+
+---
+
+## 2026-06-05 (session 3) — [writer+code] 2-Я ВОЛНА ЗАКРЫТА: каталог +19, tool-страницы +18, vs-comparison +21
+
+### Commits
+- `chore(tools): seed 19 external catalog tools (wave-2 Part 2)`
+- `chore(tools): chatfuel->firstpromoter, shipstation->cj affiliate_partner`
+- `docs(session): close 2026-06-05 session 3` (этот close-коммит)
+
+(Большая часть работы — DB-only: tools/comparisons/page_publications/semantic_core пишутся напрямую через service-role, в репо коммитов нет. Идентификация по subject, не по hash — см. CLAUDE.md.)
+
+### Задача
+Финал 2-й волны: Часть 2 (19 внешних туллов в каталог) → Часть 3 (18 tool-страниц новых туллов + 21 vs-comparison), всё скрытым в drip-очередь. Контроль-first на каждом новом типе.
+
+### Сделано — 2-Я ВОЛНА ЗАКРЫТА ПОЛНОСТЬЮ (кроме discount 44 — отложен до промокодов). Все content-template `second_wave = 0`.
+Произведено за волну (все сессии):
+- **pricing 14 EN+RU** (MDX /pricing/, drip #1-14)
+- **best-for 9 EN+RU** (MDX /best/, drip #15-23)
+- **guide+how-to 24 EN+RU** (MDX /guides/, drip #24-47)
+- **alternatives 14 enrich-in-place** (DB jsonb, live — НЕ drip)
+- **review 6 reconcile** (live /tools/)
+- **Часть 2: 19 внешних туллов** залиты в каталог (DB data-only, draft/archived) — `scripts/seed-extra-tools.ts`
+- **Часть 3: 18 tool-страниц** новых туллов (DB /tools/, drip #48-65) + 1 archived (Returnly)
+- **Часть 3: 21 vs-comparison** (DB /compare/, drip #66-86) + 6 reconcile + 2 excluded (returnly dead, manychat free-vs-pro tier)
+
+Каталог: tools `published=48`, `archived=5`, `draft=0`. comparisons `published EN=48`.
+Drip-очередь: `pool total=86, visible=4` (раскрыты cron), `hidden=82`. Капает 4/день 01:00 LA по `pool_number` → 7/день мес2 → 10/день мес3.
+
+Цены освежены (Часть 3, realtime web): chatfuel **tiered→flat $69** (смена модели, Fuely Super/Max убраны), help-scout $20→**$25**, bold-subscriptions +Grow/Scale/Ultimate **max→$399.99**, intercom Copilot $35→**$29**, livechat/shipstation refresh + дата, recharge **$25→$99** (ранее), +6 pricing-туллов в pricing-волне.
+
+### Механики доказаны (флип 404→200→404 без деплоя через `/api/revalidate` + `REVALIDATE_SECRET`)
+- `dynamicParams=true` на `/best/` `/guides/` (ранее), `/tools/` `/compare/` (уже были true).
+- webhook drip-aware (2011a43): semantic_core НЕ флипается в published пока страница скрыта.
+- **DB-comparison bridge:** запись напрямую в `public.comparisons`, EN+RU = **две строки** (один slug, `language` en/ru), onConflict `slug,language`. RU-row пишется ВРУЧНУЮ (translate-script comparisons не покрывает). Богаче 1-й волны: 1-я ставила только meta_title, эта — verdict/custom_intro/meta/comparison_data.useCases×3/winner_for×3 EN+RU.
+- **carve-out verdict→наш affiliate-тул:** у внешних carve-out нет /go/ CTA, verdict честно ведёт на наш каталожный тул с партнёркой (zendesk→Gorgias, intercom→Gorgias, stamped→Loox/Yotpo/Judge.me, riskified→Signifyd, parcellab/route→AfterShip, GA→Triple Whale, bold→Recharge, rockerbox→Triple Whale). В comparison /go/ всегда к стороне с affiliate.
+
+### Обнаружено
+- **affiliate_partner CHECK** (`tools_affiliate_partner_check`) — закрытый enum (impact/partnerstack/rewardful/direct/tapfiliate/lasso/partnerportal). chatfuel(FirstPromoter)/shipstation(CJ) сначала смаплены в direct/impact, потом оператор расширил CHECK в Studio (+`firstpromoter`,`cj`) → поправлены на реальные сети.
+- **`tools.alternatives_to` = uuid[]** (не slug[]) — INSERT слага падает «invalid input syntax for type uuid». Ставить [] или реальные UUID.
+- **canon compare slug = алфавит туллов** через `-vs-` (`lib/content/slug.ts`); роут редиректит неканон → канон. tool_a/tool_b ставим в порядке slug.
+- **29 second_wave vs-comparison** (не 22): фильтр по именам новых туллов пропускал пары существующих туллов. Из 29: 21 написано/ready, 6 реконсил к live (канон-slug уже в 1-й волне), 2 excluded.
+- **Дубли канон-slug в ключах:** «klaviyo vs mailchimp for shopify» = «mailchimp vs klaviyo for shopify»; «recharge vs loop» = «loop vs recharge» — оба члена пары реконсилены к одной существующей странице.
+- Статус-конвенция drip-aware: новый скрытый контент → `ready_to_publish` + `published_article_path` (cron флипнет в published при раскрытии по exact-path); реконсил к live → `published`. Так `second_wave=0` без ложного published.
+- WebFetch official-pricing у многих вендоров отдаёт 403 (Constant Contact, Stamped) или JS-пустышку (ActiveCampaign, Brevo, Route) — базовые цены берём официальные с честной датой, при невозможности добора оставляем baseline + WebSearch-подтверждение неизменности.
+
+### Fixes
+- `scripts/seed-extra-tools.ts` (закоммичен) — идемпотентный seed 19 туллов.
+- chatfuel/shipstation affiliate_partner → firstpromoter/cj после расширения CHECK.
+- Returnly закрыт: tool `status=archived`; ключ «loop returns vs returnly» `status=excluded` + note (sunset 2023 → Loop Returns, покрыто migrate-returnly-to-loop how-to).
+- «manychat free vs pro» `status=excluded` + note (plan-tier, не tool-vs-tool; покрыто /tools/manychat).
+
+### Open follow-ups (не блокеры)
+- **discount bucket 44** — ждёт партнёрских промокодов.
+- **code-долг: alternatives тонкие-категории грид** (`pool.length===1` → closest-in-category вместо cross-category по рейтингу).
+- **Pagefind** покрытие pricing/best (сейчас только guides/tools/comparisons).
+- **homepage «Latest reviews» сломан** (/reviews/→/tools/ merge).
+- **FINAL-ARCHITECTURE-V4 rewrite** (drift в секциях агентов/публикации).
+- **пересмотр агентов:** убрать OPS, сократить, SCOUT без RSS, CHIEF опц. мониторинг+GSC не публикация (Vercel-cron публикует сам).
+- **smile-io affiliate_url** → реальная реф-ссылка когда получим (placeholder сейчас).
+
+### ТОЧКА ВХОДА — следующая сессия
+2-я волна капает сама (drip 4/день). Варианты: (а) code-долги (тонкие гриды / Pagefind / homepage); (б) пересмотр агентов; (в) ждать discount промокоды; (г) мониторить публикацию + GSC когда накопится индексация. **Контент-производство на паузе** до 3-й волны (ключи 102-427) или discount.

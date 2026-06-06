@@ -484,7 +484,7 @@ export default async function HomePage() {
                   </p>
                 </div>
                 <Link
-                  href={`${localePrefix}/reviews`}
+                  href={`${localePrefix}/tools`}
                   className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-[var(--brand)] hover:text-[var(--brand-hover)]"
                 >
                   {dict.reviewsSection.viewAll}

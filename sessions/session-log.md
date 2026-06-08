@@ -813,3 +813,52 @@ Vercel жаловался на перерасход ресурса; прошлы
 - **Почему отложено:** переезд многосессионный; старт с исчерпанным контекстом = риск полумигрированного состояния (часть [locale], часть нет, капля подвешена, SEO живых на кону) после компакта. Спайк доказал жизнеспособность — спешить некуда, окно за день-два не закроется.
 
 **Прочие хвосты (не локаль):** discount-bucket (промокоды), alternatives тонкие гриды (`pool.length===1` → closest-in-category), Pagefind покрытие pricing/best, пересмотр агентов (OPS убрать и т.д.), FINAL-ARCHITECTURE-V4 rewrite (drift агентов/публикации).
+
+---
+
+## 2026-06-07 (session 2) — [infra+code] [locale]-ПЕРЕЕЗД + CUTOVER + RU-RACE ФИКС — всё в проде, зелёное
+
+### Commits (на ветке feat/locale-isr → merge в main)
+- checkpoint(locale-isr): structural backbone — move EN routes into app/[locale]/
+- checkpoint(locale-isr): build-green [locale] migration — config, metadata, cron, proxy
+- fix(locale-isr): bare-EN rewrite via explicit segment alternation (beforeFiles)
+- refactor(seo): buildMetadata locale param LanguageCode → Locale
+- docs(locale-plan): §1 done + §3 preview-proof results / §3 fully green
+- Merge feat/locale-isr: migrate routing to app/[locale]/ (merge 94080a4)
+- fix(locale-isr): pin locale from params in every page BODY — RU race fix (38802e2)
+
+### Задача
+Выполнить отложенный [locale]-переезд целым заходом (план Resources/LOCALE-MIGRATION-PLAN.md), доказать §3, cutover в прод. Корень: `getLocale()→headers()` (Dynamic API) гасил ISR site-wide → Vercel Active-CPU 3:17/4ч.
+
+### Сделано — ВСЁ В ПРОДЕ, ЗЕЛЁНОЕ
+- **Переезд `app/` + `app/ru/` → `app/[locale]/`** (native `next.config` rewrites, bare-EN сохранён). 28 EN-роут-папок + home в `[locale]`; 28 `app/ru/*` зеркал удалены; root layout → passthrough, `[locale]/layout.tsx` владеет `<html lang>`+fonts+providers+`setLocale`+`generateStaticParams`+валидация; `global-error.tsx`; 27 `generateMetadata` запинены `pinLocale(params)`; drip-cron+`/api/revalidate` на внутренние locale-пути; `proxy.ts` сужен до auth (header-writes убраны); sitemap/metadata loop по `i18n.locales`+x-default. **Merge 94080a4.**
+- **middleware-46m мёртв + ISR жив:** build 494 стр, все `/[locale]/*` Static/SSG, cache `s-maxage` HIT.
+- **Капля:** revalidate на ВНУТРЕННИЕ locale-пути (`/en`,`/ru`) — спайк §2 доказал что bare не пробивает rewrite. drip-гейт в проде цел (flair-ai 404, klaviyo 200), cron 01:00 LA (два UTC-слота 0 8 + 0 9).
+- **§3 доказательства (preview):** full sweep 292/292=200 ноль `/en/` утечек; live drip-flip 404→200→404 bare+ru по 5 drip-типам (БД восстановлена); es-тест O(1) (+1 локаль = build 737 стр, /es испанский Static, hreflang авто-es, ноль route-файлов; откатан как тест). Оставлено улучшение `buildMetadata` LanguageCode→Locale.
+- **RU-RACE ФИКС (38802e2):** после cutover RU-хабы+главная+статика+калькуляторы рендерили EN. **Причина — RSC async-race:** `[locale]/layout` пишет локаль в стор после `await params`, тела хабов звали `getLocale()` сразу (без yield) → читали стор ДО записи → EN-дефолт. 6 детальных `[slug]` выигрывали race случайно (через `await params` за slug). **Фикс:** все 28 страниц на `const locale = await pinLocale(params)` первой строкой тела — локаль авторитетно из URL-params, без гонки, race-class устранён навсегда. login/email-roi вручную (PageProps без params / конфликт локального имени `params`). Прод-спот-чек: RU по ВСЕМ типам, EN цел, тумблер стабилен, build Static, капля цела.
+
+### Обнаружено
+- **Negative-lookahead `source` в `next.config` rewrites НЕ срабатывает из `beforeFiles` под Next 16 + Turbopack** — bare суб-пути проваливались в жадный `/[locale]`-матч и 404-или (даже без конкурирующего роута). Регекс компилируется верно, но не матчит в рантайме. Решение: **явная альтернация top-level сегментов** `/:seg(tools|pricing|...)/:path*`. (`EN_SEGMENTS` в next.config; новый top-level роут = +1 строка.)
+- **`afterFiles` (массив-форма rewrites) НЕ годится:** выполняется после матчинга роутов → `/[locale]` уже схватил bare-путь. Нужен `beforeFiles`.
+- **`/en/:path*`→bare 301-страж зацикливается** с bare→/en rewrite (Next переобрабатывает `/en`-назначение через redirects под beforeFiles). Убран. Вместо: `en` исключён из rewrite (прямой `/en/*`=200, дедуп canonical→bare). **Ноль внутренних ссылок на `/en/`** (только комменты + пути файлов контента) → доп-страж не нужен.
+- **RSC async-race layout-setLocale vs body-getLocale** — главный урок. Нельзя полагаться на layout `setLocale` для тел страниц; каждое тело пинит из своих params. Детальные «работали» лишь на `await params`-yield (хрупко).
+- **`.next/dev/types` от убитого dev-сервера** ссылается на старые пути → ложный type-error в build; лечится `rm -rf .next`.
+- **pinLocale(params) НЕ уводит в Dynamic** — params не Dynamic API; страницы остались Static (ƒ только dashboard/login/saved/email-roi — читают searchParams/auth).
+
+### ИЗВЕСТНАЯ ДЕТАЛЬ (не баг, зафиксировано)
+EN-хабы содержат кириллицу в HTML (`tagline_ru` в сериализованном пейлоаде клиентского каталога `ToolsCatalog` — оба языка в данных, клиент выбирает по локали). Видимый server-рендер EN корректен (`/tools` h1/title английские). Pre-existing. Возможный SEO-нюанс (два языка в одном HTML) — на заметку, не трогали. (Comparison-детали так НЕ делают: EN `/compare/X` = 0 кириллицы.)
+
+### Fixes
+- `next.config.ts`: bare-EN rewrites (явная сегмент-альтернация, beforeFiles) + home-pin + tracing под `[locale]`; `/en` 301-страж убран; `en` исключён из rewrite.
+- `lib/i18n/locale-store.ts`: хелпер `pinLocale(params)` (пин из route-params + валидация).
+- `app/api/cron/drip-publish` + `app/api/revalidate`: revalidatePath на внутренние locale-пути (loop `i18n.locales`).
+- `proxy.ts`: matcher → только `/dashboard`+`/saved`(+locale); locale-детект и header-writes удалены.
+- 28 `app/[locale]/**/page.tsx`: тело пинит `pinLocale(params)` (RU-race фикс).
+
+### Open follow-ups
+- **LanguageCode→Locale контент-локализаторы** (`localizeTool`/`getMdxContent`/`SavedCard` и пр.) — для реального релиза es (сейчас типизированы en|ru; es упирается). Типизация контента, не роутинга.
+- **EN-хабы tagline_ru в HTML** — SEO-нюанс на заметку (см. выше).
+- Прочее (не локаль): discount-bucket 44 (промокоды), alternatives тонкие гриды (`pool.length===1`), Pagefind pricing/best, пересмотр агентов, FINAL-ARCHITECTURE-V4 rewrite.
+
+### ТОЧКА ВХОДА — следующая сессия
+Переезд+cutover+RU-фикс ЗАКРЫТЫ, прод стабилен на `[locale]`. **Утром:** CHIEF-отчёт — ночной cron раскрыл следующие из очереди (капля жива в проде). **За сутки-двое:** проверить упал ли Vercel Active-CPU под лимит (цель переезда — был 3:17/4ч). Дальше — хвосты на выбор. Ветка `feat/locale-isr` смержена (удалить по подтверждению оператора).

@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { absoluteUrl, truncate } from "@/lib/utils"
-import type { LanguageCode } from "@/lib/supabase/types"
-import { i18n } from "@/lib/i18n/config"
+import { i18n, type Locale } from "@/lib/i18n/config"
 
 /* ----------------------------------------------------------------------------
    buildMetadata — single source of truth for page metadata.
@@ -22,7 +21,7 @@ interface BuildMetadataOptions {
   description: string
   /** Path WITHOUT locale prefix, e.g. "/tools/klaviyo". */
   path: string
-  locale?: LanguageCode
+  locale?: Locale
   /** Override the OG image. Path or absolute URL. */
   ogImage?: string
   /** "website" | "article". Defaults to "website". */
@@ -58,7 +57,7 @@ const DEFAULT_OG_IMAGE =
   "/api/og?title=Botapolis&description=The%20AI%20operator%27s%20manual%20for%20Shopify"
 const SITE_NAME = "Botapolis"
 
-function localePath(path: string, locale: LanguageCode): string {
+function localePath(path: string, locale: Locale): string {
   const clean = path.startsWith("/") ? path : `/${path}`
   // Default locale (EN) lives at the bare path; every other locale is prefixed.
   if (locale === i18n.defaultLocale) return clean
@@ -90,7 +89,7 @@ export function buildMetadata({
     "x-default": absoluteUrl(localePath(path, i18n.defaultLocale)),
   }
   for (const loc of i18n.locales) {
-    languages[loc] = absoluteUrl(localePath(path, loc as LanguageCode))
+    languages[loc] = absoluteUrl(localePath(path, loc))
   }
 
   // Twitter card text caps are tight — trim aggressively on long descriptions.

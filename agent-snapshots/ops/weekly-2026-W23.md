@@ -15,7 +15,7 @@ agent: "ops"
 - Comparison window: 2026-05-25 through 2026-05-31.
 - GSC mature coverage in current window: 3/7 days (2026-06-01, 2026-06-02, 2026-06-03).
 - GSC mature coverage in comparison window: 7/7 days (2026-05-25, 2026-05-26, 2026-05-27, 2026-05-28, 2026-05-29, 2026-05-30, 2026-05-31).
-- Affiliate clicks fell from 152 to 279 (+83.6%).
+- Affiliate clicks rose from 152 to 279 (+83.6%).
 - Beehiiv total subscribers ended at 4; new subscribers this week: 0.
 
 ## Metrics
@@ -57,7 +57,7 @@ agent: "ops"
 ## Interpretation
 
 - Search data is only partially mature for the current week. Compare GSC totals cautiously until 2026-06-04 through 2026-06-07 mature in later daily runs.
-- Affiliate activity declined sharply week over week, concentrated after 2026-06-04. No conversions or revenue were recorded in either window.
+- Affiliate activity increased week over week, though daily counts weakened after 2026-06-04. No conversions or revenue were recorded in either window.
 - Subscriber count stayed flat at 4; newsletter engagement rates were not available in `performance_snapshots`.
 
 ## Infrastructure Context

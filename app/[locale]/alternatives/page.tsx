@@ -37,7 +37,7 @@ import type { ToolRow } from "@/lib/supabase/types"
    path except search or direct link).
 ---------------------------------------------------------------------------- */
 
-export const revalidate = 21600
+export const revalidate = 86400
 
 type CardTool = Pick<
   ToolRow,

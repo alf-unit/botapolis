@@ -33,7 +33,7 @@ import type { ComparisonRow, ToolRow } from "@/lib/supabase/types"
    top level and `localePrefix` flows uniformly through the tree.
 ---------------------------------------------------------------------------- */
 
-export const revalidate = 3600
+export const revalidate = 86400
 
 type CardComparison = Pick<
   ComparisonRow,

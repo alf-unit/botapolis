@@ -160,7 +160,7 @@ async function fetchLatestReviews(locale: "en" | "ru"): Promise<HomeReview[]> {
 // ISR — same window as the rest of the site. /compare and /reviews/page.tsx
 // both refresh on Supabase / MDX mutations via /api/revalidate, so the
 // homepage picks up changes within a deploy or webhook cycle.
-export const revalidate = 3600
+export const revalidate = 86400
 
 export default async function HomePage({
   params,

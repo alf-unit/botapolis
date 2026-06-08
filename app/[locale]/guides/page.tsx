@@ -23,7 +23,7 @@ import { absoluteUrl, cn } from "@/lib/utils"
    feels consistent.
 ---------------------------------------------------------------------------- */
 
-export const revalidate = 21600
+export const revalidate = 86400
 
 export async function generateMetadata({
   params,

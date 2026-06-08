@@ -28,7 +28,7 @@ import { absoluteUrl, cn } from "@/lib/utils"
    which 404'd). Listed in the sitemap now (see app/sitemap.ts).
 ---------------------------------------------------------------------------- */
 
-export const revalidate = 21600
+export const revalidate = 86400
 
 export async function generateMetadata({
   params,

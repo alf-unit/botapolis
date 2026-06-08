@@ -26,7 +26,7 @@ import type { ToolRow } from "@/lib/supabase/types"
    /api/revalidate?path=/tools on any tool mutation.
 ---------------------------------------------------------------------------- */
 
-export const revalidate = 3600
+export const revalidate = 86400
 
 // Fields used by the card / filter UI. Selecting narrowly keeps the SSR
 // HTML small (no need to ship `description`/`features` to the browser).

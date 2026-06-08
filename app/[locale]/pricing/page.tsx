@@ -32,7 +32,7 @@ import { absoluteUrl, cn } from "@/lib/utils"
    + Footer Resources column changes close that loop.
 ---------------------------------------------------------------------------- */
 
-export const revalidate = 21600
+export const revalidate = 86400
 
 export async function generateMetadata({
   params,

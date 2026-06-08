@@ -1,29 +1,21 @@
 import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
-import "./globals.css"
-
-import { ThemeProvider } from "@/components/theme-provider"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { Toaster } from "@/components/ui/sonner"
-import { PostHogProvider } from "@/components/analytics/PostHogProvider"
-import { PlausibleScript } from "@/components/analytics/PlausibleScript"
-import { ScrollRevealController } from "@/components/shared/ScrollRevealController"
 
 /* ----------------------------------------------------------------------------
-   Geist (Sans + Mono) via next/font.
-   Cyrillic subset is required for the RU locale.
----------------------------------------------------------------------------- */
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin", "cyrillic"],
-  display: "swap",
-})
+   Root layout — pass-through only.
+   ----------------------------------------------------------------------------
+   The document shell (<html>/<body>, fonts, providers) lives in
+   `app/[locale]/layout.tsx` so the `lang` attribute can be locale-driven.
+   This root layout exists only to (a) satisfy Next's required root layout
+   slot and (b) carry the site-wide default metadata (metadataBase, title
+   template, OG defaults, the Google notranslate opt-out). Metadata exports
+   are collected from every layout regardless of what the component renders,
+   so keeping them here applies them globally while the component itself
+   renders nothing but its children. The matching `translate="no"` HTML
+   attribute is set on <html> in the locale layout.
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-})
+   This is the standard next-intl dual-layout shape; confirmed building as
+   Static on Next 16.
+---------------------------------------------------------------------------- */
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://botapolis.com"),
@@ -45,18 +37,13 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Botapolis",
-    description:
-      "The AI operator's manual for Shopify-native commerce.",
+    description: "The AI operator's manual for Shopify-native commerce.",
   },
-  // Suppress browser auto-translate. We ship native EN + RU via the
-  // /ru/... routes and the EN/RU chip in the navbar is the single source
-  // of truth for locale. Chrome's auto-translate iframe (`flexible?lang=
-  // auto`) layers on top, fights our CSP loudly in the console, and
-  // delivers a double-translated UX for users who already have a RU
-  // build available one click away. `<meta name="google" content=
-  // "notranslate">` is the Google-specific opt-out; the HTML
-  // `translate="no"` attribute below covers Safari / Edge / Yandex
-  // and any other browser that respects the W3C standard.
+  // Suppress browser auto-translate. We ship native EN + RU; the EN/RU chip
+  // in the navbar is the single source of truth for locale. `<meta name=
+  // "google" content="notranslate">` is the Google-specific opt-out; the
+  // HTML `translate="no"` attribute (set on <html> in the locale layout)
+  // covers Safari / Edge / Yandex and any W3C-compliant browser.
   other: {
     google: "notranslate",
   },
@@ -67,58 +54,12 @@ export const viewport: Viewport = {
   initialScale: 1,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#FAFAF9" },
-    { media: "(prefers-color-scheme: dark)",  color: "#0A0A0B" },
+    { media: "(prefers-color-scheme: dark)", color: "#0A0A0B" },
   ],
 }
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html
-      lang="en"
-      translate="no"
-      suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full bg-background text-foreground font-sans">
-        {/* No-JS fallback for scroll-reveal — invisible-by-default state
-            (globals.css §8) would leave crawlers and JS-off visitors
-            staring at blank sections. This style block is only honoured
-            when JavaScript is disabled, forcing everything visible. */}
-        <noscript>
-          {/* eslint-disable-next-line react/no-unknown-property */}
-          <style>{`.scroll-reveal{opacity:1!important;transform:none!important;}`}</style>
-        </noscript>
-        <ScrollRevealController />
-        <ThemeProvider
-          attribute="class"
-          // Spec: follow OS preference for first-time visitors, remember
-          // their pick once they touch the toggle. Some browsers (notably
-          // Chrome iOS in incognito) report `prefers-color-scheme: dark`
-          // regardless of the iOS Display setting — owner-decided we
-          // don't work around that here. If a browser misreports system
-          // preference, that's between the browser and its user.
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {/* PostHog is a thin wrapper that initialises posthog-js on the
-              client when NEXT_PUBLIC_POSTHOG_KEY is set; without a key, the
-              provider becomes a pure pass-through and emits no requests. */}
-          <PostHogProvider>
-            <TooltipProvider delay={150}>{children}</TooltipProvider>
-          </PostHogProvider>
-          {/* Sonner toast portal — used by login flow, save-calculation
-              actions, and any future async feedback. Placed outside the
-              tooltip provider so toasts aren't constrained by its bounds. */}
-          <Toaster position="bottom-right" richColors closeButton />
-        </ThemeProvider>
-        {/* Plausible — server-rendered <Script> that no-ops unless
-            NEXT_PUBLIC_PLAUSIBLE_ENABLED === "true". Sits outside the
-            theme provider so theme flips don't re-mount the analytics tag. */}
-        <PlausibleScript />
-      </body>
-    </html>
-  )
+  return children
 }

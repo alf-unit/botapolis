@@ -218,7 +218,69 @@ const klaviyoPricingRedirects = [
   { source: "/ru/guides/klaviyo-pricing", destination: "/ru/pricing/klaviyo", permanent: true },
 ]
 
+// ----------------------------------------------------------------------------
+// Bare-EN routing (LOCALE-MIGRATION-PLAN — native rewrites)
+// ----------------------------------------------------------------------------
+// EN is the default locale and lives at the bare path (`/tools`), RU under
+// `/ru/*`. The app tree is `app/[locale]/*`, so a bare request must be
+// rewritten INTERNALLY to `/en/...` for the [locale] segment to match. This
+// rewrite is the entire routing layer — it runs at the edge with ZERO Active
+// CPU (no per-request middleware Supabase calls), which is the whole point of
+// the migration (kills the middleware-46m CPU bottleneck).
+//
+// Top-level public URL segments that live under app/[locale]/. Route groups
+// ((account), (auth)) add no URL segment, so their children are listed flat.
+// A bare request to one of these is rewritten to /en/<seg>/... so the
+// [locale] segment receives a valid locale prefix.
+//
+// Why an explicit alternation instead of a negative-lookahead catch-all
+// (`/((?!en|ru|api|...).*)`): under Next 16 + Turbopack the lookahead `source`
+// form does NOT reliably fire from `beforeFiles` — bare paths fell through to
+// the greedy `/[locale]` dynamic match and 404'd, even for paths with no
+// competing route. A literal-segment alternation compiles to a plain
+// path-to-regexp matcher that fires correctly. Cost: adding a new top-level
+// route means adding one entry here (top-level routes are rare).
+//
+// NON-default locales ('ru', 'es') and the out-of-[locale] routes (api, go,
+// auth/callback, sitemap.xml, robots.txt, og/icon image routes, _next) are
+// simply NOT listed, so they're never rewritten. A leaked external `/en/*`
+// URL renders the page directly (200) and is deduped to the bare URL by the
+// page canonical (buildMetadata maps EN → bare); no /en redirect (it would
+// loop with the rewrite under beforeFiles).
+const EN_SEGMENTS = [
+  "about",
+  "alternatives",
+  "best",
+  "compare",
+  "contact",
+  "directory",
+  "guides",
+  "legal",
+  "methodology",
+  "pricing",
+  "search",
+  "tools",
+  "dashboard",
+  "login",
+  "saved",
+].join("|")
+
 const nextConfig: NextConfig = {
+  async rewrites() {
+    // `beforeFiles`: run before filesystem/dynamic route matching so a bare
+    // path is rewritten to /en/... before the greedy `/[locale]` segment can
+    // claim it (e.g. `/tools` → locale="tools" → guard 404).
+    return {
+      beforeFiles: [
+        // Home: bare `/` → `/en`.
+        { source: "/", destination: "/en" },
+        // Bare top-level segment, no sub-path (`/tools`, `/pricing`, …).
+        { source: `/:seg(${EN_SEGMENTS})`, destination: "/en/:seg" },
+        // Bare segment + sub-path (`/pricing/klaviyo`, `/tools/[slug]`, …).
+        { source: `/:seg(${EN_SEGMENTS})/:path*`, destination: "/en/:seg/:path*" },
+      ],
+    }
+  },
   async redirects() {
     // Order: slug-specific klaviyo-pricing first (so it wins over the
     // catch-all /reviews/:slug), then legacy -review-2026 collapse, then
@@ -281,9 +343,13 @@ const nextConfig: NextConfig = {
   // route). Pinning the trace to `content/**` is the documented fix:
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats
   outputFileTracingIncludes: {
-    "/guides/**":   ["./content/guides/**"],
-    "/pricing/**":  ["./content/pricing/**"],
-    "/sitemap.xml": ["./content/**"],
+    // Route keys now carry the [locale] segment — the MDX loader reads
+    // content/{type}/{lang}/{slug}.mdx at request time for /[locale]/guides/
+    // [slug] and /[locale]/pricing/[slug]. /sitemap.xml stays outside [locale].
+    "/[locale]/guides/**":  ["./content/guides/**"],
+    "/[locale]/pricing/**": ["./content/pricing/**"],
+    "/[locale]/best/**":    ["./content/best/**"],
+    "/sitemap.xml":         ["./content/**"],
   },
 }
 

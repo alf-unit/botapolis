@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { absoluteUrl, truncate } from "@/lib/utils"
-import type { LanguageCode } from "@/lib/supabase/types"
+import { i18n, type Locale } from "@/lib/i18n/config"
 
 /* ----------------------------------------------------------------------------
    buildMetadata — single source of truth for page metadata.
@@ -21,7 +21,7 @@ interface BuildMetadataOptions {
   description: string
   /** Path WITHOUT locale prefix, e.g. "/tools/klaviyo". */
   path: string
-  locale?: LanguageCode
+  locale?: Locale
   /** Override the OG image. Path or absolute URL. */
   ogImage?: string
   /** "website" | "article". Defaults to "website". */
@@ -57,12 +57,11 @@ const DEFAULT_OG_IMAGE =
   "/api/og?title=Botapolis&description=The%20AI%20operator%27s%20manual%20for%20Shopify"
 const SITE_NAME = "Botapolis"
 
-function localePath(path: string, locale: LanguageCode): string {
+function localePath(path: string, locale: Locale): string {
   const clean = path.startsWith("/") ? path : `/${path}`
-  if (locale === "ru") {
-    return clean === "/" ? "/ru" : `/ru${clean}`
-  }
-  return clean
+  // Default locale (EN) lives at the bare path; every other locale is prefixed.
+  if (locale === i18n.defaultLocale) return clean
+  return clean === "/" ? `/${locale}` : `/${locale}${clean}`
 }
 
 export function buildMetadata({
@@ -77,13 +76,21 @@ export function buildMetadata({
   keywords,
   absoluteTitle = false,
 }: BuildMetadataOptions): Metadata {
-  const enPath = localePath(path, "en")
-  const ruPath = localePath(path, "ru")
-  const currentPath = locale === "ru" ? ruPath : enPath
+  const currentPath = localePath(path, locale)
 
   const canonical = absoluteUrl(currentPath)
   const ogUrl     = absoluteUrl(currentPath)
   const image     = absoluteUrl(ogImage ?? DEFAULT_OG_IMAGE)
+
+  // hreflang map — one entry per configured locale, plus x-default → the
+  // default-locale (bare-EN) URL. Locale-driven so adding a language needs
+  // no change here (O(1) per language).
+  const languages: Record<string, string> = {
+    "x-default": absoluteUrl(localePath(path, i18n.defaultLocale)),
+  }
+  for (const loc of i18n.locales) {
+    languages[loc] = absoluteUrl(localePath(path, loc))
+  }
 
   // Twitter card text caps are tight — trim aggressively on long descriptions.
   const shortDescription = truncate(description, 200)
@@ -97,11 +104,7 @@ export function buildMetadata({
     keywords,
     alternates: {
       canonical,
-      languages: {
-        en:          absoluteUrl(enPath),
-        ru:          absoluteUrl(ruPath),
-        "x-default": absoluteUrl(enPath),
-      },
+      languages,
     },
     openGraph: {
       title,

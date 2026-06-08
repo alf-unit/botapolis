@@ -43,6 +43,7 @@ import { revalidatePath } from "next/cache"
 import { NextResponse, type NextRequest } from "next/server"
 
 import { createServiceClient } from "@/lib/supabase/service"
+import { i18n } from "@/lib/i18n/config"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -297,8 +298,16 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // 3. Revalidate every newly-visible surface (EN + RU detail, type hub).
-  //    Plus the global surfaces (sitemap, homepage) once.
+  // 3. Revalidate every newly-visible surface across ALL locales, plus the
+  //    type hub and the global surfaces (sitemap, homepage).
+  //
+  //    Paths MUST be the INTERNAL locale-prefixed form (`/en/...`, `/ru/...`).
+  //    Under the bare-EN `next.config` rewrite ( /X → /en/X ), the spike
+  //    (LOCALE-MIGRATION-PLAN §2) proved that `revalidatePath('/en/X')` pierces
+  //    the cache for the page served at bare `/X`, while bare `revalidatePath
+  //    ('/X')` does NOT reach the rewritten route. So we revalidate `/en/...`
+  //    (serves bare) and `/ru/...` (serves /ru) — never the bare form.
+  //    /sitemap.xml is a real route outside [locale] → revalidated bare.
   const revalidated: string[] = []
   const touch = (p: string) => {
     revalidatePath(p)
@@ -307,15 +316,17 @@ export async function GET(req: NextRequest) {
   const hubsTouched = new Set<string>()
   for (const f of flipped) {
     const seg = URL_SEGMENT[f.content_type] ?? f.content_type
-    touch(`/${seg}/${f.slug}`)
-    touch(`/ru/${seg}/${f.slug}`)
-    if (!hubsTouched.has(seg)) {
-      touch(`/${seg}`)
-      hubsTouched.add(seg)
+    for (const loc of i18n.locales) {
+      touch(`/${loc}/${seg}/${f.slug}`)
+      const hubKey = `${loc}:${seg}`
+      if (!hubsTouched.has(hubKey)) {
+        touch(`/${loc}/${seg}`)
+        hubsTouched.add(hubKey)
+      }
     }
   }
   touch("/sitemap.xml")
-  touch("/")
+  for (const loc of i18n.locales) touch(`/${loc}`)
 
   // 4. Best-effort semantic_core sync (non-authoritative). Exact path match.
   let semanticSynced = 0

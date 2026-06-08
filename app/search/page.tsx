@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import type { Metadata } from "next"
 
 import { Navbar } from "@/components/nav/Navbar"
@@ -94,7 +95,12 @@ export default async function SearchPage() {
       <Navbar strings={dict.nav} localePrefix={localePrefix} />
 
       <main>
-        <SearchPageClient strings={strings} locale={locale} />
+        {/* SearchPageClient reads `?q=` via useSearchParams(); a Suspense
+            boundary is required for the page to render statically (CSR
+            bailout). Surfaced once the locale-ISR fix made this page static. */}
+        <Suspense>
+          <SearchPageClient strings={strings} locale={locale} />
+        </Suspense>
       </main>
 
       <Footer

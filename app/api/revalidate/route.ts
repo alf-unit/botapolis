@@ -17,6 +17,7 @@
 import { revalidatePath, revalidateTag } from "next/cache"
 import { NextResponse, type NextRequest } from "next/server"
 import { timingSafeEqual } from "node:crypto"
+import { i18n } from "@/lib/i18n/config"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -36,18 +37,31 @@ interface SupabaseWebhookPayload {
   old_record?: { slug?: string }
 }
 
+/** Internal locale-prefixed surfaces for a detail slug under a URL segment.
+ *  Under the bare-EN rewrite the cache is keyed on the internal `/en/...` /
+ *  `/ru/...` paths (LOCALE-MIGRATION-PLAN §2 spike) — never the bare form —
+ *  so we expand every locale here. /sitemap.xml is a real route outside
+ *  [locale] and is revalidated bare. */
+function localeSurfaces(seg: string, slug: string): string[] {
+  const paths: string[] = []
+  for (const loc of i18n.locales) {
+    paths.push(`/${loc}/${seg}/${slug}`, `/${loc}/${seg}`, `/${loc}`)
+  }
+  paths.push("/sitemap.xml")
+  return paths
+}
+
 function derivePathsFromSupabaseWebhook(payload: SupabaseWebhookPayload): string[] {
   const slug = payload.record?.slug ?? payload.old_record?.slug
   if (!slug) return []
   switch (payload.table) {
     case "tools":
-      // /directory is a permanent redirect to /tools and has no [slug]
-      // route; the tool detail page is /tools/{slug}. Listing the old
-      // /directory paths was a no-op (revalidatePath silently ignores
-      // unknown paths) but cluttered logs — dropped in the May 2026 audit.
-      return [`/tools/${slug}`, "/tools", "/"]
+      // tool detail page is /tools/{slug} (/directory is a redirect with no
+      // [slug] route). Expanded across locales to the internal paths the
+      // rewrite cache is keyed on.
+      return localeSurfaces("tools", slug)
     case "comparisons":
-      return [`/compare/${slug}`, "/compare", "/"]
+      return localeSurfaces("compare", slug)
     default:
       return []
   }

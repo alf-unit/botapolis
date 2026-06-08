@@ -12,6 +12,7 @@ import { localizeToolPartial } from "@/lib/content/tool-locale"
 import { filterVisibleRows } from "@/lib/content/visibility"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl } from "@/lib/utils"
 import type { ToolRow } from "@/lib/supabase/types"
 
@@ -72,8 +73,12 @@ async function fetchTools(): Promise<CardTool[]> {
 // --------------------------------------------------------------------------
 // Metadata
 // --------------------------------------------------------------------------
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const locale = await pinLocale(params)
   return buildMetadata({
     title:       locale === "ru" ? "Инструменты для Shopify" : "AI tools for Shopify operators",
     description: locale === "ru"

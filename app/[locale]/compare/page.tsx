@@ -13,6 +13,7 @@ import {
 import { filterVisibleRows } from "@/lib/content/visibility"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl } from "@/lib/utils"
 import type { ComparisonRow, ToolRow } from "@/lib/supabase/types"
 
@@ -111,8 +112,12 @@ async function fetchComparisons(
 // --------------------------------------------------------------------------
 // Metadata
 // --------------------------------------------------------------------------
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const locale = await pinLocale(params)
   const title =
     locale === "ru"
       ? "Сравнения AI-инструментов для Shopify"

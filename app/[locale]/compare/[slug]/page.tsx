@@ -23,6 +23,7 @@ import {
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
 import { canonicalCompareSlug, isCanonicalCompareSlug } from "@/lib/content/slug"
 import { getToolRatings } from "@/lib/content/rating"
@@ -292,7 +293,7 @@ export async function generateStaticParams() {
 // ============================================================================
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const locale = await getLocale()
+  const locale = await pinLocale(params)
   // Always advertise the canonical URL even if the visitor landed on the
   // reverse form — search engines following the canonical pointer end
   // up on the same page the runtime redirect below sends humans to.

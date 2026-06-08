@@ -7,6 +7,7 @@ import { SearchPageClient } from "@/components/shared/SearchPageClient"
 import { buildMetadata } from "@/lib/seo/metadata"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl } from "@/lib/utils"
 
 /* ----------------------------------------------------------------------------
@@ -38,8 +39,12 @@ import { absoluteUrl } from "@/lib/utils"
 // as a separate URL. Sitemap exposes the bare /search entry only.
 export const revalidate = 86400
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const locale = await pinLocale(params)
   const ru = locale === "ru"
   return buildMetadata({
     title:       ru ? "Поиск по Botapolis" : "Search Botapolis",

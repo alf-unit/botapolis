@@ -12,6 +12,7 @@ import {
 import { getAllMdxFrontmatter } from "@/lib/content/mdx"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl, cn } from "@/lib/utils"
 
 /* ----------------------------------------------------------------------------
@@ -34,8 +35,12 @@ import { absoluteUrl, cn } from "@/lib/utils"
 
 export const revalidate = 21600
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const locale = await pinLocale(params)
   return buildMetadata({
     title:
       locale === "ru"

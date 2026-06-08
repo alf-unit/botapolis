@@ -43,6 +43,30 @@ export function readLocale(): Locale {
 }
 
 /**
+ * Pin the locale for a `generateMetadata` render straight from the route
+ * params, then return it.
+ *
+ * Why metadata needs this when the page body doesn't: the `[locale]` layout
+ * calls `setLocale` before its children render, so page components resolve
+ * `getLocale()` correctly. But `generateMetadata` is NOT guaranteed to run
+ * after the layout body — Next resolves metadata in its own pass — so each
+ * one must pin its own locale from the authoritative source it IS handed:
+ * `params`. The param type is loose (`locale?`) so a dynamic route's
+ * `Promise<{ slug }>` params object satisfies it too (extra/optional props),
+ * letting both static and `[slug]` pages call this without a type dance.
+ */
+export async function pinLocale(
+  params: Promise<Record<string, string | undefined>>,
+): Promise<Locale> {
+  const { locale } = await params
+  const safe = (
+    i18n.locales.includes(locale as Locale) ? locale : i18n.defaultLocale
+  ) as Locale
+  setLocale(safe)
+  return safe
+}
+
+/**
  * Wrap a route export (the default page component or `generateMetadata`) so
  * it pins `locale` for this render before delegating to the shared EN
  * implementation. Works for sync and async exports alike — the args and

@@ -35,6 +35,7 @@ import {
 } from "@/lib/content/related-blocks"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
 import type {
   ToolFeature,
@@ -151,7 +152,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const locale = await getLocale()
+  const locale = await pinLocale(params)
   const rawTool = await fetchTool(slug)
 
   if (!rawTool) {

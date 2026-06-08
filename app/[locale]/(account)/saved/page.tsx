@@ -9,6 +9,7 @@ import { buildMetadata } from "@/lib/seo/metadata"
 import { createClient } from "@/lib/supabase/server"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { cn, formatPrice, formatNumber } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import type { SavedCalculationRow } from "@/lib/supabase/types"
@@ -26,8 +27,12 @@ import type { SavedCalculationRow } from "@/lib/supabase/types"
    need a new 003_* migration for it.
 ---------------------------------------------------------------------------- */
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const locale = await pinLocale(params)
   return buildMetadata({
     title:       locale === "ru" ? "Сохранённые расчёты" : "Saved calculations",
     description: locale === "ru"

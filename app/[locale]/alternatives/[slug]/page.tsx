@@ -17,6 +17,7 @@ import {
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { localizeTool, localizeToolPartial } from "@/lib/content/tool-locale"
 import { filterVisibleRows, isSlugVisible } from "@/lib/content/visibility"
 import { absoluteUrl, cn } from "@/lib/utils"
@@ -162,7 +163,7 @@ export async function generateStaticParams() {
 // --------------------------------------------------------------------------
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const locale = await getLocale()
+  const locale = await pinLocale(params)
   const rawSource = await fetchSource(slug)
 
   if (!rawSource) {

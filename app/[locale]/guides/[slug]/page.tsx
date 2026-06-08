@@ -16,6 +16,7 @@ import {
 import { getAllMdxSlugs, getMdxContent } from "@/lib/content/mdx"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl } from "@/lib/utils"
 
 /* ----------------------------------------------------------------------------
@@ -48,7 +49,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const locale = await getLocale()
+  const locale = await pinLocale(params)
   const guide = await getMdxContent("guides", slug, locale)
 
   if (!guide) {

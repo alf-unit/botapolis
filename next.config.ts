@@ -1,4 +1,5 @@
 import type { NextConfig } from "next"
+import { i18n } from "./lib/i18n/config"
 
 /* ----------------------------------------------------------------------------
    Security headers — TZ § 15.1 (May 2026 audit)
@@ -218,12 +219,65 @@ const klaviyoPricingRedirects = [
   { source: "/ru/guides/klaviyo-pricing", destination: "/ru/pricing/klaviyo", permanent: true },
 ]
 
+// ----------------------------------------------------------------------------
+// Bare-EN routing (LOCALE-MIGRATION-PLAN — native rewrites)
+// ----------------------------------------------------------------------------
+// EN is the default locale and lives at the bare path (`/tools`), RU under
+// `/ru/*`. The app tree is `app/[locale]/*`, so a bare request must be
+// rewritten INTERNALLY to `/en/...` for the [locale] segment to match. This
+// rewrite is the entire routing layer — it runs at the edge with ZERO Active
+// CPU (no per-request middleware Supabase calls), which is the whole point of
+// the migration (kills the middleware-46m CPU bottleneck).
+//
+// The negative-lookahead excludes everything that must NOT collapse into
+// /en/*: non-default locales (served by [locale] directly), API/handler
+// routes, the OAuth callback, root metadata image routes, Next/Vercel
+// internals, and any path with a file extension (sitemap.xml, robots.txt,
+// favicon.ico, /pagefind/*.js, static assets). The exclude list derives the
+// locale codes from i18n config, so adding `es` later needs no change here.
+const NON_DEFAULT_LOCALES = i18n.locales.filter((l) => l !== i18n.defaultLocale)
+const REWRITE_EXCLUDE = [
+  ...NON_DEFAULT_LOCALES, // 'ru' (+ 'es' once added) — handled by [locale]
+  "api",
+  "go",
+  "auth", // /auth/callback (Supabase OAuth) lives outside [locale]
+  "opengraph-image",
+  "icon",
+  "apple-icon",
+  "_next",
+  "_vercel",
+].join("|")
+// eslint-disable-next-line no-useless-escape -- the \. escapes are required in the regex string
+const BARE_EN_SOURCE = `/((?!${REWRITE_EXCLUDE}|.*\\..*).*)`
+
+// Safety net: if an internal `/en/*` URL ever leaks outward (a stray link, an
+// external backlink), 301 it to the bare canonical. Redirects run BEFORE
+// rewrites, and the rewrite destination (`/en/...`) is internal — Next does
+// not re-run redirects on a rewrite target — so there is no loop.
+const stripEnPrefixRedirects = [
+  { source: "/en/:path*", destination: "/:path*", permanent: true },
+]
+
 const nextConfig: NextConfig = {
+  async rewrites() {
+    return [
+      // Home: bare `/` → `/en` (the regex group is empty for `/`, so pin it
+      // explicitly to avoid a `/en/` trailing-slash edge case).
+      { source: "/", destination: "/en" },
+      { source: BARE_EN_SOURCE, destination: "/en/$1" },
+    ]
+  },
   async redirects() {
     // Order: slug-specific klaviyo-pricing first (so it wins over the
     // catch-all /reviews/:slug), then legacy -review-2026 collapse, then
-    // the generic /reviews/{*,hub} → /tools/{*,hub} family.
-    return [...klaviyoPricingRedirects, ...legacyReviewRedirects, ...reviewsToToolsRedirects]
+    // the generic /reviews/{*,hub} → /tools/{*,hub} family, then the /en/*
+    // leak guard (disjoint from the others).
+    return [
+      ...klaviyoPricingRedirects,
+      ...legacyReviewRedirects,
+      ...reviewsToToolsRedirects,
+      ...stripEnPrefixRedirects,
+    ]
   },
   async headers() {
     return [
@@ -281,9 +335,13 @@ const nextConfig: NextConfig = {
   // route). Pinning the trace to `content/**` is the documented fix:
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats
   outputFileTracingIncludes: {
-    "/guides/**":   ["./content/guides/**"],
-    "/pricing/**":  ["./content/pricing/**"],
-    "/sitemap.xml": ["./content/**"],
+    // Route keys now carry the [locale] segment — the MDX loader reads
+    // content/{type}/{lang}/{slug}.mdx at request time for /[locale]/guides/
+    // [slug] and /[locale]/pricing/[slug]. /sitemap.xml stays outside [locale].
+    "/[locale]/guides/**":  ["./content/guides/**"],
+    "/[locale]/pricing/**": ["./content/pricing/**"],
+    "/[locale]/best/**":    ["./content/best/**"],
+    "/sitemap.xml":         ["./content/**"],
   },
 }
 

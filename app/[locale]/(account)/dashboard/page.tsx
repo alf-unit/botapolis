@@ -9,6 +9,7 @@ import { buildMetadata } from "@/lib/seo/metadata"
 import { createClient } from "@/lib/supabase/server"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 
@@ -24,8 +25,12 @@ import { buttonVariants } from "@/components/ui/button"
    for now they document what's coming.
 ---------------------------------------------------------------------------- */
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const locale = await pinLocale(params)
   return buildMetadata({
     title:       locale === "ru" ? "Личный кабинет"   : "Dashboard",
     description: locale === "ru"

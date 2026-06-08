@@ -9,6 +9,7 @@ import { buildMetadata } from "@/lib/seo/metadata"
 import { generateBreadcrumbSchema } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl } from "@/lib/utils"
 
 /* ----------------------------------------------------------------------------
@@ -24,8 +25,12 @@ import { absoluteUrl } from "@/lib/utils"
 const PATH = "/contact"
 const CONTACT_EMAIL = "editorial@botapolis.com"
 
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const locale = await pinLocale(params)
   return buildMetadata({
     title:       locale === "ru" ? "Связаться" : "Contact",
     description:

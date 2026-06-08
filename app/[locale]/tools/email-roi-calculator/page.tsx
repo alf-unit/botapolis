@@ -14,6 +14,7 @@ import {
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl, cn } from "@/lib/utils"
 
 /* ----------------------------------------------------------------------------
@@ -34,8 +35,12 @@ const TOOL_PATH = "/tools/email-roi-calculator"
 // --------------------------------------------------------------------------
 // Metadata
 // --------------------------------------------------------------------------
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale()
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const locale = await pinLocale(params)
   // Title goes through the root layout's `title.template` ("%s · Botapolis"),
   // so we omit the brand suffix here to avoid double-stamping it.
   const title =

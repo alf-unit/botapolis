@@ -14,6 +14,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { getAllMdxSlugs, getAllMdxFrontmatter } from "@/lib/content/mdx"
 import { getVisibleSet } from "@/lib/content/visibility"
 import { absoluteUrl } from "@/lib/utils"
+import { i18n } from "@/lib/i18n/config"
 
 // Sitemap revalidation budget: daily is plenty for a docs-style site.
 // Was hourly until 2026-05-30 — Vercel Active CPU audit showed sitemap
@@ -67,13 +68,17 @@ const STATIC_ROUTES: Array<{
   { path: "/legal/affiliate-disclosure", changeFrequency: "yearly", priority: 0.3 },
 ]
 
+// Bare path for the default locale, prefixed for the rest — locale-driven so
+// adding a language is a config change, not an edit here.
+function localePath(path: string, locale: string): string {
+  if (locale === i18n.defaultLocale) return path
+  return path === "/" ? `/${locale}` : `/${locale}${path}`
+}
+
 function alternates(path: string) {
-  return {
-    languages: {
-      en: absoluteUrl(path),
-      ru: absoluteUrl(path === "/" ? "/ru" : `/ru${path}`),
-    },
-  }
+  const languages: Record<string, string> = {}
+  for (const loc of i18n.locales) languages[loc] = absoluteUrl(localePath(path, loc))
+  return { languages }
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

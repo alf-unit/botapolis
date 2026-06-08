@@ -1,44 +1,47 @@
 /**
  * Botapolis · Proxy (formerly `middleware.ts` — renamed in Next.js 16)
  * ----------------------------------------------------------------------------
- * Responsibilities, in order:
- *   1. Detect locale from the URL    (/ru/* → "ru", otherwise → "en")
- *   2. Refresh the Supabase auth cookies via `updateSession`
- *   3. Gate `/dashboard` and `/saved` (sprint 5) — redirect anonymous users
- *      to `/login?next=<intended-path>` so they land where they were going
- *      after signing in
- *   4. Forward the resolved locale + path to downstream RSCs via headers
+ * Single responsibility after the [locale] migration: gate the authenticated
+ * routes (`/dashboard`, `/saved`, and their locale-prefixed twins). Locale is
+ * no longer detected here — it comes from the `[locale]` route param — so the
+ * old `x-locale`/`x-pathname` header forwarding is gone, and the matcher is
+ * narrowed to ONLY the protected paths.
  *
- * Excluded by the matcher: `_next/*`, `/api/*`, `/go/*`, anything with a
- * file extension, and `favicon.ico`. Those paths either render no UI or have
- * their own auth/redirect flow (see app/go/[slug]/route.ts).
+ * Why the narrow matcher matters: `updateSession()` makes a Supabase network
+ * round-trip. Previously this proxy ran on (almost) every request, so bot
+ * traffic + first-time visitors each paid that cost — the dominant Vercel
+ * Fluid Active-CPU drain ("middleware-46m"). Scoping the matcher to the two
+ * auth surfaces means the round-trip only happens for the handful of requests
+ * that actually need an authenticated user.
  *
  * Per the Next.js 16 docs: `proxy` runs on the Node.js runtime — the Edge
  * runtime is no longer supported for this file convention.
  */
 import { NextResponse, type NextRequest } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
-
-export const LOCALES = ["en", "ru"] as const
-export type Locale = (typeof LOCALES)[number]
-export const DEFAULT_LOCALE: Locale = "en"
-
-function resolveLocale(pathname: string): Locale {
-  // First segment === "ru" → russian; everything else → english (default).
-  // We don't redirect EN to "/en/…" — bare paths stay locale-clean for SEO.
-  if (pathname === "/ru" || pathname.startsWith("/ru/")) return "ru"
-  return DEFAULT_LOCALE
-}
+import { i18n } from "@/lib/i18n/config"
 
 /**
- * Strip a leading `/ru` so we can match protected paths once instead of
- * once per locale. Locale-less `/dashboard` stays `/dashboard`, while
- * `/ru/dashboard` collapses to `/dashboard`.
+ * Strip a leading non-default locale segment so protected paths match once
+ * instead of once per locale. `/ru/dashboard` → `/dashboard`, `/dashboard`
+ * stays put. Derives locales from i18n config, so `es` etc. work for free.
  */
 function stripLocale(pathname: string): string {
-  if (pathname === "/ru") return "/"
-  if (pathname.startsWith("/ru/")) return pathname.slice(3) || "/"
+  for (const loc of i18n.locales) {
+    if (loc === i18n.defaultLocale) continue
+    if (pathname === `/${loc}`) return "/"
+    if (pathname.startsWith(`/${loc}/`)) return pathname.slice(loc.length + 1) || "/"
+  }
   return pathname
+}
+
+/** First path segment if it's a non-default locale, else null. */
+function localePrefix(pathname: string): string {
+  for (const loc of i18n.locales) {
+    if (loc === i18n.defaultLocale) continue
+    if (pathname === `/${loc}` || pathname.startsWith(`/${loc}/`)) return `/${loc}`
+  }
+  return ""
 }
 
 /** Paths that require an authenticated user (TZ § 10). */
@@ -50,60 +53,23 @@ function requiresAuth(localelessPath: string): boolean {
   )
 }
 
-/**
- * Supabase cookie sniff: do we have any reason to hit the auth refresh path?
- *
- * `updateSession()` makes a network round-trip to Supabase on every call —
- * cheap per-request but it adds up across bot traffic (Googlebot et al. do
- * not carry auth cookies). We skip the refresh for visitors who clearly
- * aren't logged in: no `sb-*-auth-token` cookie present.
- *
- * Auth-required paths still go through `updateSession` regardless so the
- * gate below sees an authoritative user (and so a signed-in user landing
- * on /dashboard via deep-link gets the proper refresh).
- */
-function hasSupabaseAuthCookie(request: NextRequest): boolean {
-  for (const c of request.cookies.getAll()) {
-    if (c.name.startsWith("sb-") && c.name.endsWith("-auth-token")) return true
-  }
-  return false
-}
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const locale = resolveLocale(pathname)
-  const localeless = stripLocale(pathname)
-  const needsAuth = requiresAuth(localeless)
-  const maybeLoggedIn = hasSupabaseAuthCookie(request)
 
-  // Fast path: anonymous visitor on a public page. Skip the Supabase
-  // round-trip entirely — we only need locale + pathname headers downstream.
-  // This is the cost-saver: bot traffic + first-time visitors are the bulk
-  // of requests and they don't need an auth refresh.
-  if (!needsAuth && !maybeLoggedIn) {
-    const response = NextResponse.next({ request })
-    response.headers.set("x-locale", locale)
-    response.headers.set("x-pathname", pathname)
-    return response
+  // The matcher already scopes us to protected paths; this guard is a
+  // belt-and-suspenders no-op for anything that slips through.
+  if (!requiresAuth(stripLocale(pathname))) {
+    return NextResponse.next({ request })
   }
 
-  // Slow path: either the route requires auth, or the visitor has Supabase
-  // cookies that may need rotating. Do the full refresh + auth gate.
+  // Refresh Supabase auth cookies and read the authoritative user.
   const { response, user } = await updateSession(request)
 
-  // Make request context available to Server Components via headers.
-  response.headers.set("x-locale", locale)
-  response.headers.set("x-pathname", pathname)
-
-  // ----- Auth gate ----------------------------------------------------------
-  // Anonymous users hitting /dashboard or /saved get bounced to /login with
-  // a `?next=` hint so we can return them to their destination after sign-in.
-  // We preserve locale prefix on the redirect so RU users don't get an EN
-  // login page; the `next` param keeps the original path intact.
-  if (!user && needsAuth) {
-    const loginPath = locale === "ru" ? "/ru/login" : "/login"
-    const loginUrl = new URL(loginPath, request.url)
-    // Preserve the original destination including any search params.
+  // Anonymous users hitting a protected path get bounced to /login with a
+  // `?next=` hint so they return to their destination after sign-in. Preserve
+  // the locale prefix so an RU visitor gets the RU login page.
+  if (!user) {
+    const loginUrl = new URL(`${localePrefix(pathname)}/login`, request.url)
     loginUrl.searchParams.set("next", pathname + request.nextUrl.search)
     return NextResponse.redirect(loginUrl)
   }
@@ -112,8 +78,13 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on every path except: API, redirects, Next.js internals, and static files.
+  // Scope to the authenticated surfaces only (bare EN + every non-default
+  // locale prefix). Everything else skips the proxy entirely — no locale
+  // detection, no Supabase round-trip.
   matcher: [
-    "/((?!api|go|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico|css|js|map|woff|woff2|ttf|otf)$).*)",
+    "/dashboard/:path*",
+    "/saved/:path*",
+    "/(ru|es)/dashboard/:path*",
+    "/(ru|es)/saved/:path*",
   ],
 }

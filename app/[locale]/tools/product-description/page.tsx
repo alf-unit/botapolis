@@ -12,7 +12,6 @@ import {
   generateOwnedToolSchema,
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl } from "@/lib/utils"
 
@@ -59,8 +58,12 @@ export async function generateMetadata({
   })
 }
 
-export default async function ProductDescriptionPage() {
-  const locale = await getLocale()
+export default async function ProductDescriptionPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const locale = await pinLocale(params)
   const dict   = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 

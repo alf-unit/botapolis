@@ -18,7 +18,7 @@ import { Navbar } from "@/components/nav/Navbar"
 import { Footer } from "@/components/nav/Footer"
 import { ComparisonCard } from "@/components/tools/ComparisonCard"
 import { ReviewCardCover, reviewOgCoverHref } from "@/components/content/ArticleCover"
-import { getLocale } from "@/lib/i18n/get-locale"
+import { pinLocale } from "@/lib/i18n/locale-store"
 import { getDictionary } from "@/lib/i18n/dictionaries"
 import { createServiceClient } from "@/lib/supabase/service"
 import { filterVisibleRows } from "@/lib/content/visibility"
@@ -162,8 +162,12 @@ async function fetchLatestReviews(locale: "en" | "ru"): Promise<HomeReview[]> {
 // homepage picks up changes within a deploy or webhook cycle.
 export const revalidate = 3600
 
-export default async function HomePage() {
-  const locale = await getLocale()
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const locale = await pinLocale(params)
   const dict = await getDictionary(locale)
   const localePrefix = locale === "ru" ? "/ru" : ""
 

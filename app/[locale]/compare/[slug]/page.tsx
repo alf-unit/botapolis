@@ -22,7 +22,6 @@ import {
   generateSoftwareApplicationSchema,
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
 import { canonicalCompareSlug, isCanonicalCompareSlug } from "@/lib/content/slug"
@@ -364,12 +363,12 @@ export default async function ComparisonPage({ params }: PageProps) {
   // /ru prefix; this handler lives under /compare and /ru/compare both
   // re-export it, so a bare path works in either tree).
   if (!isCanonicalCompareSlug(slug)) {
-    const locale = await getLocale()
+    const locale = await pinLocale(params)
     const prefix = locale === "ru" ? "/ru" : ""
     redirect(`${prefix}/compare/${canonicalCompareSlug(slug)}`)
   }
 
-  const locale = await getLocale()
+  const locale = await pinLocale(params)
   const row = await fetchComparison(slug, locale as "en" | "ru")
   if (!row) notFound()
 

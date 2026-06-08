@@ -43,8 +43,12 @@ export async function generateMetadata({
   })
 }
 
-export default async function MethodologyPage() {
-  const locale = await getLocale()
+export default async function MethodologyPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const locale = await pinLocale(params)
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 

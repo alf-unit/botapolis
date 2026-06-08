@@ -11,7 +11,6 @@ import {
 } from "@/lib/seo/schema"
 import { getAllMdxFrontmatter } from "@/lib/content/mdx"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl, cn } from "@/lib/utils"
 
@@ -55,8 +54,12 @@ export async function generateMetadata({
   })
 }
 
-export default async function PricingIndexPage() {
-  const locale = await getLocale()
+export default async function PricingIndexPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const locale = await pinLocale(params)
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 

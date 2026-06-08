@@ -12,7 +12,6 @@ import {
 } from "@/lib/seo/schema"
 import { filterVisibleRows } from "@/lib/content/visibility"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl } from "@/lib/utils"
 import type { ComparisonRow, ToolRow } from "@/lib/supabase/types"
@@ -148,8 +147,12 @@ export async function generateMetadata({
 // --------------------------------------------------------------------------
 // Page
 // --------------------------------------------------------------------------
-export default async function ComparePage() {
-  const locale = await getLocale()
+export default async function ComparePage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const locale = await pinLocale(params)
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 

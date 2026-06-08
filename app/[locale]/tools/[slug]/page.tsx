@@ -34,7 +34,6 @@ import {
   type RelatedComparison,
 } from "@/lib/content/related-blocks"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
 import type {
@@ -228,7 +227,7 @@ export default async function ToolDetailPage({ params }: PageProps) {
   const rawTool = await fetchTool(slug)
   if (!rawTool) notFound()
 
-  const locale = (await getLocale()) as "en" | "ru"
+  const locale = (await pinLocale(params)) as "en" | "ru"
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
   const tool = localizeTool(rawTool, locale)

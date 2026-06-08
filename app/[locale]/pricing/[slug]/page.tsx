@@ -26,7 +26,6 @@ import {
 } from "@/lib/content/related-blocks"
 import { localizeTool } from "@/lib/content/tool-locale"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl, cn, formatPrice } from "@/lib/utils"
 import type { ToolRow } from "@/lib/supabase/types"
@@ -128,7 +127,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PricingPage({ params }: PageProps) {
   const { slug } = await params
-  const locale = (await getLocale()) as "en" | "ru"
+  const locale = (await pinLocale(params)) as "en" | "ru"
   const article = await getMdxContent("pricing", slug, locale)
   if (!article) notFound()
 

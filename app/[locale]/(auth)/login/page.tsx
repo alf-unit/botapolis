@@ -6,7 +6,6 @@ import { LoginForm } from "@/components/auth/LoginForm"
 import { buildMetadata } from "@/lib/seo/metadata"
 import { createClient } from "@/lib/supabase/server"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 
 /* ----------------------------------------------------------------------------
@@ -45,10 +44,14 @@ export async function generateMetadata({
 }
 
 interface PageProps {
+  params: Promise<{ locale: string }>
   searchParams: Promise<{ next?: string }>
 }
 
-export default async function LoginPage({ searchParams }: PageProps) {
+export default async function LoginPage({ params, searchParams }: PageProps) {
+  // Pin locale from the route param first (RSC race-safe — see locale-store).
+  const locale = await pinLocale(params)
+
   // Already signed in? Bounce straight to where they were headed.
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -57,7 +60,6 @@ export default async function LoginPage({ searchParams }: PageProps) {
     redirect(next && next.startsWith("/") ? next : "/dashboard")
   }
 
-  const locale = await getLocale()
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 

@@ -16,7 +16,6 @@ import {
   generateItemListSchema,
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { localizeTool, localizeToolPartial } from "@/lib/content/tool-locale"
 import { filterVisibleRows, isSlugVisible } from "@/lib/content/visibility"
@@ -214,7 +213,7 @@ export default async function AlternativesPage({ params }: PageProps) {
   if (!rawSource) notFound()
 
   const rawAlternatives = await fetchAlternatives(rawSource)
-  const locale = await getLocale()
+  const locale = await pinLocale(params)
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 

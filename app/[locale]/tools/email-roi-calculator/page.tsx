@@ -13,7 +13,6 @@ import {
   generateOwnedToolSchema,
 } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl, cn } from "@/lib/utils"
 
@@ -75,13 +74,16 @@ export async function generateMetadata({
 // still shows a small "Powered by Botapolis" link — load-bearing for
 // attribution + a backlink we can rely on when bloggers embed the tool.
 export default async function EmailRoiCalculatorPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ locale: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const params = await searchParams
-  const embed = params.embed === "1"
-  const locale = await getLocale()
+  // Pin locale from the route param first (RSC race-safe — see locale-store).
+  const locale = await pinLocale(params)
+  const sp = await searchParams
+  const embed = sp.embed === "1"
   const dict   = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 

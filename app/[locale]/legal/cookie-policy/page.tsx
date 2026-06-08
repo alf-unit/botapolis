@@ -6,7 +6,6 @@ import { Footer } from "@/components/nav/Footer"
 import { buildMetadata } from "@/lib/seo/metadata"
 import { generateBreadcrumbSchema } from "@/lib/seo/schema"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { absoluteUrl } from "@/lib/utils"
 
@@ -53,8 +52,12 @@ export async function generateMetadata({
   })
 }
 
-export default async function CookiePolicyPage() {
-  const locale = await getLocale()
+export default async function CookiePolicyPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const locale = await pinLocale(params)
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 

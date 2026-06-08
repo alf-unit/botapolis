@@ -8,7 +8,6 @@ import { Footer } from "@/components/nav/Footer"
 import { buildMetadata } from "@/lib/seo/metadata"
 import { createClient } from "@/lib/supabase/server"
 import { getDictionary } from "@/lib/i18n/dictionaries"
-import { getLocale } from "@/lib/i18n/get-locale"
 import { pinLocale } from "@/lib/i18n/locale-store"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
@@ -42,12 +41,16 @@ export async function generateMetadata({
   })
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login?next=/dashboard")
 
-  const locale = await getLocale()
+  const locale = await pinLocale(params)
   const dict = await getDictionary(locale)
   const localePrefix: "" | "/ru" = locale === "ru" ? "/ru" : ""
 

@@ -777,3 +777,39 @@ Drip-очередь: `pool total=86, visible=4` (раскрыты cron), `hidden
 
 ### ТОЧКА ВХОДА — следующая сессия
 2-я волна капает сама (drip 4/день). Варианты: (а) code-долги (тонкие гриды / Pagefind / homepage); (б) пересмотр агентов; (в) ждать discount промокоды; (г) мониторить публикацию + GSC когда накопится индексация. **Контент-производство на паузе** до 3-й волны (ключи 102-427) или discount.
+
+---
+
+## 2026-06-07 — [infra+code] Vercel CPU-фикс: корень найден, подготовка к [locale]-переезду (спайк ✅), переезд отложен
+
+### Commits
+- checkpoint(locale-isr): ISR locale-store control + migration plan + green revalidate spike (ветка `feat/locale-isr`, `7b51476` — НЕ в main)
+
+### Задача
+Vercel жаловался на перерасход ресурса; прошлые попытки не помогли. Найти что реально жрёт Fluid Active CPU (3h17m/4h = 82% на Hobby) и оптимизировать.
+
+### Сделано — подготовка к [locale]-переезду завершена и доказана
+- **Корень CPU-перерасхода найден (доказано curl'ом прода):** `getLocale()` читал `headers()` (`lib/i18n/get-locale.ts`) → чтение `headers()` = Dynamic API → **весь сайт рендерился динамически на каждый запрос**, `revalidate` игнорировался, ISR-кэша НЕТ нигде. Прод отдавал `private, no-store, X-Vercel-Cache: MISS` на ВСЕХ страницах, включая `/legal/terms` (без Supabase) — изолировало причину до `headers()`. Боты обходят ~400 страниц по кругу → каждый хит = полный рендер + Supabase. Разбивка Vercel: function 76% + middleware 24% (это `proxy.ts`, в Next 16 middleware = `proxy.ts`).
+- **Спайк revalidate-под-rewrites ✅ ЗЕЛЁНЫЙ** → native rewrites жизнеспособны, капельница под bare-EN переживёт, **next-intl fallback не нужен**. На изолированном `app/[locale]/spike` (on-demand) + временный rewrite `/spike`→`/en/spike`: `revalidatePath('/en/spike')` пробивает bare `/spike` 404↔200. 2 gotcha записаны: (1) **крон revalidate на locale-пути** `/en/`+`/ru/` (НЕ bare — bare не достаёт до rewritten-роута); (2) **route-папка не должна начинаться с `_`** (Next: `_`-папка = private/non-routable → тихий 404; первый спайк на `__spike` был фантомом).
+- **Контроль на ветке `feat/locale-isr`** (стор `lib/i18n/locale-store.ts` + get-locale читает стор не headers + 2 обёртки `withLocale("ru")` на `about`+`tools/[slug]` + `search` Suspense-фикс). Доказано: build flip `ƒ Dynamic → ○/● Static/ISR`, RU-обёртки рендерят русский, cache HIT + s-maxage (было no-store), **drip 404→200 через revalidatePath (rockerbox, откачен)**. Чекпойнт `7b51476` запушен. **main не тронут.**
+- **`Resources/LOCALE-MIGRATION-PLAN.md` полный:** статус-шапка, §1 узлы-трекер (все `[ ]`), §2 спайк ✅, §3 чек-лист доказательств, §4 откат (Vercel «Promote» previous — миграций БД нет), §5 риски (#1 снят спайком), §6 27 RU-зеркал, §7 контроль.
+- **Решено: переезд оправдан** (многоязычное будущее — испанский + далее; костыль = +27 файлов/язык, [locale] = +1 строка/язык). Окно сейчас (116 свежих в индексе, SEO не поднялось; позже 400-500 страниц = переезд невозможен). bare-EN сохраняется (`/about` без префикса, не-EN языки с префиксом). Страницы остаются полноценными отдельными, hreflang подавляет авто-перевод для поддерживаемых языков.
+
+### Обнаружено
+- Корневого `middleware.ts` нет — middleware-метрика Vercel = `proxy.ts` (Next 16 переименовал конвенцию). `proxy.ts` крутится на каждом запросе (matcher site-wide), т.к. ставит `x-locale`-хедер, который читал `getLocale()`. После [locale]-переезда хедер не нужен → matcher сужается до auth → middleware-46m умирает.
+- Cache-Control-подход (CDN-заголовок на динамике) **отвергнут фактами:** `revalidatePath` не достаёт до CDN-HTTP-кэша, наполненного ручным `s-maxage` → drip деградирует до TTL. ISR (через убирание headers) — единственный путь, где `revalidatePath` (который крон уже зовёт) реально пробивает кэш.
+- `revalidatePath` сейчас на проде — **фактически no-op** (страницы динамические, чистить нечего); раскрытие drip «работало» лишь потому что динамика всегда читает живую БД. После ISR-фикса revalidatePath начинает работать по-настоящему.
+- Латентный баг вскрыт переходом в static: `/search` использовал `useSearchParams()` без Suspense → обёрнут в `<Suspense>` (часть контроля).
+
+### Fixes
+- (на ветке `feat/locale-isr`, не в main) `lib/i18n/locale-store.ts` (new), `lib/i18n/get-locale.ts`, `app/ru/{about,tools/[slug]}/page.tsx`, `app/search/page.tsx`.
+
+### Open follow-ups / ТОЧКА ВХОДА — следующая (СВЕЖАЯ) сессия, Infrastructure
+**[LOCALE]-ПЕРЕЕЗД — целым блоком свежей сессией (60-80 СЛУЖЕБНЫХ route-файлов; контент в БД/MDX ЦЕЛ):**
+- `git checkout feat/locale-isr` → открыть `Resources/LOCALE-MIGRATION-PLAN.md` → §1 узлы → выполнять переезд ЦЕЛЫМ заходом → §3 чек-лист доказательств → cutover.
+- Спайк §2 уже сделан — сразу к §1.
+- **В чек-лист доказательств ДОБАВИТЬ:** проверка hreflang (авто-перевод Google подавлен для EN/RU/поддерживаемых; для неподдерживаемых языков Google волен предлагать перевод — норм). Проверить, что текущее поведение авто-перевода сохранилось после переезда.
+- Делать на ветке; **cutover в main только после полного зелёного чек-листа** (bare-EN свип 198, drip 404→200 по типам, 116 live + 82 hidden целы, build Static, язык, кэш HIT, es-тест масштабируемости, hreflang).
+- **Почему отложено:** переезд многосессионный; старт с исчерпанным контекстом = риск полумигрированного состояния (часть [locale], часть нет, капля подвешена, SEO живых на кону) после компакта. Спайк доказал жизнеспособность — спешить некуда, окно за день-два не закроется.
+
+**Прочие хвосты (не локаль):** discount-bucket (промокоды), alternatives тонкие гриды (`pool.length===1` → closest-in-category), Pagefind покрытие pricing/best, пересмотр агентов (OPS убрать и т.д.), FINAL-ARCHITECTURE-V4 rewrite (drift агентов/публикации).

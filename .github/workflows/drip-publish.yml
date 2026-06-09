@@ -1,0 +1,77 @@
+# External trigger for the drip-publish cron — reliability backstop for the
+# Vercel Hobby cron (which missed the 2026-06-08 01:00 LA run by drifting past
+# the handler's time window). Runs ONCE per day at 01:00 LA, year-round.
+#
+# Required GitHub Secret:
+#   CRON_SECRET — same value as the Vercel project env var CRON_SECRET.
+#   Set it in: GitHub repo → Settings → Secrets and variables → Actions →
+#              New repository secret. The handler authorizes via
+#              `Authorization: Bearer <CRON_SECRET>` (see
+#              app/api/cron/drip-publish/route.ts `authorized()`).
+#
+# DST: GitHub Actions cron is UTC-only, so we register TWO slots (08:00 + 09:00
+# UTC); one of them always maps to ~01:00 LA (08:00 in PDT summer, 09:00 in PST
+# winter). The handler's laHour() window guard decides which slot acts; the 20h
+# dedup guard (agent_logs `drip_published`) ensures at most ONE publish per day
+# even if both slots — or the parallel Vercel cron — fire the same morning.
+#
+# Parallel with Vercel cron: intentional for ~1 week. The 20h dedup guard makes
+# it safe (first trigger to run publishes + logs; the rest skip). After a week,
+# compare reliability via agent_logs and, if Actions is steadier, drop the
+# drip-publish entries from vercel.json. We do NOT touch vercel.json here.
+#
+# Why Actions over Hobby cron: GitHub schedules fire within a few minutes of the
+# slot (rarely skipped entirely), independent of Vercel deploys, with a visible
+# run history + per-run logs + a manual "Run workflow" button. Hobby crons run
+# at low priority and can be delayed past the hour window or skipped — exactly
+# the 06-08 failure.
+
+name: Drip publish
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # 01:00 LA in PDT (summer)
+    - cron: "0 9 * * *" # 01:00 LA in PST (winter)
+  workflow_dispatch:
+    # Manual trigger: Actions tab → "Drip publish" → "Run workflow".
+    # Use ?force=1 manually via the dashboard if you need to bypass the guards;
+    # this scheduled path deliberately does NOT force, so the dedup + window
+    # guards stay in effect.
+
+permissions:
+  contents: read
+
+# Never cancel an in-flight publish because a later commit/schedule landed.
+concurrency:
+  group: drip-publish
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping drip-publish endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET secret is empty or unset."
+            exit 1
+          fi
+          # No ?force=1 — let the handler's window + 20h dedup guards apply.
+          # The endpoint returns HTTP 200 for BOTH "published" and "skipped"
+          # (outside-window / already-ran) — both are healthy outcomes. Only a
+          # non-200 (401 auth / 5xx) is a failure. Secret is sent as a header
+          # and never echoed.
+          code=$(curl -sS -o /tmp/drip.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://botapolis.com/api/cron/drip-publish")
+          echo "HTTP ${code}"
+          cat /tmp/drip.json || true
+          echo
+          if [ "${code}" != "200" ]; then
+            echo "::error::drip-publish returned HTTP ${code} (expected 200)."
+            exit 1
+          fi

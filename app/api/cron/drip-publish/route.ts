@@ -227,25 +227,39 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // Exactly-once-per-day guard — THE safeguard against double-publish now that
-  // the 2-hour window (above) lets BOTH UTC slots through in-season: the first
-  // slot (01:00 LA) publishes + writes a `drip_published` log; the second
-  // (02:00 LA, ~1h later) finds that log here and skips. Also covers the
-  // parallel GitHub Actions trigger (whichever fires first wins; the rest
-  // skip) and any accidental re-trigger. 20h lookback < the ~22-23h min gap
-  // to the next day's run, > the 1h gap between the two slots — blocks an
-  // intra-day repeat without ever skipping the next day. Sub-second
-  // simultaneity (Vercel + Actions at once) is caught by the per-row
-  // `visible_at IS NULL` flip guard below as a second layer.
+  // Once-per-LA-day guard — caps publishing at ONE batch per calendar day
+  // (America/Los_Angeles) WITHOUT ever stalling the next day.
+  //
+  // The previous version used a rolling 20-hour lookback ("skip if anything
+  // published in the last 20h"). That assumed runs always land ~24h apart at
+  // 01:00 LA. When a publish happened OFF-schedule — a late manual recovery,
+  // or a cron that drifted late — the next day's 01:00 slot fell <20h later
+  // and got blocked. That is exactly what stalled 2026-06-09: the 06-08 batch
+  // was recovered at 23:32 LA, so the 06-09 01:00 slot was only ~1.5h later
+  // and the rolling window swallowed it.
+  //
+  // Comparing LA calendar DATES fixes both ends: the same-day 02:00 slot (and
+  // the parallel GitHub trigger) see "already published today" → skip (no
+  // batch); a NEW LA date is always free → publishes regardless of when
+  // yesterday's run landed (no stall). Sub-second simultaneity (Vercel +
+  // Actions firing at once) is still caught by the per-row `visible_at IS NULL`
+  // flip guard below.
   if (!force) {
-    const since = new Date(Date.now() - 20 * 3_600_000).toISOString()
-    const { count } = await supabase
+    const laDate = (d: Date) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(d)
+    const { data: lastPub } = await supabase
       .from("agent_logs")
-      .select("*", { count: "exact", head: true })
+      .select("created_at")
       .eq("event_type", "drip_published")
-      .gte("created_at", since)
-    if (count && count > 0) {
-      return NextResponse.json({ ok: true, skipped: "already_ran_today", since })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (lastPub && laDate(new Date(lastPub.created_at)) === laDate(new Date())) {
+      return NextResponse.json({
+        ok: true,
+        skipped: "already_published_today_LA",
+        last_published: lastPub.created_at,
+      })
     }
   }
 

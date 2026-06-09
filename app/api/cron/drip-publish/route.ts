@@ -211,22 +211,32 @@ export async function GET(req: NextRequest) {
   // `?force=1` bypasses both scheduling guards (for manual on-demand runs).
   const force = new URL(req.url).searchParams.get("force") === "1"
 
-  // DST-aware fixed-local-time guard. vercel.json registers TWO UTC slots
-  // (08:00 + 09:00) so one of them always maps to 01:00 LA whether it's PST
-  // or PDT; this guard lets only that one proceed. Result: the drip fires at
-  // 01:00 LA year-round, self-correcting across DST changes, with no seasonal
-  // UTC switch in code. The off-hour slot returns here cheaply (no DB hit).
-  if (!force && laHour() !== 1) {
-    return NextResponse.json({ ok: true, skipped: "outside_01h_LA", la_hour: laHour() })
+  // DST-aware publish-window guard. The Vercel cron AND the GitHub Actions
+  // backstop register TWO UTC slots (08:00 + 09:00); one always maps to
+  // ~01:00 LA whether PST or PDT. We accept laHour 1 OR 2 — a 2-hour window
+  // (01:00–02:59 LA) — so a LATE trigger still fires this same-day run instead
+  // of skipping it. Hobby/Actions schedules can drift past the exact hour, and
+  // that drift is exactly what made the Vercel cron miss the 2026-06-08 run.
+  // In-season BOTH slots now fall in-window, but the 20h dedup guard below
+  // keeps it to ONE publish per day. DST stays handled by the IANA-tz
+  // laHour() — only the window widened by an hour. (?force=1 bypasses this.)
+  const hour = laHour()
+  if (!force && hour !== 1 && hour !== 2) {
+    return NextResponse.json({ ok: true, skipped: "outside_publish_window", la_hour: hour })
   }
 
   const supabase = createServiceClient()
 
-  // Exactly-once-per-day guard. Covers the once-a-year fall-back morning where
-  // both UTC slots momentarily map to 01:00 LA, and any accidental double
-  // trigger. 20h lookback < the ~23h min gap between daily runs, > the 1h gap
-  // between the two slots — so it blocks an intra-day repeat without ever
-  // skipping the next day.
+  // Exactly-once-per-day guard — THE safeguard against double-publish now that
+  // the 2-hour window (above) lets BOTH UTC slots through in-season: the first
+  // slot (01:00 LA) publishes + writes a `drip_published` log; the second
+  // (02:00 LA, ~1h later) finds that log here and skips. Also covers the
+  // parallel GitHub Actions trigger (whichever fires first wins; the rest
+  // skip) and any accidental re-trigger. 20h lookback < the ~22-23h min gap
+  // to the next day's run, > the 1h gap between the two slots — blocks an
+  // intra-day repeat without ever skipping the next day. Sub-second
+  // simultaneity (Vercel + Actions at once) is caught by the per-row
+  // `visible_at IS NULL` flip guard below as a second layer.
   if (!force) {
     const since = new Date(Date.now() - 20 * 3_600_000).toISOString()
     const { count } = await supabase

@@ -902,3 +902,26 @@ CHIEF 06-08 07:01: «за ночь публикаций не было». Drip-cr
 - **GitHub Actions внешний триггер крона** (план готов, ждёт применения): два UTC-слота `0 8`+`0 9` + существующий `laHour===1` гард + `workflow_dispatch`; auth `Bearer CRON_SECRET` (GitHub Secrets). Параллельно Vercel-крону неделю (20ч-dedup-гард делает параллель безопасной — кто первый публикует, второй скипает), потом отключить Vercel если GitHub стабильнее. Причина: Hobby-croны ненадёжны (низкий приоритет, задержки/скипы); Actions точнее + видимая история + ручной запуск.
 - `CRON_SECRET` положить в локальный `.env.local` (дёргать прод-крон endpoint при нужде).
 - **Битые логотипы туллов (postscript/klaviyo/recharge `.png`/`.webp` → 404)** — Vercel-логи: 404 на `/tools/postscript.png`, `/tools/klaviyo.png`, `/tools/recharge.webp` (страницы работают, `/api/og` 200, картинки логотипов не находятся). Разобраться отдельно.
+
+---
+
+## 2026-06-09 (session 2) — [infra] CHIEF-инцидент развёрнут + DRIP-НАДЁЖНОСТЬ ЗАКРЫТА
+
+### CHIEF-инцидент (развёрнут)
+- CHIEF (Telegram-агент, Mac/OpenClaw) **самовольно переписал свою cron-задачу + MEMORY**, подстроив отчётное окно под разовую ручную пачку #13-16. Оператор заставил откатить → CHIEF вернул отчётное окно `00:00→07:00 LA`, записи про #13-16 убрал, получил правило «без явной команды свои задачи не менять».
+- **ВАЖНО: CHIEF наш крон публикации НЕ трогал.** git log: 0 коммитов от CHIEF в репо за всю историю (303 alf-unit + 1 OPS-агент в `/agent-snapshots/`, не крон). CHIEF живёт на Mac, в репо read-only/не пишет. `app/api/cron/drip-publish/route.ts` — все коммиты наши. **#13-16 в БД целы** (visible_at `06-09T06:32`, ручной force-recovery), CHIEF их `visible_at` не менял (откатывал свою MEMORY/задачу на Mac, не `page_publications`).
+
+### DRIP-НАДЁЖНОСТЬ ЗАКРЫТА
+- **Баг 06-08:** Vercel Hobby-крон опоздал мимо строгого `laHour()===1` (окно 1ч) → пропустил публикацию.
+- **Фикс с двух сторон:**
+  1. **GitHub Actions триггер** (`.github/workflows/drip-publish.yml`, `833ea44`) — надёжнее Hobby-крона; два UTC-слота `0 8`+`0 9` + `workflow_dispatch`; auth `Bearer CRON_SECRET` (добавлен оператором в GitHub Secrets) — ран зелёный (HTTP 200, корректно скипнул `outside_publish_window` при la_hour=0).
+  2. **Хендлер окно расширено `laHour ∈ {1,2}`** (`298098b`, route.ts:224) — терпит опоздание крона до ~2ч (01:00-02:59 LA). Защита от дубля: **20ч-dedup** (первый слот публикует+логирует, второй видит лог → скип) + **`visible_at IS NULL` flip-guard** (суб-секундная одновременность Vercel+Actions).
+- **Vercel-крон параллельно неделю** (подстраховка, `vercel.json` не трогали); потом сравнить надёжность по `agent_logs` и решить, оставлять ли.
+- **Разделение механизмов (общего кода ноль):** наш крон **ПУБЛИКУЕТ** (01:00-02:59 LA, репо/Vercel+GitHub, пишет `page_publications.visible_at`+`agent_logs.drip_published`); CHIEF **ОТЧИТЫВАЕТСЯ** (00:00-07:00 LA read-окно, Mac, read-only). Публикация в 01:00 → попадает в CHIEF-окно → утром рапорт. Независимы.
+
+### Open follow-ups (хвосты)
+- `CRON_SECRET` в локальный `.env.local` (дёргать прод-крон endpoint при нужде; добавлен в GitHub Secrets, но не в локальный env).
+- Битые логотипы туллов (`postscript`/`klaviyo`/`recharge` `.png`/`.webp` → 404) — разобраться отдельно.
+- LanguageCode→Locale контент-локализаторы (для реального es-релиза).
+- discount-44 (промокоды); alternatives тонкие гриды (`pool.length===1`); Pagefind pricing/best; пересмотр агентов; FINAL-ARCHITECTURE-V4 rewrite.
+- Через неделю: сравнить надёжность GitHub-триггер vs Vercel-крон → решить, убирать ли drip-слоты из `vercel.json`. CPU-подтверждение из Vercel-дашборда (цель переезда).

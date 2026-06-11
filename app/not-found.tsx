@@ -4,7 +4,9 @@ import "./globals.css"
 
 import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { Toaster } from "@/components/ui/sonner"
 import { PostHogProvider } from "@/components/analytics/PostHogProvider"
+import { ScrollRevealController } from "@/components/shared/ScrollRevealController"
 import LocaleNotFound from "./[locale]/not-found"
 
 /* ----------------------------------------------------------------------------
@@ -33,11 +35,16 @@ import LocaleNotFound from "./[locale]/not-found"
    locale signal, and `readLocale()` falls back to EN, so the component
    renders English. /ru/* typos still get the RU branded 404 via surface #1.
 
-   Provider nesting mirrors `app/[locale]/layout.tsx` (ThemeProvider →
-   PostHogProvider → TooltipProvider) so Navbar/Footer client bits behave
-   identically. Toaster / ScrollRevealController / PlausibleScript are
-   intentionally omitted — no toasts, no .scroll-reveal nodes, and no
-   analytics value in counting crawler-junk URLs.
+   The body mirrors `app/[locale]/layout.tsx` 1:1 (ThemeProvider →
+   PostHogProvider → TooltipProvider, plus ScrollRevealController + its
+   noscript fallback and the Toaster portal) — NOT a trimmed subset. First
+   ship omitted ScrollRevealController as "no .scroll-reveal nodes here",
+   which was wrong: the Footer's newsletter CTA carries `scroll-reveal`
+   (invisible-by-default per globals.css §8), so the subscribe block
+   reserved its space but never faded in on this surface. NewsletterForm
+   also reports via sonner toasts, so the Toaster portal is required for
+   subscribe feedback. Only PlausibleScript stays out — no analytics value
+   in counting crawler-junk URLs.
 ---------------------------------------------------------------------------- */
 
 const geistSans = Geist({
@@ -67,6 +74,13 @@ export default function RootNotFound() {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground font-sans">
+        {/* No-JS fallback for scroll-reveal — same as the locale layout:
+            without it, JS-off visitors stare at an invisible newsletter CTA. */}
+        <noscript>
+          {/* eslint-disable-next-line react/no-unknown-property */}
+          <style>{`.scroll-reveal{opacity:1!important;transform:none!important;}`}</style>
+        </noscript>
+        <ScrollRevealController />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -78,6 +92,7 @@ export default function RootNotFound() {
               <LocaleNotFound />
             </TooltipProvider>
           </PostHogProvider>
+          <Toaster position="bottom-right" richColors closeButton />
         </ThemeProvider>
       </body>
     </html>

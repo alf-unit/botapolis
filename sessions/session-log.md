@@ -950,3 +950,42 @@ CHIEF 06-08 07:01: «за ночь публикаций не было». Drip-cr
 ### Open follow-ups (хвосты, без изменений)
 - Pro-vs-окно решение (выше). Через неделю: GitHub vs Vercel надёжность → убирать ли Vercel-слоты. CPU-подтверждение из Vercel-дашборда.
 - `CRON_SECRET` в локальный `.env.local`. Битые логотипы (postscript/klaviyo/recharge `.png`/`.webp` → 404). LanguageCode→Locale для es-релиза. EN-хабы tagline_ru в HTML. discount-44, alternatives гриды, Pagefind, агенты, FINAL-ARCHITECTURE rewrite.
+
+---
+
+## 2026-06-11 — [infra] GSC 404-отчёт (26 URL) разобран: RU /go/ revenue-фикс + directory→tools 308 + JSON-LD источник
+
+### Commits
+- `fix(seo+revenue): GSC 404 cleanup — RU /go/ rewrite, directory→tools 308, JSON-LD @id`
+- `docs(session): GSC 404 cleanup session log` (этот close-коммит)
+
+(Идентификация по subject, не по hash — см. CLAUDE.md.)
+
+### Задача
+GSC «Не найдено (404)» — 26 URL (сканы мая 2026). Разобрать по категориям, починить что чинится, подтвердить что корректно мертво.
+
+### Сделано
+- **🔴 REVENUE-ФИКС: `/ru/go/:slug` → rewrite на `/go/:slug`** (next.config beforeFiles). Все CTA-компоненты (AffiliateButton, tools/[slug] tail-card, RecommendedTools, 3 калькулятора) строят href как `${localePrefix}/go/{slug}`, а роут `/go/[slug]` живёт ВНЕ `app/[locale]/` → **каждый партнёрский клик с любой RU-страницы уходил в 404**. Подтверждено точечным curl до фикса: `/ru/go/klaviyo` = 404, `/go/klaviyo` = 302→vendor. Rewrite (НЕ redirect): один хоп до вендора + Referer цел → `source_path` в affiliate_clicks остаётся RU-статьёй.
+- **`/directory/:slug` + `/ru/directory/:slug` → 308 `/tools/:slug`** (13 GSC-URL). Хаб `/directory` редиректился давно, детальные пути — никогда.
+- **`/ru/directory` хаб стал locale-aware** — `permanentRedirect` был захардкожен на `/tools` (терял локаль), теперь префикс из `params.locale`.
+- **JSON-LD `@id` починен (живой источник мёртвых URL):** `lib/seo/schema.ts` эмитил `…/directory/{slug}#software` в SoftwareApplication на каждой tool/comparison-странице → `/tools/`. Google тащил dead-пути отсюда даже после чистки sitemap.
+- **Старые калькуляторы** `/tools/{ltv-cac,ad-spend-breakeven}` (+RU) → 308 `/tools` (1:1 замены нет, хаб с живыми калькуляторами).
+- **Несуществующие секции** `/news` `/blog` (+RU) → 308 `/guides` (решение оператора).
+- **robots.txt: `/ru/go/` в disallow** (bare `/go/` уже был закрыт изначально — оба партнёрских пути закрыты от индексации).
+- **Корректные 404 (НЕ чиним, решение оператора):** `/rss.xml` (фида нет и не делаем), `/mo` + `/mec` (мусор Googlebot). `/best` + `/ru/best` — stale GSC-записи (хаб live с 2026-06-03, уже 200).
+
+### Обнаружено
+- **`${localePrefix}/go/` паттерн в CTA ломается для любой не-EN локали** — роут вне `[locale]`. При релизе es добавить `/es/go/:slug` rewrite + `/es/go/` в robots (помечено комментами в next.config + robots.ts).
+- sitemap directory-баг был пофикшен ещё в мае (коммент в sitemap.ts), но JSON-LD `@id` остался вторым, незамеченным источником `/directory/`-URL.
+- tsc --noEmit чистый; spot-check после деплоя — см. ниже.
+
+### Fixes
+- `next.config.ts` — rewrite `/ru/go/:slug`; redirect-семейства directoryToTools / retiredCalculators / retiredSections.
+- `lib/seo/schema.ts` — JSON-LD `@id` `/directory/`→`/tools/` (2 места).
+- `app/[locale]/directory/page.tsx` — locale-aware redirect.
+- `app/robots.ts` — disallow `/ru/go/`.
+
+### Open follow-ups
+- Оператор: нажать «ПРОВЕРИТЬ ИСПРАВЛЕНИЕ» в GSC на 404-отчёте после зелёного деплоя.
+- es-релиз: `/es/go/` rewrite + robots (вместе с LanguageCode→Locale хвостом).
+- Прочее без изменений: GitHub-vs-Vercel крон-надёжность (~16-06), CPU из Vercel-дашборда, битые логотипы (postscript/klaviyo/recharge), discount-44, alternatives гриды, Pagefind pricing/best, пересмотр агентов, FINAL-ARCHITECTURE rewrite.

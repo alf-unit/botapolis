@@ -219,6 +219,45 @@ const klaviyoPricingRedirects = [
 ]
 
 // ----------------------------------------------------------------------------
+// GSC 404 cleanup (2026-06-11) — three families of dead URLs Google was still
+// crawling (detected 2026-05, mostly pre-merge / pre-[locale] crawls):
+//
+//   1. /directory/{slug} — the catalog was merged into /tools long ago and
+//      the /directory HUB already 308s to /tools, but the per-tool DETAIL
+//      paths (/directory/klaviyo, …) had no route and 404'd. They were also
+//      still emitted as JSON-LD @id (fixed separately in lib/seo/schema.ts).
+//      13 such URLs in the GSC report (7 EN + 6 RU). Collapse to /tools/{slug}.
+//   2. /tools/{ltv-cac,ad-spend-breakeven} — two retired calculators. No 1:1
+//      replacement, so send to the /tools hub (where the 3 live calculators
+//      surface) rather than leave a bare 404.
+//   3. /news + /blog — sections that never shipped (no route, no MDX). Point
+//      them at /guides, the closest live editorial hub.
+//
+// All 308 (permanent) — Google treats 308 == 301 for link-equity transfer.
+// ----------------------------------------------------------------------------
+const directoryToToolsRedirects = [
+  { source: "/directory/:slug",     destination: "/tools/:slug",     permanent: true },
+  { source: "/ru/directory/:slug",  destination: "/ru/tools/:slug",  permanent: true },
+  // Hubs (/directory, /ru/directory) are handled locale-aware by
+  // app/[locale]/directory/page.tsx — :slug requires a segment so it never
+  // matches the bare hub here.
+]
+
+const retiredCalculatorRedirects = [
+  { source: "/tools/ltv-cac",                destination: "/tools",     permanent: true },
+  { source: "/tools/ad-spend-breakeven",     destination: "/tools",     permanent: true },
+  { source: "/ru/tools/ltv-cac",             destination: "/ru/tools",  permanent: true },
+  { source: "/ru/tools/ad-spend-breakeven",  destination: "/ru/tools",  permanent: true },
+]
+
+const retiredSectionRedirects = [
+  { source: "/news",      destination: "/guides",     permanent: true },
+  { source: "/ru/news",   destination: "/ru/guides",  permanent: true },
+  { source: "/blog",      destination: "/guides",     permanent: true },
+  { source: "/ru/blog",   destination: "/ru/guides",  permanent: true },
+]
+
+// ----------------------------------------------------------------------------
 // Bare-EN routing (LOCALE-MIGRATION-PLAN — native rewrites)
 // ----------------------------------------------------------------------------
 // EN is the default locale and lives at the bare path (`/tools`), RU under
@@ -278,14 +317,38 @@ const nextConfig: NextConfig = {
         { source: `/:seg(${EN_SEGMENTS})`, destination: "/en/:seg" },
         // Bare segment + sub-path (`/pricing/klaviyo`, `/tools/[slug]`, …).
         { source: `/:seg(${EN_SEGMENTS})/:path*`, destination: "/en/:seg/:path*" },
+
+        // Locale-prefixed affiliate redirector (REVENUE FIX, 2026-06-11).
+        // `/go/[slug]` is the single monetised exit and lives OUTSIDE
+        // app/[locale]/ (it's locale-agnostic — attribution comes from the
+        // Referer header, not the path). But every CTA component prepends
+        // `${localePrefix}/go/...`, so RU pages emit `/ru/go/{slug}` — which
+        // had NO matching route and 404'd, silently killing every affiliate
+        // click on the entire Russian surface. We rewrite (not redirect) to
+        // the bare /go/ route: a rewrite keeps the hop count at one (302 →
+        // vendor) and leaves Referer = the RU article, so click logs keep
+        // their real source_path. `go` is intentionally absent from
+        // EN_SEGMENTS (bare /go/ already resolves directly). Add other
+        // non-default locales here when they ship (es, …).
+        { source: "/ru/go/:slug", destination: "/go/:slug" },
       ],
     }
   },
   async redirects() {
-    // Order: slug-specific klaviyo-pricing first (so it wins over the
-    // catch-all /reviews/:slug), then legacy -review-2026 collapse, then
-    // the generic /reviews/{*,hub} → /tools/{*,hub} family.
-    return [...klaviyoPricingRedirects, ...legacyReviewRedirects, ...reviewsToToolsRedirects]
+    // Order: slug-specific /tools/* and /reviews/klaviyo-pricing first (so
+    // they win over any broader pattern), then legacy -review-2026 collapse,
+    // then the generic /reviews/{*,hub} → /tools/{*,hub} family, then the
+    // 2026-06-11 GSC-404 cleanup families (directory/calculators/sections).
+    // None of the cleanup sources overlap the reviews family, so they're
+    // free to sit after it.
+    return [
+      ...klaviyoPricingRedirects,
+      ...retiredCalculatorRedirects,
+      ...legacyReviewRedirects,
+      ...reviewsToToolsRedirects,
+      ...directoryToToolsRedirects,
+      ...retiredSectionRedirects,
+    ]
   },
   async headers() {
     return [

@@ -13,6 +13,11 @@ export default function robots(): MetadataRoute.Robots {
   const disallow = [
     "/api/",
     "/go/",
+    // Locale-prefixed affiliate redirector. RU pages emit `/ru/go/{slug}`
+    // CTAs (now rewritten to the bare /go/ route in next.config); keep Google
+    // out of them the same way it's kept out of bare /go/. Add /es/go/ etc.
+    // when those locales ship.
+    "/ru/go/",
     // Sprint 5 — account surface. /account/ is the legacy /(account)/ group
     // hint; /dashboard/ and /saved/ are the real URLs. Keep both: search
     // engines occasionally fish for the segment-name path even when the

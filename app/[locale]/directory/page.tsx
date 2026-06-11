@@ -15,8 +15,17 @@ import { permanentRedirect } from "next/navigation"
  * If we ever need a 301 specifically (e.g. for analytics tooling that
  * doesn't track 308s), move this rule into `next.config.ts > redirects()`.
  */
-export default function DirectoryRedirect() {
-  permanentRedirect("/tools")
+export default async function DirectoryRedirect({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  // Locale-aware: /ru/directory must land on /ru/tools, not the bare EN hub.
+  // (Until 2026-06-11 this hardcoded "/tools", so RU readers lost their
+  // locale on the redirect — surfaced as a /ru/directory 404 in GSC.)
+  const { locale } = await params
+  const prefix = locale === "ru" ? "/ru" : ""
+  permanentRedirect(`${prefix}/tools`)
 }
 
 // Belt-and-suspenders: even if Next prerenders a static stub, the metadata

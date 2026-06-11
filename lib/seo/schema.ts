@@ -98,7 +98,7 @@ export function generateReviewSchema({
 }: ReviewSchemaInput) {
   const application: JsonLd = {
     "@type":             "SoftwareApplication",
-    "@id":               `${SITE_URL}/directory/${tool.slug}#software`,
+    "@id":               `${SITE_URL}/tools/${tool.slug}#software`,
     name:                tool.name,
     description:         tool.description ?? tool.tagline ?? undefined,
     applicationCategory: humanCategory(tool.category),
@@ -167,7 +167,7 @@ type SoftwareApplicationTool = Pick<
 export function generateSoftwareApplicationSchema(tool: SoftwareApplicationTool) {
   const node: JsonLd = {
     "@type":             "SoftwareApplication",
-    "@id":               `${SITE_URL}/directory/${tool.slug}#software`,
+    "@id":               `${SITE_URL}/tools/${tool.slug}#software`,
     name:                tool.name,
     description:         tool.description ?? tool.tagline ?? undefined,
     applicationCategory: humanCategory(tool.category),

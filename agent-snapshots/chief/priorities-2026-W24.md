@@ -1,6 +1,6 @@
 # OPS priorities — 2026-W24
 
-generated_at: 2026-06-12T07:44:11.226851-07:00
+generated_at: 2026-06-12T07:46:10.791228-07:00
 la_window_for_metrics: 2026-06-05..2026-06-11
 publishing_rate_daily: 4
 weekly_target: 28

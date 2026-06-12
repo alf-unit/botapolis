@@ -1,6 +1,6 @@
 # Weekly strategic digest — 2026-W24
 
-Generated: 2026-06-12T07:44:11.226851-07:00
+Generated: 2026-06-12T07:46:10.791228-07:00
 Metric window: 2026-06-05..2026-06-11 (Los Angeles calendar dates)
 Comparison window: 2026-05-29..2026-06-04
 
@@ -15,17 +15,12 @@ Comparison window: 2026-05-29..2026-06-04
 | affiliate revenue | 0.0 | 0.0 | not populated in snapshots |
 
 ## Top growers
-- https://botapolis.com/reviews/manychat: 6 -> 87 impressions (+81), clicks 0 -> 0, avg pos 70.0 -> 57.1
-- https://botapolis.com/pricing/loop-returns: 0 -> 34 impressions (+34), clicks 0 -> 0, avg pos None -> 39.9
-- https://botapolis.com/reviews/loox: 2 -> 25 impressions (+23), clicks 0 -> 0, avg pos 53.0 -> 54.8
+- unknown: 301 -> 416 impressions (+115), clicks 2 -> 0, avg pos 48.1 -> 44.7
 
 ## Top decliners
-- https://botapolis.com/reviews/postscript-review-2026: 65 -> 29 impressions (-36), clicks 0 -> 0, avg pos 34.6 -> 26.5
-- https://botapolis.com/tools/yotpo: 25 -> 0 impressions (-25), clicks 0 -> 0, avg pos 64.6 -> None
-- https://botapolis.com/reviews/gorgias-review-2026: 21 -> 10 impressions (-11), clicks 0 -> 0, avg pos 60.0 -> 69.7
+- no negative page-level gsc movement in top_pages snapshots
 
 ## Recent publication clusters
-
 - adcreative-ai: 9
 - loop-subscriptions: 6
 - mailchimp: 6
@@ -96,6 +91,4 @@ Comparison window: 2026-05-29..2026-06-04
 
 ## Last writer-log blocks
 
-
 ## Last infra-log blocks
-

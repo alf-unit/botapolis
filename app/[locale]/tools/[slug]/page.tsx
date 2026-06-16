@@ -238,9 +238,15 @@ export default async function ToolDetailPage({ params }: PageProps) {
   const crossLinked = await fetchCrossLinkedTools(tool.integrates_with_tools ?? [])
 
   // Related block — curated centre → satellite paths. Runs in parallel
-  // since the fetchers are independent (DB vs MDX walks). The
-  // alternatives sub-section doesn't need a query — every published tool
-  // has its own /alternatives/[slug] page by construction.
+  // since the fetchers are independent (DB vs MDX walks).
+  //
+  // `alternativesVisible` gates the "See X alternatives" link. The old
+  // assumption ("every published tool has its own /alternatives page by
+  // construction") broke under the drip gate: the 18 wave-2 tools have NO
+  // `alternatives` gate row, so their /alternatives/[slug] 404s. Rendering
+  // the link unconditionally would ship a dead link the moment each tool
+  // page goes live (audit 2026-06-12). Gate it on the alternatives page
+  // being publicly visible — same pattern as the compare/best sub-sections.
   //
   // `pricingSlugs` powers the "See full pricing breakdown" CTA that
   // surfaces inside the Pricing section when a matching /pricing/{slug}
@@ -248,9 +254,10 @@ export default async function ToolDetailPage({ params }: PageProps) {
   // 404s during the Etap J-generate rollout — only the 50 tools we
   // ship pricing pages for get the deep-dive link; the rest keep the
   // summary-only pricing section.
-  const [relatedComparisons, bestMentions, pricingSlugsEn, pricingSlugsRu] = await Promise.all([
+  const [relatedComparisons, bestMentions, alternativesVisible, pricingSlugsEn, pricingSlugsRu] = await Promise.all([
     fetchRelatedComparisons(tool.id, tool.category, locale, locale, 3),
     fetchBestMentions(tool.slug, locale, 3),
+    isSlugVisible("alternatives", slug),
     getAllMdxSlugs("pricing", "en"),
     locale === "ru" ? getAllMdxSlugs("pricing", "ru") : Promise.resolve<string[]>([]),
   ])
@@ -328,11 +335,13 @@ export default async function ToolDetailPage({ params }: PageProps) {
   )
   const hasOperatorQuotes = (tool.operator_quotes?.length ?? 0) > 0
   const hasVerdict = !!tool.verdict
-  // Related block always renders the /alternatives/[slug] link (every
-  // published tool has one), so the section is never empty for a real
-  // tool. Compare + best-of sub-sections are conditional.
+  // Related block sub-sections are all conditional now: the alternatives
+  // link only renders when that page is publicly visible (drip gate), and
+  // compares/best-of only when there's content. The whole Section is hidden
+  // when none of the three has anything — no empty "Related" heading.
   const hasRelatedCompares = relatedComparisons.length > 0
   const hasRelatedBests = bestMentions.length > 0
+  const hasRelatedContent = alternativesVisible || hasRelatedCompares || hasRelatedBests
 
   const tocEntries: TocEntry[] = []
   if (tool.description) tocEntries.push({ id: "tldr", title: t.tldrHeading, level: 2 })
@@ -346,10 +355,9 @@ export default async function ToolDetailPage({ params }: PageProps) {
   if (hasExternalRatings)  tocEntries.push({ id: "external-ratings", title: t.externalRatingsHeading, level: 2 })
   if (hasOperatorQuotes)   tocEntries.push({ id: "operator-quotes", title: t.operatorQuotesHeading, level: 2 })
   if (hasVerdict)          tocEntries.push({ id: "verdict", title: t.verdictHeading, level: 2 })
-  // Related always renders (at minimum the /alternatives link), so always
-  // surface it in ToC. Skipping the entry for thin pages would force the
-  // reader to scroll past PartnerAlternatives to discover it.
-  tocEntries.push({ id: "related", title: t.relatedHeading, level: 2 })
+  // Related surfaces in the ToC only when it actually renders content —
+  // a hidden alternatives page + no compares + no best-of means no Section.
+  if (hasRelatedContent) tocEntries.push({ id: "related", title: t.relatedHeading, level: 2 })
 
   // ──────────────────────────────────────────────────────────────────────
   // JSON-LD — Article + Review + Breadcrumb. We emit BOTH Article and
@@ -647,9 +655,13 @@ export default async function ToolDetailPage({ params }: PageProps) {
                   See fetchRelatedComparisons + fetchBestMentions for the
                   curation logic (same-category first for compares,
                   publishedAt DESC for bests). */}
+              {hasRelatedContent && (
               <Section id="related" title={t.relatedHeading} eyebrow="12">
                 <div className="flex flex-col gap-6 max-w-3xl">
-                  {/* a. Alternatives hub for this tool — always present. */}
+                  {/* a. Alternatives hub for this tool — only when its page is
+                      publicly visible (drip gate). Wave-2 tools without an
+                      alternatives gate row would otherwise link to a 404. */}
+                  {alternativesVisible && (
                   <Link
                     href={`${localePrefix}/alternatives/${slug}`}
                     className={cn(
@@ -666,6 +678,7 @@ export default async function ToolDetailPage({ params }: PageProps) {
                       aria-hidden="true"
                     />
                   </Link>
+                  )}
 
                   {/* b. Head-to-head comparisons — top 3, same-category first. */}
                   {hasRelatedCompares && (
@@ -752,6 +765,7 @@ export default async function ToolDetailPage({ params }: PageProps) {
                   )}
                 </div>
               </Section>
+              )}
 
               {/* ── Partner alternatives — emphasized when this tool has no
                   affiliate_url so the block is the page's primary monetised

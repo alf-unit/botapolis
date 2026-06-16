@@ -2,6 +2,8 @@ import Link from "next/link"
 import type { ComponentPropsWithoutRef } from "react"
 
 import { cn } from "@/lib/utils"
+import { i18n, type Locale } from "@/lib/i18n/config"
+import { readLocale } from "@/lib/i18n/locale-store"
 import { Callout } from "./Callout"
 import { ProsConsList } from "./ProsConsList"
 import { AffiliateButton } from "./AffiliateButton"
@@ -49,6 +51,34 @@ function isOwnDomain(host: string): boolean {
   return host === OWN_DOMAIN || host.endsWith(`.${OWN_DOMAIN}`)
 }
 
+/**
+ * Locale-prefix a root-relative internal href for the active locale.
+ *
+ * Why this exists: editorial MDX authors write internal links bare
+ * (`/alternatives/loox`, `/compare/x-vs-y`) regardless of locale — the
+ * RU article tree mirrors the EN body. Without prefixing, every internal
+ * click from an RU page (`/ru/pricing/loox`) jumped to the EN destination,
+ * dropping the reader out of the Russian surface (audit 2026-06-12: 371 of
+ * 405 RU internal links leaked to EN). We rewrite at render time instead of
+ * editing 76 MDX files, and the locale comes from the request-scoped store
+ * (`readLocale`) which the page body pins via `pinLocale(params)` before the
+ * MDX renders.
+ *
+ * Only root-relative paths (`/...`) for a NON-default locale are touched:
+ *   - default locale (EN) → bare, untouched (don't break the EN surface)
+ *   - `#anchor`, `mailto:`, `tel:`, relative paths (no leading `/`) → untouched
+ *   - already-prefixed paths (`/ru`, `/ru/...`, `/en`, `/en/...`) → untouched
+ *     (no double-prefix; an explicit `/en/...` author link stays as written)
+ */
+function localizeInternalHref(href: string, locale: Locale): string {
+  if (locale === i18n.defaultLocale) return href
+  if (!href.startsWith("/")) return href
+  for (const loc of i18n.locales) {
+    if (href === `/${loc}` || href.startsWith(`/${loc}/`)) return href
+  }
+  return `/${locale}${href}`
+}
+
 function isAllowedExternal(host: string): boolean {
   return ALLOWED_EXTERNAL_DOMAINS.some(
     (d) => host === d || host.endsWith(`.${d}`),
@@ -57,12 +87,16 @@ function isAllowedExternal(host: string): boolean {
 
 function MdxLink({ href = "", children, className, ...rest }: AnchorProps) {
   const isExternal = /^https?:\/\//.test(href)
+  // Active locale for this render — pinned by the page body's pinLocale(params)
+  // before the MDX tree renders (RU-race fix, 2026-06-07). Used to prefix bare
+  // internal links so RU pages keep the reader on the /ru/* surface.
+  const locale = readLocale()
 
   // Internal path (`/...`, `#anchor`, relative) → Next Link, no special policy.
   if (!isExternal) {
     return (
       <Link
-        href={href}
+        href={localizeInternalHref(href, locale)}
         className={cn(
           "text-[var(--brand)] underline underline-offset-[3px] decoration-[1.5px] decoration-[var(--accent-300)]",
           "hover:decoration-[var(--brand)] transition-colors",

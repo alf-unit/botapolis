@@ -286,6 +286,12 @@ const retiredSectionRedirects = [
 // URL renders the page directly (200) and is deduped to the bare URL by the
 // page canonical (buildMetadata maps EN → bare); no /en redirect (it would
 // loop with the rewrite under beforeFiles).
+// NEVER add a public/ asset folder name here. A segment listed below is
+// rewritten to /en/<seg>/... — so `/tools/klaviyo.png` became `/en/tools/
+// klaviyo.png`, which has no route and 404'd, shadowing the static logo
+// files that lived in public/tools/ (audit 2026-06-12). Tool logos now live
+// in public/logos/ precisely because `logos` is NOT a routed segment and so
+// is never rewritten. Keep static-asset folders out of this list.
 const EN_SEGMENTS = [
   "about",
   "alternatives",

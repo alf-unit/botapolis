@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRight, FileText, Layers, Loader2, Search, Sparkles } from "lucide-react"
+import { ArrowRight, FileText, Layers, Loader2, Search, Sparkles, Tag, Trophy, GitCompareArrows } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { track } from "@/lib/analytics/events"
@@ -62,7 +62,9 @@ interface PagefindModule {
   init?(): Promise<void>
 }
 
-type ResultGroup = "tool" | "review" | "guide" | "comparison" | "other"
+type ResultGroup =
+  | "tool" | "pricing" | "comparison" | "alternatives" | "best"
+  | "review" | "guide" | "other"
 
 interface ResultCard {
   id:          string
@@ -80,14 +82,19 @@ interface GroupMeta {
 }
 
 const GROUP_LABEL: Record<ResultGroup, GroupMeta> = {
-  tool:       { en: "Tools",   ru: "Инструменты", icon: Sparkles },
-  review:     { en: "Reviews", ru: "Обзоры",      icon: FileText },
-  guide:      { en: "Guides",  ru: "Гайды",       icon: FileText },
-  comparison: { en: "Compare", ru: "Сравнения",   icon: Layers   },
-  other:      { en: "Other",   ru: "Другое",       icon: Search   },
+  tool:         { en: "Tools",        ru: "Инструменты",  icon: Sparkles },
+  pricing:      { en: "Pricing",      ru: "Цены",          icon: Tag },
+  comparison:   { en: "Compare",      ru: "Сравнения",     icon: Layers },
+  alternatives: { en: "Alternatives", ru: "Альтернативы",  icon: GitCompareArrows },
+  best:         { en: "Best-of",      ru: "Подборки",      icon: Trophy },
+  review:       { en: "Reviews",      ru: "Обзоры",        icon: FileText },
+  guide:        { en: "Guides",       ru: "Гайды",         icon: FileText },
+  other:        { en: "Other",        ru: "Другое",        icon: Search },
 }
 
-const GROUP_ORDER: ResultGroup[] = ["tool", "review", "guide", "comparison", "other"]
+const GROUP_ORDER: ResultGroup[] = [
+  "tool", "pricing", "comparison", "alternatives", "best", "review", "guide", "other",
+]
 
 // Module-level singleton so navigating away from /search and back doesn't
 // re-download the index. Same pattern the modal used.
@@ -115,11 +122,14 @@ async function loadPagefind(): Promise<PagefindModule | null> {
 
 function pickGroup(rawType: string | undefined): ResultGroup {
   switch (rawType) {
-    case "tool":       return "tool"
-    case "review":     return "review"
-    case "guide":      return "guide"
-    case "comparison": return "comparison"
-    default:           return "other"
+    case "tool":         return "tool"
+    case "pricing":      return "pricing"
+    case "alternatives": return "alternatives"
+    case "best":         return "best"
+    case "review":       return "review"
+    case "guide":        return "guide"
+    case "comparison":   return "comparison"
+    default:             return "other"
   }
 }
 

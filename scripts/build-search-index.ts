@@ -106,12 +106,22 @@ function mdxToPlainText(raw: string): string {
     .trim()
 }
 
+// MDX content types Pagefind indexes (all share the /{type}/{slug} URL shape
+// + a colocated /opengraph-image). The singular label is what the search UI
+// groups on (meta.type / filters.type).
+const MDX_TYPE_LABEL: Record<"guides" | "pricing" | "best", string> = {
+  guides: "guide",
+  pricing: "pricing",
+  best: "best",
+}
+
 async function indexMdx(
   index: PagefindIndex,
-  type: "guides",
+  type: "guides" | "pricing" | "best",
   locale: "en" | "ru",
   visible: Set<string> | null,
 ): Promise<number> {
+  const label = MDX_TYPE_LABEL[type]
   const dir = path.join(CONTENT_DIR, type, locale)
   let files: string[] = []
   try {
@@ -155,10 +165,10 @@ async function indexMdx(
           // We point at the colocated OG image so the modal carousel
           // looks consistent with social-share previews.
           image:    `${url}/opengraph-image`,
-          type:     "guide",
+          type:     label,
         },
         filters: {
-          type: ["guide"],
+          type: [label],
         },
       })
       if (errors.length > 0) {
@@ -179,13 +189,14 @@ async function indexMdx(
 async function indexSupabase(
   index: PagefindIndex,
   visTools: Set<string> | null,
+  visAlts: Set<string> | null,
   visCmp: Set<string> | null,
-): Promise<{ tools: number; comparisons: number }> {
+): Promise<{ tools: number; alternatives: number; comparisons: number }> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) {
     console.log("[search-index] Supabase env not present — skipping DB records.")
-    return { tools: 0, comparisons: 0 }
+    return { tools: 0, alternatives: 0, comparisons: 0 }
   }
 
   const supabase = createClient(url, key, {
@@ -202,43 +213,83 @@ async function indexSupabase(
     .limit(2000)
 
   let toolsAdded = 0
+  let altsAdded = 0
   if (toolsErr) {
     console.error("[search-index] tools fetch error:", toolsErr.message)
   } else {
     for (const tool of tools ?? []) {
-      // Drip gate — don't index a tool that isn't publicly visible yet.
-      if (visTools && !visTools.has(tool.slug)) continue
-      const body = [
-        tool.name,
-        tool.tagline,
-        tool.description,
-        tool.best_for,
-        (tool.pros ?? []).join("\n"),
-        (tool.cons ?? []).join("\n"),
-      ]
-        .filter(Boolean)
-        .join("\n\n")
+      // Drip gate — index the /tools/{slug} review only when that page is
+      // publicly visible.
+      if (!visTools || visTools.has(tool.slug)) {
+        const body = [
+          tool.name,
+          tool.tagline,
+          tool.description,
+          tool.best_for,
+          (tool.pros ?? []).join("\n"),
+          (tool.cons ?? []).join("\n"),
+        ]
+          .filter(Boolean)
+          .join("\n\n")
 
-      const { errors } = await index.addCustomRecord({
-        url:      `/tools/${tool.slug}`,
-        content:  body,
-        language: "en",
-        meta: {
-          title:       tool.name,
-          description: tool.tagline ?? "",
-          image:       tool.logo_url ?? "",
-          type:        "tool",
-          category:    tool.category ?? "",
-        },
-        filters: {
-          type:     ["tool"],
-          category: tool.category ? [tool.category] : [],
-        },
-      })
-      if (errors.length > 0) {
-        console.error(`[search-index] tool ${tool.slug}:`, errors)
-      } else {
-        toolsAdded++
+        const { errors } = await index.addCustomRecord({
+          url:      `/tools/${tool.slug}`,
+          content:  body,
+          language: "en",
+          meta: {
+            title:       tool.name,
+            description: tool.tagline ?? "",
+            image:       tool.logo_url ?? "",
+            type:        "tool",
+            category:    tool.category ?? "",
+          },
+          filters: {
+            type:     ["tool"],
+            category: tool.category ? [tool.category] : [],
+          },
+        })
+        if (errors.length > 0) {
+          console.error(`[search-index] tool ${tool.slug}:`, errors)
+        } else {
+          toolsAdded++
+        }
+      }
+
+      // /alternatives/{slug} — the computed listicle for this tool. Gates
+      // independently from /tools (its own drip unit). Thin record: the tool
+      // name + "alternatives" + positioning so a "klaviyo alternatives" query
+      // surfaces it. Thumbnail reuses the tool logo (no colocated OG here).
+      if (!visAlts || visAlts.has(tool.slug)) {
+        const altBody = [
+          `${tool.name} alternatives`,
+          tool.tagline,
+          tool.best_for,
+          tool.category,
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+
+        const { errors: altErrors } = await index.addCustomRecord({
+          url:      `/alternatives/${tool.slug}`,
+          content:  altBody,
+          language: "en",
+          meta: {
+            title:       `${tool.name} alternatives`,
+            description: tool.tagline ?? "",
+            image:       tool.logo_url ?? "",
+            type:        "alternatives",
+            category:    tool.category ?? "",
+          },
+          filters: {
+            type:     ["alternatives"],
+            category: tool.category ? [tool.category] : [],
+          },
+        })
+        if (altErrors.length > 0) {
+          console.error(`[search-index] alternatives ${tool.slug}:`, altErrors)
+        } else {
+          altsAdded++
+        }
       }
     }
   }
@@ -308,7 +359,7 @@ async function indexSupabase(
     }
   }
 
-  return { tools: toolsAdded, comparisons: comparisonsAdded }
+  return { tools: toolsAdded, alternatives: altsAdded, comparisons: comparisonsAdded }
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +381,10 @@ async function main() {
   // filtering). A dedicated client just for the gate read; indexSupabase keeps
   // its own client for the bulk data queries.
   let visGuides: Set<string> | null = null
+  let visPricing: Set<string> | null = null
+  let visBest: Set<string> | null = null
   let visTools: Set<string> | null = null
+  let visAlts: Set<string> | null = null
   let visCmp: Set<string> | null = null
   const gUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const gKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -338,16 +392,26 @@ async function main() {
     const gate = createClient(gUrl, gKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     })
-    ;[visGuides, visTools, visCmp] = await Promise.all([
+    ;[visGuides, visPricing, visBest, visTools, visAlts, visCmp] = await Promise.all([
       fetchVisibleSet(gate, "guides"),
+      fetchVisibleSet(gate, "pricing"),
+      fetchVisibleSet(gate, "best"),
       fetchVisibleSet(gate, "tools"),
+      fetchVisibleSet(gate, "alternatives"),
       fetchVisibleSet(gate, "comparisons"),
     ])
   }
 
+  // MDX content (guides/pricing/best) — EN + RU. Each gates on its own
+  // visible-slug set; getAllMdx* parity means the index matches what renders.
   const guides = await indexMdx(index as PagefindIndex, "guides", "en", visGuides)
-  const guidesRu = await indexMdx(index as PagefindIndex, "guides", "ru", visGuides)
-  const db = await indexSupabase(index as PagefindIndex, visTools, visCmp)
+    + await indexMdx(index as PagefindIndex, "guides", "ru", visGuides)
+  const pricing = await indexMdx(index as PagefindIndex, "pricing", "en", visPricing)
+    + await indexMdx(index as PagefindIndex, "pricing", "ru", visPricing)
+  const best = await indexMdx(index as PagefindIndex, "best", "en", visBest)
+    + await indexMdx(index as PagefindIndex, "best", "ru", visBest)
+  // DB content — tools (/tools), alternatives (/alternatives), comparisons.
+  const db = await indexSupabase(index as PagefindIndex, visTools, visAlts, visCmp)
 
   const { errors: writeErrors, outputPath } = await (index as PagefindIndex).writeFiles({
     outputPath: OUTPUT_PATH,
@@ -357,7 +421,7 @@ async function main() {
     process.exitCode = 1
   } else {
     console.log(
-      `[search-index] wrote ${outputPath} — guides:${guides + guidesRu} tools:${db.tools} comparisons:${db.comparisons}`,
+      `[search-index] wrote ${outputPath} — guides:${guides} pricing:${pricing} best:${best} tools:${db.tools} alternatives:${db.alternatives} comparisons:${db.comparisons}`,
     )
   }
 

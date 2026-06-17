@@ -11,7 +11,7 @@
  */
 import type { MetadataRoute } from "next"
 import { createServiceClient } from "@/lib/supabase/service"
-import { getAllMdxSlugs, getAllMdxFrontmatter } from "@/lib/content/mdx"
+import { getAllMdxFrontmatter } from "@/lib/content/mdx"
 import { getVisibleSet } from "@/lib/content/visibility"
 import { absoluteUrl } from "@/lib/utils"
 import { i18n } from "@/lib/i18n/config"
@@ -202,15 +202,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       alternates:      alternates(path),
     })
   }
-  // RU guide translations land later — emit RU URLs only when a
-  // `content/guides/ru/{slug}.mdx` file actually exists.
-  const ruGuideSlugs = await getAllMdxSlugs("guides", "ru")
-  for (const slug of ruGuideSlugs) {
+  // RU guide translations — emit only when a `content/guides/ru/{slug}.mdx`
+  // exists. Carry the same reciprocal hreflang alternates as the EN entry
+  // (Google wants each URL to point at all language variants) and use the
+  // RU file's own date for lastModified instead of "now".
+  const ruGuideEntries = await getAllMdxFrontmatter("guides", "ru")
+  for (const { slug, frontmatter } of ruGuideEntries) {
+    const path = `/guides/${slug}`
     routes.push({
-      url:             absoluteUrl(`/ru/guides/${slug}`),
-      lastModified:    now,
+      url:             absoluteUrl(`/ru${path}`),
+      lastModified:    new Date(frontmatter.updatedAt ?? frontmatter.publishedAt),
       changeFrequency: "monthly",
       priority:        0.7,
+      alternates:      alternates(path),
     })
   }
 
@@ -231,13 +235,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       alternates:      alternates(path),
     })
   }
-  const ruPricingSlugs = await getAllMdxSlugs("pricing", "ru")
-  for (const slug of ruPricingSlugs) {
+  const ruPricingEntries = await getAllMdxFrontmatter("pricing", "ru")
+  for (const { slug, frontmatter } of ruPricingEntries) {
+    const path = `/pricing/${slug}`
     routes.push({
-      url:             absoluteUrl(`/ru/pricing/${slug}`),
-      lastModified:    now,
+      url:             absoluteUrl(`/ru${path}`),
+      lastModified:    new Date(frontmatter.updatedAt ?? frontmatter.publishedAt),
       changeFrequency: "monthly",
       priority:        0.7,
+      alternates:      alternates(path),
     })
   }
 
@@ -257,16 +263,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       alternates:      alternates(path),
     })
   }
-  // RU best-of translations land later — emit RU URLs only when a
-  // `content/best/ru/{slug}.mdx` file actually exists. Today every EN
-  // best-of has an RU mirror (Etap G), so this loop reflects the live set.
-  const ruBestSlugs = await getAllMdxSlugs("best", "ru")
-  for (const slug of ruBestSlugs) {
+  // RU best-of translations — emit only when a `content/best/ru/{slug}.mdx`
+  // exists. Same reciprocal hreflang alternates + real lastModified as the
+  // guides/pricing RU loops above.
+  const ruBestEntries = await getAllMdxFrontmatter("best", "ru")
+  for (const { slug, frontmatter } of ruBestEntries) {
+    const path = `/best/${slug}`
     routes.push({
-      url:             absoluteUrl(`/ru/best/${slug}`),
-      lastModified:    now,
+      url:             absoluteUrl(`/ru${path}`),
+      lastModified:    new Date(frontmatter.updatedAt ?? frontmatter.publishedAt),
       changeFrequency: "monthly",
       priority:        0.7,
+      alternates:      alternates(path),
     })
   }
 

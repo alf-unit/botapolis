@@ -56,7 +56,12 @@ export type ToolCategory     =
   | "email" | "sms" | "support" | "chat"
   | "ads" | "content" | "analytics" | "inventory"
   | "reviews" | "upsell"
-export type AffiliatePartner = "impact" | "partnerstack" | "rewardful" | "direct"
+// Mirrors the DB CHECK on tools.affiliate_partner. Extended 2026-06 as new
+// networks were onboarded (firstpromoter/cj) + the wave-2 catalog seed
+// (tapfiliate/lasso/partnerportal). Keep in sync with the migration CHECK.
+export type AffiliatePartner =
+  | "impact" | "partnerstack" | "rewardful" | "direct"
+  | "tapfiliate" | "lasso" | "partnerportal" | "firstpromoter" | "cj"
 export type LanguageCode     = "en" | "ru"
 export type ComparisonStatus = "draft" | "published" | "archived"
 export type SubscriberStatus = "active" | "unsubscribed" | "bounced" | "pending"

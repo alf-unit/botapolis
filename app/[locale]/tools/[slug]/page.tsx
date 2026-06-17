@@ -178,6 +178,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     path:        `/tools/${slug}`,
     locale,
     type:        "article",
+    // Branded per-tool social OG = the same logo-forward cover the page hero
+    // renders (1200×630 /api/og?variant=cover), instead of the generic
+    // Botapolis default. Keyed by logo path → follows logo_url (incl. the
+    // -v2 cache-bust). П.15.
+    ogImage:     reviewOgCoverHref({
+      toolName:    tool.name,
+      logoUrl:     tool.logo_url,
+      rating:      tool.rating,
+      eyebrowWord: locale === "ru" ? "Обзор" : "Review",
+    }),
     article: {
       publishedTime: tool.created_at,
       modifiedTime:  tool.updated_at,

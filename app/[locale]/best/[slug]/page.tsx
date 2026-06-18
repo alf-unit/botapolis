@@ -106,7 +106,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     path: `/best/${slug}`,
     locale,
     type: "article",
-    ogImage: frontmatter.ogImage,
+    // Branded colocated OG card (П.15-best). Point og:image at the new
+    // /best/[slug]/opengraph-image route so best-of shares get a branded
+    // cover instead of the generic default. frontmatter.ogImage still wins.
+    ogImage: frontmatter.ogImage ?? `/best/${slug}/opengraph-image`,
     article: {
       publishedTime: frontmatter.publishedAt,
       modifiedTime: frontmatter.updatedAt ?? frontmatter.publishedAt,

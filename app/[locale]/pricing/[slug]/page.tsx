@@ -108,7 +108,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     path: `/pricing/${slug}`,
     locale,
     type: "article",
-    ogImage: frontmatter.ogImage,
+    // Branded colocated OG card (was overridden by the generic default). Same
+    // fix as /guides + /compare — point og:image at the colocated route.
+    ogImage: frontmatter.ogImage ?? `/pricing/${slug}/opengraph-image`,
     article: {
       publishedTime: frontmatter.publishedAt,
       modifiedTime: frontmatter.updatedAt ?? frontmatter.publishedAt,

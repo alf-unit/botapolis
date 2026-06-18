@@ -68,7 +68,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     path: `/guides/${slug}`,
     locale,
     type: "article",
-    ogImage: frontmatter.ogImage,
+    // Branded colocated OG card. Was silently overridden by buildMetadata's
+    // generic default (guides served the generic Botapolis OG); point og:image
+    // at the route's own opengraph-image so shares get the type-specific cover.
+    // frontmatter.ogImage still wins if an author set a custom one. Bare path
+    // = locale-agnostic, same pattern as /compare.
+    ogImage: frontmatter.ogImage ?? `/guides/${slug}/opengraph-image`,
     article: {
       publishedTime: frontmatter.publishedAt,
       modifiedTime: frontmatter.updatedAt ?? frontmatter.publishedAt,

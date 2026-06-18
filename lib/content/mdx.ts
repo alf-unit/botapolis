@@ -14,7 +14,13 @@ import { z } from "zod"
 import { mdxComponents } from "@/components/content/mdx-components"
 import { extractToc, type TocEntry } from "@/lib/content/toc"
 import { getReadingTime, type ReadingTime } from "@/lib/content/reading-time"
-import { filterVisibleSlugs, isSlugVisible } from "@/lib/content/visibility"
+import { isSlugVisible } from "@/lib/content/visibility"
+import {
+  CONTENT_DIR,
+  getAllMdxSlugs,
+  type ContentType,
+  type ContentLocale,
+} from "@/lib/content/mdx-slugs"
 
 /* ----------------------------------------------------------------------------
    MDX pipeline (server-only)
@@ -167,10 +173,10 @@ export type PricingFrontmatter = z.infer<typeof pricingFrontmatterSchema>
 // Public API
 // ============================================================================
 
-export type ContentType = "reviews" | "guides" | "best" | "pricing"
-export type ContentLocale = "en" | "ru"
-
-const CONTENT_DIR = path.join(process.cwd(), "content")
+// ContentType / ContentLocale / CONTENT_DIR / getAllMdxSlugs moved to the
+// compiler-free mdx-slugs module (П.7 — keeps the MDX compiler out of OG-route
+// bundles). Re-export so existing `@/lib/content/mdx` importers are unaffected.
+export { getAllMdxSlugs, type ContentType, type ContentLocale }
 
 type FrontmatterFor<T extends ContentType> = T extends "reviews"
   ? ReviewFrontmatter
@@ -301,32 +307,6 @@ export async function getMdxContent<T extends ContentType>(
     readingTime: getReadingTime(rawBody, locale),
     fellBackToEn: resolved.fellBack,
   } satisfies CompiledContent<T>
-}
-
-/**
- * Read all slugs of a given content type / locale, ignoring drafts.
- * The slug list drives `generateStaticParams` and the index pages.
- * Returns the bare slug (no `.mdx` extension).
- */
-export async function getAllMdxSlugs(
-  type: ContentType,
-  locale: ContentLocale = "en",
-): Promise<string[]> {
-  const dir = path.join(CONTENT_DIR, type, locale)
-  let files: string[] = []
-  try {
-    files = await fs.readdir(dir)
-  } catch {
-    return []
-  }
-  const slugs = files
-    .filter((f) => f.endsWith(".mdx"))
-    .map((f) => f.replace(/\.mdx$/, ""))
-  // Drip gate — drop slugs not yet published. Locale-agnostic, so this filters
-  // both EN and RU walks (fixes the RU-sitemap + generateStaticParams holes
-  // where drafts/unpublished slugs previously leaked). No-op when the flag is
-  // off. getAllMdxFrontmatter() calls through here, so hubs inherit the gate.
-  return filterVisibleSlugs(type, slugs)
 }
 
 /**

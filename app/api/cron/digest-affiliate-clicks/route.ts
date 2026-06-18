@@ -90,9 +90,10 @@ export async function GET(req: NextRequest) {
         .join(",")}`,
     )
 
-    // TODO (block F / Resend integration): POST `sorted` to a Resend
-    // template targeted at editorial@botapolis.com. Until then the digest
-    // is observable via Vercel logs + this JSON response.
+    // No email send: Resend was dropped from the stack (Beehiiv-only, owner
+    // decision) so this digest is delivered via Vercel logs + the JSON
+    // response below, consumed by CHIEF/OPS. There is no pending Resend work;
+    // wire a Beehiiv/other send here only if a pushed digest is ever wanted.
     return NextResponse.json({
       ok:    true,
       since,

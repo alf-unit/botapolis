@@ -13,7 +13,9 @@ import matter from "gray-matter"
 import { notFound } from "next/navigation"
 import { ImageResponse } from "next/og"
 
-import { getAllMdxSlugs } from "@/lib/content/mdx"
+// Thin slug-listing module (NOT @/lib/content/mdx) — keeps the MDX compiler
+// out of this OG route's serverless bundle (П.7 NFT-trace fix).
+import { getAllMdxSlugs } from "@/lib/content/mdx-slugs"
 import { isSlugVisible } from "@/lib/content/visibility"
 import { createServiceClient } from "@/lib/supabase/service"
 

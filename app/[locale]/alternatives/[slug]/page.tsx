@@ -124,18 +124,35 @@ async function fetchAlternatives(source: ToolRow, limit = 8): Promise<AltCard[]>
   const pool: AltCard[] = visiblePool.slice(0, limit)
   if (pool.length >= 2) return pool
 
-  // Fallback — small categories (today: chat = ManyChat alone). Widen the
-  // pool to any other published tool so the page still ships something
-  // useful rather than a "no results" placeholder.
-  const { data: anyOther } = await supabase
+  // Thin same-category pool — single-member categories (personalization =
+  // LimeSpot, inventory = Inventory Planner, upsell = Rebuy, fraud, …). Widen
+  // by SUBCATEGORY OVERLAP — neighbours that share at least one subcategory
+  // are credible alternatives — NOT a blind cross-category rating sort, which
+  // surfaced unrelated tools (audit П.8). Same proven pattern as
+  // PartnerAlternatives. When the tool has no subcategories (or none overlap),
+  // return the thin/empty pool honestly — the editorial intro/verdict frames
+  // "few options in this category"; we never pad the grid with irrelevant
+  // top-rated tools.
+  const subcategories = (source.subcategories ?? []) as string[]
+  if (subcategories.length === 0) return pool
+
+  const seen = new Set<string>([source.slug, ...pool.map((t) => t.slug)])
+  const { data: overlap, error: overlapErr } = await supabase
     .from("tools")
     .select(select)
     .eq("status", "published")
-    .neq("slug", source.slug)
+    .neq("category", source.category)          // same category already covered above
+    .overlaps("subcategories", subcategories)
     .order("rating", { ascending: false, nullsFirst: false })
     .limit(40)
-
-  return (await filterVisibleRows("tools", anyOther ?? [])).slice(0, limit)
+  if (overlapErr) {
+    console.error(`[/alternatives/${source.slug}] subcategory fetch failed:`, overlapErr.message)
+    return pool
+  }
+  const overlapVisible = (await filterVisibleRows("tools", overlap ?? [])).filter(
+    (t) => !seen.has(t.slug),
+  )
+  return [...pool, ...overlapVisible].slice(0, limit)
 }
 
 // --------------------------------------------------------------------------

@@ -20,8 +20,8 @@ status: ready
 - Current-week priorities file: not found.
 
 ## Executive Summary
-- Search visibility is up on a normalized mature-day basis: 131.2 impressions/day vs 141.3 prior week (-7.1%).
-- GSC clicks remain at 1 for the available current-week data, unchanged from 0 in the prior comparison window.
+- Search visibility is slightly down on a normalized mature-day basis: 131.2 impressions/day vs 141.3 prior week (-7.1%).
+- GSC clicks increased to 1 for the available current-week data, from 0 in the prior comparison window.
 - Weighted average position moved from 44.1 to 45.8. Lower is better; this is +1.6 positions.
 - Affiliate clicks totaled 92 vs 128 prior week (-36 / -28.1%). Conversions and revenue remain 0 and $0.00.
 - Beehiiv total subscribers ended at 4; new subscribers recorded this week: 0.
